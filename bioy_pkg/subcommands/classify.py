@@ -11,8 +11,8 @@ from csv import DictReader, DictWriter
 from collections import defaultdict
 from itertools import groupby
 
-from ion_tools.sequtils import UNCLASSIFIED_REGEX
-from ion_tools.utils import Opener, csv2dict
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX
+from bioy_pkg.utils import Opener, csv2dict
 
 log = logging.getLogger(__name__)
 

@@ -15,8 +15,8 @@ from itertools import groupby, islice
 from random import shuffle
 from collections import defaultdict
 
-from ion_tools.sequtils import consensus, run_muscle, parse_uc, from_ascii, fastalite
-from ion_tools.utils import chunker, opener, Opener
+from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, from_ascii, fastalite
+from bioy_pkg.utils import chunker, opener, Opener
 
 log = logging.getLogger(__name__)
 

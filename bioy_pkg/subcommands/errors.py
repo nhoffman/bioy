@@ -10,9 +10,9 @@ import sys
 
 from collections import Counter
 from csv import DictWriter, writer, DictReader
-from ion_tools import sequtils
-from ion_tools.sequtils import itemize_errors, error_count
-from ion_tools.utils import Opener, parse_extras
+from bioy_pkg import sequtils
+from bioy_pkg.sequtils import itemize_errors, error_count
+from bioy_pkg.utils import Opener, parse_extras
 from os import devnull
 
 log = logging.getLogger(__name__)

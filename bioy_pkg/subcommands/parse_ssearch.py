@@ -8,8 +8,8 @@ import pprint
 import csv
 from itertools import islice
 
-from ion_tools.sequtils import homodecodealignment, parse_ssearch36, from_ascii
-from ion_tools.utils import Opener, csv2dict
+from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
+from bioy_pkg.utils import Opener, csv2dict
 
 log = logging.getLogger(__name__)
 

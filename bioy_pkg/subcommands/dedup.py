@@ -13,9 +13,9 @@ from itertools import groupby, ifilter, islice
 from random import shuffle
 from collections import defaultdict
 
-from ion_tools.deduplicate import dedup
-from ion_tools.sequtils import fastalite
-from ion_tools.utils import csv2dict
+from bioy_pkg.deduplicate import dedup
+from bioy_pkg.sequtils import fastalite
+from bioy_pkg.utils import csv2dict
 
 log = logging.getLogger(__name__)
 
