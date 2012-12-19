@@ -10,6 +10,9 @@ import sys
 from importlib import import_module
 from bioy_pkg import subcommands, __version__ as version, __doc__ as docstring
 
+log = logging
+# log = logging.getLogger(__name__)
+
 def main(argv):
     action, arguments = parse_arguments(argv)
 
@@ -78,7 +81,14 @@ def parse_arguments(argv):
         # individual subcommand ((`script action -h`))
         # if no individual subcommand is specified (run_action[False]),
         # a full list of docstrings is displayed
-        mod = import_module('{}.{}'.format(subcommands.__name__, name))
+        try:
+            mod = import_module('{}.{}'.format(subcommands.__name__, name))
+        except Exception, e:
+            log.error('error importing module {}.{}'.format(
+                    subcommands.__name__, name))
+            log.error(e)
+            continue
+            
         subparser = subparsers.add_parser(
             name, help = mod.__doc__.lstrip().split('\n', 1)[0],
             description = mod.__doc__,
