@@ -15,13 +15,13 @@ from collections import defaultdict
 
 from bioy_pkg.deduplicate import dedup
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.utils import csv2dict
+from bioy_pkg.utils import Csv2Dict
 
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('infile', type = argparse.FileType('r'), help = 'input fasta file')
-    parser.add_argument('-i','--seq-info', type = csv2dict('seqname'),
+    parser.add_argument('-i','--seq-info', type = Csv2Dict('seqname'),
                         help='csv file containing column "seqname" plus another column for grouping sequences prior to deduplication')
     parser.add_argument('--primary-group', help='string specifying column in seq_info to use for grouping [default %(default)s]',
                         default = 'species')
