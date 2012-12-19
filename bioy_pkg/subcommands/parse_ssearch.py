@@ -9,19 +9,19 @@ import csv
 from itertools import islice
 
 from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
-from bioy_pkg.utils import Opener, csv2dict
+from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument(
-        'alignments', 
+        'alignments',
         default = sys.stdin,
         type = Opener('r'),
         nargs = '?',
         help = 'ssearch -m 10 formatted file')
     parser.add_argument(
-        '-o', '--out', 
+        '-o', '--out',
         default = sys.stdout,
         type = Opener('w'),
         help = '(default csv)-formatted output')
@@ -38,26 +38,26 @@ def build_parser(parser):
             help = 'Output all ssearch fieldnames.  Overrides --fieldnames'
             )
     parser.add_argument(
-        '--limit', 
-        type = int, 
+        '--limit',
+        type = int,
         metavar = 'N',
         help = 'Print no more than N alignments')
     parser.add_argument(
         '--expr',
-        help = """Filter output according to a python expression. 
-                  Each alignment is represented by a dict called "a". 
+        help = """Filter output according to a python expression.
+                  Each alignment is represented by a dict called "a".
                   Example: --expr="a['sw_zscore'] > 550" """)
-    parser.add_argument('--no-header', 
-        dest='header', 
+    parser.add_argument('--no-header',
+        dest='header',
         action = 'store_false')
     parser.add_argument('-d', '--decode',
-        type = csv2dict('name', 'rle'),
+        type = Csv2Dict('name', 'rle'),
         default = [],
         nargs = '+',
         help = 'Decode alignment')
-    parser.add_argument('--fasta', 
+    parser.add_argument('--fasta',
             choices = ['t_seq','t_name', 'q_seq', 'q_name', 'all'],
-            help = """creates a fasta format of the alignment by 
+            help = """creates a fasta format of the alignment by
                       query ('q_seq' or 'q_name'), target ('t_seq' or 't_name') or 'all'""")
 
 def action(args):
