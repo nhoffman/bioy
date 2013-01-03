@@ -6,3 +6,4 @@ data/sha
 data/ver
 MANIFEST
 dist
+*.egg-info
