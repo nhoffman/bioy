@@ -15,17 +15,17 @@ log = logging.getLogger(__name__)
 def flattener(iterable):
     """
     Flatten nested iterables (not strings or dict-like objects).
-    
+
     Poached from http://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists-in-python
     """
     for el in iterable:
         if isinstance(el, Iterable) and not (isinstance(el, basestring) or hasattr(el, 'get')):
-            for sub in flatten(el):
+            for sub in flattener(el):
                 yield sub
         else:
             yield el
 
-            
+
 def chunker(seq, size, combine_last = None):
     """
     Break sequence seq into lists of length `size`. If the length of
@@ -55,7 +55,7 @@ def grouper(n, iterable, pad=True):
     else:
         return (takewhile(lambda x: x is not None, c) for c in iterout)
 
-    
+
 def cast(val):
     for func in [int, float, lambda x: x.strip()]:
         try:
