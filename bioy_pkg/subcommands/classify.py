@@ -11,8 +11,8 @@ from csv import DictReader, DictWriter
 from collections import defaultdict
 from itertools import groupby
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX
-from bioy_pkg.utils import Opener, Csv2Dict
+from ion_tools.sequtils import UNCLASSIFIED_REGEX
+from ion_tools.utils import Opener, csv2dict
 
 log = logging.getLogger(__name__)
 
@@ -33,11 +33,11 @@ def build_parser(parser):
             help = 'add detailed csv file')
     parser.add_argument('-s', '--seq-info',
             required = True,
-            type = Csv2Dict('seqname'),
+            type = csv2dict('seqname'),
             help = 'seq info file(s) to match sequence ids to taxids')
     parser.add_argument('-t', '--tax',
             required = True,
-            type = Csv2Dict('tax_id'),
+            type = csv2dict('tax_id'),
             help = 'tax table of taxids and species names')
     parser.add_argument('-i', '--identity-threshold',
             default = 99,
@@ -57,14 +57,14 @@ def build_parser(parser):
             default = True,
             help = 'do not exclude records with unclassified-looking species name')
     parser.add_argument('--exclude-by-taxid',
-            type = Csv2Dict('tax_id'),
+            type = csv2dict('tax_id'),
             help = 'csv file with column "tax_id" providing a set of tax_ids to exclude from the results')
     parser.add_argument('-w', '--weights',
-            type = Csv2Dict('name', 'weight', ['name', 'weight']),
+            type = csv2dict('name', 'weight', ['name', 'weight']),
             default = {},
             help = 'Provides a weight (number of reads) associated with each id')
     parser.add_argument('-m', '--map',
-            type = Csv2Dict('name', 'specimen', ['name', 'specimen']),
+            type = csv2dict('name', 'specimen', ['name', 'specimen']),
             default = {},
             help = 'map file with sequence ids to specimen names')
     parser.add_argument(
@@ -87,6 +87,9 @@ def build_parser(parser):
     parser.add_argument('--blast-fmt',
             help = 'blast header (default: qseqid sseqid pident qstart qend qlen)',
             default = 'qseqid sseqid pident qstart qend qlen')
+    parser.add_argument('--classification',
+            help = 'target taxonomonic classification. Default: "%(default)s"',
+            default = 'species')
 
 def action(args):
     # aggregate(a) blast results and classifications by clusters
@@ -96,7 +99,7 @@ def action(args):
         'reads',
         'pct_reads',
         'clusters',
-        'species',
+        args.classification,
         'max_percent', 'min_percent',
         'max_coverage', 'min_coverage',
         # 'query_ids'
@@ -109,7 +112,7 @@ def action(args):
             'pident',
             'coverage',
             'ambig',
-            'species_name',
+            '{}_name'.format(args.classification),
             'accession',
             'species_id',
             'tax_id',
@@ -150,14 +153,14 @@ def action(args):
             for h in hits:
                 info = args.seq_info[h['sseqid']]
                 taxonomy = args.tax[info['tax_id']]
-                species_id = taxonomy['species'] or None
+                species_id = taxonomy[args.classification] or None
                 species_name = args.tax[species_id]['tax_name'] if species_id else None
                 coverage = (float(h['qend']) - float(h['qstart']) + 1) / float(h['qlen']) * 100
 
                 match = query != h['sseqid']
                 # filter by taxonomy
                 if args.filter_by_name:
-                    match &= species_id and not UNCLASSIFIED_REGEX.search(species_name)
+                    match &= species_id != None and not UNCLASSIFIED_REGEX.search(species_name)
 
                 match &= query != h['sseqid']
                 match &= float(h['pident']) >= args.identity_threshold
@@ -178,7 +181,7 @@ def action(args):
                         'accession': info['accession'],
                         'subject': h['sseqid'],
                         'match':'yes' if match else 'no',
-                        'species_name': species_name,
+                        '{}_name'.format(args.classification): species_name,
                         'species_id': species_id,
                         'rank': taxonomy['rank'],
                         'tax_id': info['tax_id'],
@@ -229,7 +232,7 @@ def action(args):
             # Output
             out.writerow({
                 'specimen':specimen,
-                'species':species,
+                args.classification:species,
                 'reads':int(reads),
                 'pct_reads':reads/s_reads * 100,
                 'clusters':clusters,
