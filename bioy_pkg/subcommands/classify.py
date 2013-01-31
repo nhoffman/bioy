@@ -11,8 +11,8 @@ from csv import DictReader, DictWriter
 from collections import defaultdict
 from itertools import groupby
 
-from ion_tools.sequtils import UNCLASSIFIED_REGEX
-from ion_tools.utils import Opener, csv2dict
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX
+from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
@@ -33,11 +33,11 @@ def build_parser(parser):
             help = 'add detailed csv file')
     parser.add_argument('-s', '--seq-info',
             required = True,
-            type = csv2dict('seqname'),
+            type = Csv2Dict('seqname'),
             help = 'seq info file(s) to match sequence ids to taxids')
     parser.add_argument('-t', '--tax',
             required = True,
-            type = csv2dict('tax_id'),
+            type = Csv2Dict('tax_id'),
             help = 'tax table of taxids and species names')
     parser.add_argument('-i', '--identity-threshold',
             default = 99,
@@ -57,14 +57,14 @@ def build_parser(parser):
             default = True,
             help = 'do not exclude records with unclassified-looking species name')
     parser.add_argument('--exclude-by-taxid',
-            type = csv2dict('tax_id'),
+            type = Csv2Dict('tax_id'),
             help = 'csv file with column "tax_id" providing a set of tax_ids to exclude from the results')
     parser.add_argument('-w', '--weights',
-            type = csv2dict('name', 'weight', ['name', 'weight']),
+            type = Csv2Dict('name', 'weight', ['name', 'weight']),
             default = {},
             help = 'Provides a weight (number of reads) associated with each id')
     parser.add_argument('-m', '--map',
-            type = csv2dict('name', 'specimen', ['name', 'specimen']),
+            type = Csv2Dict('name', 'specimen', ['name', 'specimen']),
             default = {},
             help = 'map file with sequence ids to specimen names')
     parser.add_argument(
