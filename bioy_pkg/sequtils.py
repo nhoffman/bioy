@@ -694,9 +694,9 @@ def _iterfasta(handle):
         if line.startswith('>'):
             if name:
                 yield seqlite(name.split()[0], name, seq)
-                name, seq = line[1:].strip(), ''
-            else:
-                seq += line.strip()
+            name, seq = line[1:].strip(), ''
+        else:
+            seq += line.strip()
 
     yield seqlite(name.split()[0], name, seq)
 
