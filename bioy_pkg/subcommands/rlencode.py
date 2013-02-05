@@ -25,8 +25,8 @@ def build_parser(parser):
 def action(args):
     seqs = fastalite(args.infile)
 
-    outfile = args.outfile or opener(args.infile.replace('.fasta', '_rle.fasta', 'w'))
-    rlefile = args.rlefile or opener(args.infile.replace('.fasta', '_rle.csv.bz2'), 'w')
+    outfile = args.outfile or opener(args.infile.name.replace('.fasta', '_rle.fasta', 'w'))
+    rlefile = args.rlefile or opener(args.infile.name.replace('.fasta', '_rle.csv.bz2'), 'w')
 
     writer = csv.writer(rlefile)
     writer.writerow(['name','rle'])
