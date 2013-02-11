@@ -10,15 +10,11 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('infile',
-            nargs = '?',
-            default = sys.stdin,
-            type = Opener('r'),
+            type = Opener(),
             help = 'Input fasta file')
-    parser.add_argument('-r', '--rlefile',
-            nargs = '+',
+    parser.add_argument('rlefile',
             type = Csv2Dict(),
-            help='csv file (may be bzip encoded) containing columns "name","rle"',
-            required = True)
+            help='csv file (may be bzip encoded) containing columns "name","rle"')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
             default = sys.stdout,
