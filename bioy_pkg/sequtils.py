@@ -671,6 +671,16 @@ def show_errors(errorlist, width = 40):
 
     return out
 
+def format_taxonomy(names, selectors, asterisk = '*'):
+    tax = defaultdict(set)
+    for i,name in enumerate(names):
+        name = name.split(None, 1)
+        star = asterisk if selectors[i:i+1][0] else ''
+        tax[name[0]].add(star if len(name) == 1 else name[1] + star)
+
+    return ';'.join(['{} {}'.format(taxo,'/'.join(nomy))
+        if nomy else taxo for taxo,nomy in tax.items()])
+
 def _readfasta(handle):
     """
     Lightweight fasta parser. Returns iterator of namedtuple instances
