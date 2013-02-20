@@ -6,59 +6,66 @@ Optional grouping by specimen and query sequences
 import sys
 import logging
 import os
-import csv
+
 from csv import DictReader, DictWriter
 from collections import defaultdict
-from itertools import groupby
+from itertools import groupby, imap, ifilter
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
+
 
 def build_parser(parser):
     parser.add_argument('blast_file',
             nargs = '?',
             default = sys.stdin,
             type = Opener('r'),
-            help = 'csv tabular blast file of query and subject hits')
+            help = 'CSV tabular blast file of query and subject hits')
     parser.add_argument('-o', '--out',
             default = sys.stdout,
             type = Opener('w'),
-            help = 'tab delimited list of classifications by species \
-                   [specimen, species, reads, clusters, max_percent, min_percent[]')
+            help = """Tab delimited list of classifications by species
+                   [specimen, species, reads, clusters, max_percent, min_percent[]""")
     parser.add_argument('-O', '--detail',
             default = os.devnull,
             type  = Opener('w'),
-            help = 'add detailed csv file')
+            help = 'Add detailed csv file')
     parser.add_argument('-s', '--seq-info',
             required = True,
             type = Csv2Dict('seqname'),
-            help = 'seq info file(s) to match sequence ids to taxids')
-    parser.add_argument('-t', '--tax',
+            help = 'seq info file(s) to match sequence ids to taxids [%(default)s]')
+    parser.add_argument('-t', '--taxonomy',
             required = True,
             type = Csv2Dict('tax_id'),
-            help = 'tax table of taxids and species names')
-    parser.add_argument('-i', '--identity-threshold',
+            help = 'tax table of taxids and species names [%(default)s]')
+    parser.add_argument('--min-identity',
             default = 99,
             type = float,
-            help = 'blast percent threshold for classification [%(default)s]')
-    parser.add_argument('-c', '--coverage-threshold',
+            help = 'minimum identity threshold for accepting matches [> %(default)s]')
+    parser.add_argument('--max-identity',
+            default = 100,
+            type = float,
+            help = 'maximum identity threshold for accepting matches [<= %(default)s]')
+    parser.add_argument('-c', '--coverage',
             default = 95,
             type = float,
             help = 'percent of alignment coverage of blast result [%(default)s]')
     parser.add_argument('-a', '--asterisk',
             default = 100,
             type = float,
-            help = 'next to any species above a certain threshold')
+            help = 'Next to any species above a certain threshold [[%(default)s]')
     parser.add_argument('-F', '--no-filter-by-name',
             action='store_false',
             dest = 'filter_by_name',
             default = True,
-            help = 'do not exclude records with unclassified-looking species name')
+            help = 'do not exclude records with unclassified-looking species name [%(default)s]')
     parser.add_argument('--exclude-by-taxid',
             type = Csv2Dict('tax_id'),
-            help = 'csv file with column "tax_id" providing a set of tax_ids to exclude from the results')
+            default = {},
+            help = """csv file with column "tax_id" providing a set of tax_ids
+                      to exclude from the results""")
     parser.add_argument('-w', '--weights',
             type = Csv2Dict('name', 'weight', ['name', 'weight']),
             default = {},
@@ -67,69 +74,137 @@ def build_parser(parser):
             type = Csv2Dict('name', 'specimen', ['name', 'specimen']),
             default = {},
             help = 'map file with sequence ids to specimen names')
-    parser.add_argument(
-            '--not-all-one-group',
+    parser.add_argument('--not-all-one-group',
             dest = 'all_one_group',
             action = 'store_false',
             default = True,
-            help = 'If --map is not provided, the default behavior is to treat \
-                    all reads as one group; use this option to treat \
-                    each read as a separate group.')
-    parser.add_argument(
-            '--min-cluster-size',
+            help = """If --map is not provided, the default behavior is to treat
+                    all reads as one group; use this option to treat
+                    each read as a separate group [%(default)s]""")
+    parser.add_argument('--min-cluster-size',
             default = 0,
             type = int,
             help = 'minimum cluster size to include in classification output')
     parser.add_argument('--no-hits', type = Opener('w'),
                         help = 'file containing name of each query with no hits')
-    parser.add_argument('--all-taxids', type = Opener('w'),
-                        help = 'file containing set of taxids represented in the output')
     parser.add_argument('--blast-fmt',
             help = 'blast header (default: qseqid sseqid pident qstart qend qlen)',
             default = 'qseqid sseqid pident qstart qend qlen')
-    parser.add_argument('--classification',
-            help = 'target taxonomonic classification. Default: "%(default)s"',
+    parser.add_argument('--target-rank',
+            help = 'Rank at which to classify. Default: "%(default)s"',
             default = 'species')
+    parser.add_argument('--details-identity',
+            help = 'Minimum identity threshold for classification details file',
+            default = 90)
+    parser.add_argument('--details-coverage',
+            help = 'Minimum coverage threshold for classification details file',
+            default = 90)
+
+def update_blast_results(b, seq_info, taxonomy, target_rank):
+    info = seq_info[b['sseqid']]
+    tax = taxonomy[info['tax_id']]
+
+    b['query'] = b['qseqid']
+    b['subject'] = b['sseqid']
+    b['pident'] = float(b['pident'])
+
+    b['tax_id'] = info['tax_id']
+    b['accession'] = info['accession']
+    b['ambig_count'] = int(info['ambig_count'])
+    b['tax_name'] = tax['tax_name']
+    b['rank'] = tax['rank']
+
+    b['target_rank_id'] = tax[target_rank]
+    b['target_rank_name'] = taxonomy[b['target_rank_id']]['tax_name']
+
+    return b
+
+def coverage(start, end, length):
+    return (float(end) - float(start) + 1) / float(length) * 100
 
 def action(args):
-    # aggregate(a) blast results and classifications by clusters
-    blast_fmt = args.blast_fmt.split()
+    ### Rows
+    etc = 'no match' # This row holds all unmatched
+
+    rows = [
+        (None, lambda h: args.max_identity >= h['pident'] > args.min_identity
+            and h['coverage'] >= args.coverage),
+        ('> {}%'.format(args.max_identity),
+            lambda h: h['pident'] > args.max_identity and h['coverage'] >= args.coverage),
+        ('<= {}%'.format(args.min_identity),
+            lambda h: h['pident'] <= args.min_identity and h['coverage'] >= args.coverage)
+    ]
+
+    ### Columns
     out_header = [
         'specimen',
         'reads',
         'pct_reads',
         'clusters',
-        args.classification,
+        args.target_rank,
         'max_percent', 'min_percent',
         'max_coverage', 'min_coverage',
-        # 'query_ids'
         ]
-    detail_header = [
-            'specimen',
-            'query',
-            'subject',
-            'match',
-            'pident',
-            'coverage',
-            'ambig',
-            '{}_name'.format(args.classification),
-            'accession',
-            'species_id',
-            'tax_id',
-            'tax_name',
-            'rank'
-            ]
 
-    out = DictWriter(args.out, out_header)
+    out = DictWriter(args.out, out_header, extrasaction = 'ignore')
     out.writeheader()
 
-    detail = DictWriter(args.detail, detail_header)
+    detail_header = [
+        'specimen',
+        'query',
+        'subject',
+        'match',
+        'pident',
+        'coverage',
+        'ambig_count',
+        'target_rank_id',
+        'target_rank_name',
+        'accession',
+        'species_id',
+        'tax_id',
+        'tax_name',
+        'rank'
+        ]
+
+    detail = DictWriter(args.detail, detail_header, extrasaction = 'ignore')
     detail.writeheader()
 
     if args.no_hits:
         args.no_hits.write('query\n')
+    ###
+
+    ### format blast data
+    blast_fmt = args.blast_fmt.split()
 
     blast_results = DictReader(args.blast_file, fieldnames = blast_fmt, delimiter = '\t')
+
+    # add some preliminary values to blast results
+    blast_results = imap(lambda b: dict({
+        'coverage':coverage(b['qstart'], b['qend'], b['qlen']),
+        }, **b), blast_results)
+
+    # Some raw filtering
+    blast_results = ifilter(lambda b:
+            float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size, blast_results)
+
+    blast_results = ifilter(lambda b: float(b['pident']) >= args.details_identity, blast_results)
+    blast_results = ifilter(lambda b: float(b['coverage']) >= args.details_coverage, blast_results)
+
+    # add required values for classification
+    blast_results = imap(lambda b:
+            update_blast_results(b, args.seq_info, args.taxonomy, args.target_rank), blast_results)
+
+    # remove hits with target_rank_id
+    blast_results = ifilter(lambda b: b['target_rank_id'], blast_results)
+
+    # (Optional) In some cases you want to filter some target hits (RDP < 10.30)
+    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
+    blast_results = ifilter(lambda b: b['ambig_count'] < 3, blast_results)
+    blast_results = ifilter(
+            lambda b: b['target_rank_id'] not in args.exclude_by_taxid, blast_results)
+    blast_results = ifilter(
+            lambda b: not UNCLASSIFIED_REGEX.search(b['target_rank_name']), blast_results)
+    ###
 
     # first, group by specimen
     if args.map:
@@ -139,111 +214,46 @@ def action(args):
     else:
         specimen_grouper = lambda s: s['qseqid']
 
-    all_taxids = set()
-    for specimen, results in groupby(blast_results, specimen_grouper):
-        classifications = {}
-        # nest, group by query
-        s_reads = 0
-        for query, hits in groupby(results, lambda q: q['qseqid']):
-            q_reads = float(args.weights.get(query, 1))
-            if q_reads < args.min_cluster_size:
-                continue
-            s_reads += q_reads
-            data = defaultdict(list)
-            for h in hits:
-                info = args.seq_info[h['sseqid']]
-                taxonomy = args.tax[info['tax_id']]
-                species_id = taxonomy[args.classification] or None
-                species_name = args.tax[species_id]['tax_name'] if species_id else None
-                coverage = (float(h['qend']) - float(h['qstart']) + 1) / float(h['qlen']) * 100
+    for specimen, hits in groupby(blast_results, specimen_grouper):
+        hits = list(hits)
+        categories = defaultdict(list)
+        clusters = set()
 
-                match = query != h['sseqid']
-                # filter by taxonomy
-                if args.filter_by_name:
-                    match &= species_id != None and not UNCLASSIFIED_REGEX.search(species_name)
+        for cat, fltr in rows:
+            categories[cat] = filter(fltr, hits)
+            clusters |= set(map(lambda h: h['query'], categories[cat]))
+            hits = filter(lambda h: h['query'] not in clusters, hits)
 
-                match &= query != h['sseqid']
-                match &= float(h['pident']) >= args.identity_threshold
-                match &= int(info['ambig_count']) < 3
-                match &= coverage >= args.coverage_threshold
-                if args.exclude_by_taxid:
-                    match &= species_id not in args.exclude_by_taxid
-                # aggregate data that is a match
-                if match:
-                    data[species_id].append(dict(h, **{'coverage':coverage}))
-                    all_taxids.add((species_id, species_name))
-
-                # Ouput hit details
-                if coverage > 90 and float(h['pident']) > 90:
-                    detail.writerow({
-                        'specimen':specimen,
-                        'query':query,
-                        'accession': info['accession'],
-                        'subject': h['sseqid'],
-                        'match':'yes' if match else 'no',
-                        '{}_name'.format(args.classification): species_name,
-                        'species_id': species_id,
-                        'rank': taxonomy['rank'],
-                        'tax_id': info['tax_id'],
-                        'tax_name': taxonomy['tax_name'],
-                        'coverage': coverage,
-                        'pident': h['pident'],
-                        'ambig': info['ambig_count']
-                        })
-
-            # data is empty if there were no hits
-            if args.no_hits and not data:
-                args.no_hits.write(query+'\n')
-
-            ## Add data into the classification dict
-            key = frozenset(data.keys()) if data else frozenset()
-            if key in classifications:
-                (d, r, c) = classifications[key]
-                for k,v in data.items():
-                    d[k].extend(v)
-                classifications[key] = (d, r + q_reads, c + 1)
-            else:
-                classifications[key] = (data, q_reads, 1)
+        # remaining hits go in the 'no match' category
+        categories[etc] = hits
+        clusters |= set(map(lambda h: h['query'], hits))
+        total_reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
-        for s_ids, (data, reads, clusters) in sorted(
-            classifications.items(), key = lambda a: a[1][1], reverse=True):
-            # Species names
-            if s_ids:
-                sp = defaultdict(list)
-                for i in s_ids:
-                    name = args.tax[i]['tax_name'].split(None, 1)
-                    max_pident = max([float(d['pident']) for d in data[i]])
-                    max_coverage = max([d['coverage'] for d in data[i]])
-                    if max_pident >= args.asterisk and max_coverage >= args.coverage_threshold:
-                        star = '*'
-                    else:
-                        star = ''
-                    sp[name[0]].append(star if len(name) == 1 else name[1] + star)
-                species = ';'.join(['{} {}'.format(
-                    genus,'/'.join(species)) if species else genus for genus,species in sp.items()])
-            else:
-                species = 'no match'
+        for cat, hits in categories.items():
+            if hits:
+                clusters = set(h['query'] for h in hits)
+                coverages = set(h['coverage'] for h in hits)
+                percents = set(h['pident'] for h in hits)
+                reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
-            percents = [float(v['pident']) for values in data.values() for v in values]
-            coverages = [v['coverage'] for values in data.values() for v in values]
-            # qseqids = set(v['qseqid'] for values in data.values() for v in values)
+                if not cat:
+                    names = map(lambda h: h['target_rank_name'], hits)
+                    selectors = map(lambda h: h['pident'] >= args.asterisk
+                                          and h['coverage'] >= args.coverage, hits)
+                    species = format_taxonomy(names, selectors, '*')
+                else:
+                    species = cat
 
-            # Output
-            out.writerow({
-                'specimen':specimen,
-                args.classification:species,
-                'reads':int(reads),
-                'pct_reads':reads/s_reads * 100,
-                'clusters':clusters,
-                'max_percent':max(percents) if percents else None,
-                'min_percent':min(percents) if percents else None,
-                'max_coverage':max(coverages) if coverages else None,
-                'min_coverage':min(coverages) if coverages else None,
-                # 'query_ids': ' '.join(qseqids)
-                })
+                out.writerow({
+                    'specimen':specimen,
+                    args.target_rank:species,
+                    'reads':int(reads),
+                    'pct_reads': reads / total_reads * 100,
+                    'clusters':len(clusters),
+                    'max_percent':max(percents) if percents else 0,
+                    'min_percent':min(percents) if percents else 0,
+                    'max_coverage':max(coverages)if coverages else 0,
+                    'min_coverage':min(coverages)if coverages else 0,
+                    })
 
-        if args.all_taxids:
-            writer = csv.writer(args.all_taxids)
-            writer.writerow(['tax_id','tax_name'])
-            writer.writerows(all_taxids)
