@@ -10,12 +10,12 @@ import os
 from csv import DictReader, DictWriter
 from collections import defaultdict
 from itertools import groupby, imap, ifilter
+from operator import itemgetter
 
 from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
-
 
 def build_parser(parser):
     parser.add_argument('blast_file',
@@ -56,11 +56,6 @@ def build_parser(parser):
             default = 100,
             type = float,
             help = 'Next to any species above a certain threshold [[%(default)s]')
-    parser.add_argument('-F', '--no-filter-by-name',
-            action='store_false',
-            dest = 'filter_by_name',
-            default = True,
-            help = 'do not exclude records with unclassified-looking species name [%(default)s]')
     parser.add_argument('--exclude-by-taxid',
             type = Csv2Dict('tax_id'),
             default = {},
@@ -126,7 +121,7 @@ def action(args):
     ### Rows
     etc = 'no match' # This row holds all unmatched
 
-    rows = [
+    groups = [
         (None, lambda h: args.max_identity >= h['pident'] > args.min_identity
             and h['coverage'] >= args.coverage),
         ('> {}%'.format(args.max_identity),
@@ -219,41 +214,46 @@ def action(args):
         categories = defaultdict(list)
         clusters = set()
 
-        for cat, fltr in rows:
-            categories[cat] = filter(fltr, hits)
-            clusters |= set(map(lambda h: h['query'], categories[cat]))
+        for cat, fltr in groups:
+            matches = filter(fltr, hits)
+            if cat:
+                categories[cat] = matches
+            else:
+                for _, queries in groupby(matches, itemgetter('query')):
+                    queries = list(queries)
+                    cat = frozenset(map(itemgetter('target_rank_id'), queries))
+                    categories[cat].extend(queries)
+            clusters |= set(map(itemgetter('query'), matches))
             hits = filter(lambda h: h['query'] not in clusters, hits)
 
         # remaining hits go in the 'no match' category
         categories[etc] = hits
-        clusters |= set(map(lambda h: h['query'], hits))
+        clusters |= set(map(itemgetter('query'), hits))
         total_reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
-        for cat, hits in categories.items():
-            if hits:
-                clusters = set(h['query'] for h in hits)
-                coverages = set(h['coverage'] for h in hits)
-                percents = set(h['pident'] for h in hits)
-                reads = sum(float(args.weights.get(c, 1)) for c in clusters)
+        sort_by_reads = lambda c: sum(int(args.weights.get(q, 1)) for q in set(c['query'] for c in c[1]))
+        for cat, hits in sorted(categories.items(), key=sort_by_reads, reverse=True):
+            clusters = set(map(itemgetter('query'), hits))
+            coverages = set(map(itemgetter('coverage'), hits))
+            percents = set(map(itemgetter('pident'), hits))
+            reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
-                if not cat:
-                    names = map(lambda h: h['target_rank_name'], hits)
-                    selectors = map(lambda h: h['pident'] >= args.asterisk
-                                          and h['coverage'] >= args.coverage, hits)
-                    species = format_taxonomy(names, selectors, '*')
-                else:
-                    species = cat
+            if isinstance(cat, frozenset):
+                names = map(itemgetter('target_rank_name'), hits)
+                selectors = map(lambda h: h['pident'] >= args.asterisk
+                                      and h['coverage'] >= args.coverage, hits)
+                cat = format_taxonomy(names, selectors, '*')
 
-                out.writerow({
-                    'specimen':specimen,
-                    args.target_rank:species,
-                    'reads':int(reads),
-                    'pct_reads': reads / total_reads * 100,
-                    'clusters':len(clusters),
-                    'max_percent':max(percents) if percents else 0,
-                    'min_percent':min(percents) if percents else 0,
-                    'max_coverage':max(coverages)if coverages else 0,
-                    'min_coverage':min(coverages)if coverages else 0,
-                    })
+            out.writerow({
+                'specimen':specimen,
+                args.target_rank:cat,
+                'reads':int(reads),
+                'pct_reads': reads / total_reads * 100,
+                'clusters':len(clusters),
+                'max_percent':max(percents) if percents else 0,
+                'min_percent':min(percents) if percents else 0,
+                'max_coverage':max(coverages)if coverages else 0,
+                'min_coverage':min(coverages)if coverages else 0,
+                })
 
