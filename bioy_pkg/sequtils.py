@@ -697,7 +697,7 @@ def format_taxonomy(names, selectors, asterisk = '*'):
                 onomy.append(pred + mark)
             else:
                 tax += mark
-        taxonomy.append('{} {}'.format(tax, '/'.join(onomy)))
+        taxonomy.append('{} {}'.format(tax, '/'.join(onomy)).strip())
 
     return ';'.join(taxonomy)
 
