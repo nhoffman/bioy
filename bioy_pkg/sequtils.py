@@ -689,9 +689,9 @@ def format_taxonomy(names, selectors, asterisk = '*'):
         taxons[subject][predicate] |= selectors[i]
 
     taxonomy = []
-    for tax, preds in taxons.items():
+    for tax, preds in sorted(taxons.items()):
         onomy = []
-        for pred, has_asterisk in preds.items():
+        for pred, has_asterisk in sorted(preds.items()):
             mark = asterisk if has_asterisk else ''
             if pred:
                 onomy.append(pred + mark)
