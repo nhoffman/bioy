@@ -672,14 +672,34 @@ def show_errors(errorlist, width = 40):
     return out
 
 def format_taxonomy(names, selectors, asterisk = '*'):
-    tax = defaultdict(set)
+    """
+    Create a friendly formatted string of taxonomy names. Names will have an asterisk
+    value appended *only* if the cooresponding element in the selectors evaluates to True.
+
+    FIXME: default and length difference between names and selectors to False.
+    """
+    assert len(names) == len(selectors)
+
+    taxons = defaultdict(lambda: defaultdict(bool))
+
     for i,name in enumerate(names):
         name = name.split(None, 1)
-        star = asterisk if selectors[i:i+1][0] else ''
-        tax[name[0]].add(star if len(name) == 1 else name[1] + star)
+        subject = name[0]
+        predicate = name[1] if name[1:] else None
+        taxons[subject][predicate] |= selectors[i]
 
-    return ';'.join(['{} {}'.format(taxo,'/'.join(nomy))
-        if nomy else taxo for taxo,nomy in tax.items()])
+    taxonomy = []
+    for tax, preds in taxons.items():
+        onomy = []
+        for pred, has_asterisk in preds.items():
+            mark = asterisk if has_asterisk else ''
+            if pred:
+                onomy.append(pred + mark)
+            else:
+                tax += mark
+        taxonomy.append('{} {}'.format(tax, '/'.join(onomy)))
+
+    return ';'.join(taxonomy)
 
 def _readfasta(handle):
     """
