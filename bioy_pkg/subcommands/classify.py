@@ -78,8 +78,6 @@ def build_parser(parser):
             default = 0,
             type = int,
             help = 'minimum cluster size to include in classification output')
-    parser.add_argument('--no-hits', type = Opener('w'),
-                        help = 'file containing name of each query with no hits')
     parser.add_argument('--blast-fmt',
             help = 'blast header (default: qseqid sseqid pident qstart qend qlen)',
             default = 'qseqid sseqid pident qstart qend qlen')
@@ -88,6 +86,7 @@ def build_parser(parser):
             default = 'species')
     parser.add_argument('--details-identity',
             help = 'Minimum identity threshold for classification details file',
+            type = float,
             default = 90)
 
 def update_blast_results(b, seq_info, taxonomy, target_rank):
@@ -161,9 +160,6 @@ def action(args):
     if args.out_detail:
         detail = DictWriter(args.out_detail, detail_header, extrasaction = 'ignore')
         detail.writeheader()
-
-    if args.no_hits:
-        args.no_hits.write('query\n')
     ###
 
     ### filter and format format blast data
@@ -179,7 +175,6 @@ def action(args):
     # some raw filtering
     blast_results = ifilter(lambda b:
             float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size, blast_results)
-
     blast_results = ifilter(lambda b: float(b['pident']) >= args.details_identity, blast_results)
     blast_results = ifilter(lambda b: float(b['coverage']) >= args.coverage, blast_results)
 
@@ -190,13 +185,14 @@ def action(args):
     # remove hits with no rank ids
     blast_results = ifilter(lambda b: b['target_rank_id'], blast_results)
 
-    # (Optional) In some cases you want to filter some target hits (RDP < 10.30)
-    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
-    blast_results = ifilter(lambda b: b['ambig_count'] < 3, blast_results)
     blast_results = ifilter(
             lambda b: b['target_rank_id'] not in args.exclude_by_taxid, blast_results)
-    blast_results = ifilter(
-            lambda b: not UNCLASSIFIED_REGEX.search(b['target_rank_name']), blast_results)
+
+    # (Optional) In some cases you want to filter some target hits (RDP < 10.30)
+#    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
+#    blast_results = ifilter(lambda b: b['ambig_count'] < 3, blast_results)
+#    blast_results = ifilter(
+#            lambda b: not UNCLASSIFIED_REGEX.search(b['target_rank_name']), blast_results)
     ###
 
     # first, group by specimen
