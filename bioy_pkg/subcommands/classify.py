@@ -5,7 +5,6 @@ Optional grouping by specimen and query sequences
 """
 import sys
 import logging
-import os
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
@@ -28,8 +27,7 @@ def build_parser(parser):
             type = Opener('w'),
             help = """Tab delimited list of classifications by species
                    [specimen, species, reads, clusters, max_percent, min_percent[]""")
-    parser.add_argument('-O', '--detail',
-            default = os.devnull,
+    parser.add_argument('-O', '--out-detail',
             type  = Opener('w'),
             help = 'Add detailed csv file')
     parser.add_argument('-s', '--seq-info',
@@ -91,9 +89,6 @@ def build_parser(parser):
     parser.add_argument('--details-identity',
             help = 'Minimum identity threshold for classification details file',
             default = 90)
-    parser.add_argument('--details-coverage',
-            help = 'Minimum coverage threshold for classification details file',
-            default = 90)
 
 def update_blast_results(b, seq_info, taxonomy, target_rank):
     info = seq_info[b['sseqid']]
@@ -110,7 +105,9 @@ def update_blast_results(b, seq_info, taxonomy, target_rank):
     b['rank'] = tax['rank']
 
     b['target_rank_id'] = tax[target_rank]
-    b['target_rank_name'] = taxonomy[b['target_rank_id']]['tax_name']
+
+    if b['target_rank_id']:
+        b['target_rank_name'] = taxonomy[b['target_rank_id']]['tax_name']
 
     return b
 
@@ -119,15 +116,13 @@ def coverage(start, end, length):
 
 def action(args):
     ### Rows
-    etc = 'no match' # This row holds all unmatched
+    etc = 'no match' # This row will hold all unmatched
 
+    # groups have list prioritization!
     groups = [
-        (None, lambda h: args.max_identity >= h['pident'] > args.min_identity
-            and h['coverage'] >= args.coverage),
-        ('> {}%'.format(args.max_identity),
-            lambda h: h['pident'] > args.max_identity and h['coverage'] >= args.coverage),
-        ('<= {}%'.format(args.min_identity),
-            lambda h: h['pident'] <= args.min_identity and h['coverage'] >= args.coverage)
+        ('> {}%'.format(args.max_identity), lambda h: h['pident'] > args.max_identity),
+        (None, lambda h: args.max_identity >= h['pident'] > args.min_identity),
+        ('<= {}%'.format(args.min_identity), lambda h: h['pident'] <= args.min_identity),
     ]
 
     ### Columns
@@ -136,9 +131,12 @@ def action(args):
         'reads',
         'pct_reads',
         'clusters',
-        args.target_rank,
+        'tax_name',
         'max_percent', 'min_percent',
         'max_coverage', 'min_coverage',
+        'rank',
+        'hi',
+        'low',
         ]
 
     out = DictWriter(args.out, out_header, extrasaction = 'ignore')
@@ -148,7 +146,6 @@ def action(args):
         'specimen',
         'query',
         'subject',
-        'match',
         'pident',
         'coverage',
         'ambig_count',
@@ -161,14 +158,15 @@ def action(args):
         'rank'
         ]
 
-    detail = DictWriter(args.detail, detail_header, extrasaction = 'ignore')
-    detail.writeheader()
+    if args.out_detail:
+        detail = DictWriter(args.out_detail, detail_header, extrasaction = 'ignore')
+        detail.writeheader()
 
     if args.no_hits:
         args.no_hits.write('query\n')
     ###
 
-    ### format blast data
+    ### filter and format format blast data
     blast_fmt = args.blast_fmt.split()
 
     blast_results = DictReader(args.blast_file, fieldnames = blast_fmt, delimiter = '\t')
@@ -178,18 +176,18 @@ def action(args):
         'coverage':coverage(b['qstart'], b['qend'], b['qlen']),
         }, **b), blast_results)
 
-    # Some raw filtering
+    # some raw filtering
     blast_results = ifilter(lambda b:
             float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size, blast_results)
 
     blast_results = ifilter(lambda b: float(b['pident']) >= args.details_identity, blast_results)
-    blast_results = ifilter(lambda b: float(b['coverage']) >= args.details_coverage, blast_results)
+    blast_results = ifilter(lambda b: float(b['coverage']) >= args.coverage, blast_results)
 
     # add required values for classification
     blast_results = imap(lambda b:
             update_blast_results(b, args.seq_info, args.taxonomy, args.target_rank), blast_results)
 
-    # remove hits with target_rank_id
+    # remove hits with no rank ids
     blast_results = ifilter(lambda b: b['target_rank_id'], blast_results)
 
     # (Optional) In some cases you want to filter some target hits (RDP < 10.30)
@@ -211,24 +209,40 @@ def action(args):
 
     for specimen, hits in groupby(blast_results, specimen_grouper):
         hits = list(hits)
+
+        if args.out_detail:
+            detail.writerows(dict({'specimen':specimen}, **h) for h in hits)
+
         categories = defaultdict(list)
+        # clusters will hold the query ids as hits are matched to categories
         clusters = set()
 
+        # filter out categories
         for cat, fltr in groups:
             matches = filter(fltr, hits)
-            if cat:
-                categories[cat] = matches
-            else:
-                for _, queries in groupby(matches, itemgetter('query')):
-                    queries = list(queries)
-                    cat = frozenset(map(itemgetter('target_rank_id'), queries))
-                    categories[cat].extend(queries)
+            if matches:
+                if cat:
+                    categories[cat] = matches
+                else:
+                    # when part of the 'None' category create a frozen set of ids as the category
+                    for _, queries in groupby(matches, itemgetter('query')):
+                        queries = list(queries)
+                        cat = frozenset(map(itemgetter('target_rank_id'), queries))
+                        categories[cat].extend(queries)
+
+            # add query ids that were matched to a filter
             clusters |= set(map(itemgetter('query'), matches))
+
+            # remove all hits corresponding to a matched query id (cluster)
             hits = filter(lambda h: h['query'] not in clusters, hits)
 
         # remaining hits go in the 'no match' category
-        categories[etc] = hits
+        if hits:
+           categories[etc] = hits
+
+        # include the remaining hits in the clusters set
         clusters |= set(map(itemgetter('query'), hits))
+
         total_reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
@@ -239,6 +253,8 @@ def action(args):
             percents = set(map(itemgetter('pident'), hits))
             reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
+            # if frozen set of tax ids then print the tax names
+            # FIXME: Perhaps do this above when building categories
             if isinstance(cat, frozenset):
                 names = map(itemgetter('target_rank_name'), hits)
                 selectors = map(lambda h: h['pident'] >= args.asterisk
@@ -246,8 +262,11 @@ def action(args):
                 cat = format_taxonomy(names, selectors, '*')
 
             out.writerow({
+                'hi':args.max_identity,
+                'low':args.min_identity,
+                'rank':args.target_rank,
                 'specimen':specimen,
-                args.target_rank:cat,
+                'tax_name':cat,
                 'reads':int(reads),
                 'pct_reads': reads / total_reads * 100,
                 'clusters':len(clusters),
