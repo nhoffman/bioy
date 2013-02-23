@@ -188,7 +188,7 @@ def action(args):
     blast_results = ifilter(
             lambda b: b['target_rank_id'] not in args.exclude_by_taxid, blast_results)
 
-    # (Optional) In some cases you want to filter some target hits (RDP < 10.30)
+    # (Optional) In some cases you want to filter some target hits
 #    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
 #    blast_results = ifilter(lambda b: b['ambig_count'] < 3, blast_results)
 #    blast_results = ifilter(
@@ -220,11 +220,20 @@ def action(args):
                 if cat:
                     categories[cat] = matches
                 else:
-                    # when part of the 'None' category create a frozen set of ids as the category
+                    # create sets of tax_rank_id
+                    cats = defaultdict(list)
                     for _, queries in groupby(matches, itemgetter('query')):
                         queries = list(queries)
-                        cat = frozenset(map(itemgetter('target_rank_id'), queries))
-                        categories[cat].extend(queries)
+                        target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
+                        cats[target_ids].extend(queries)
+
+                    # and finally add to categories
+                    for _, queries in cats.items():
+                        queries = list(queries)
+                        names = map(itemgetter('target_rank_name'), queries)
+                        selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
+                        tax = format_taxonomy(names, selectors, '*')
+                        categories[tax].extend(queries)
 
             # add query ids that were matched to a filter
             clusters |= set(map(itemgetter('query'), matches))
@@ -248,14 +257,6 @@ def action(args):
             coverages = set(map(itemgetter('coverage'), hits))
             percents = set(map(itemgetter('pident'), hits))
             reads = sum(float(args.weights.get(c, 1)) for c in clusters)
-
-            # if frozen set of tax ids then print the tax names
-            # FIXME: Perhaps do this above when building categories
-            if isinstance(cat, frozenset):
-                names = map(itemgetter('target_rank_name'), hits)
-                selectors = map(lambda h: h['pident'] >= args.asterisk
-                                      and h['coverage'] >= args.coverage, hits)
-                cat = format_taxonomy(names, selectors, '*')
 
             out.writerow({
                 'hi':args.max_identity,
