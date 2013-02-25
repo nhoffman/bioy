@@ -126,35 +126,18 @@ def action(args):
 
     ### Columns
     out_header = [
-        'specimen',
-        'reads',
-        'pct_reads',
-        'clusters',
-        'tax_name',
-        'max_percent', 'min_percent',
-        'max_coverage', 'min_coverage',
-        'rank',
-        'hi',
-        'low',
+        'specimen', 'reads', 'pct_reads', 'clusters', 'tax_name',
+        'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
+        'rank', 'hi', 'low',
         ]
 
     out = DictWriter(args.out, out_header, extrasaction = 'ignore')
     out.writeheader()
 
     detail_header = [
-        'specimen',
-        'query',
-        'subject',
-        'pident',
-        'coverage',
-        'ambig_count',
-        'target_rank_id',
-        'target_rank_name',
-        'accession',
-        'species_id',
-        'tax_id',
-        'tax_name',
-        'rank'
+        'specimen', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
+        'target_rank_id', 'target_rank_name', 'accession', 'species_id',
+        'tax_id', 'tax_name', 'rank'
         ]
 
     if args.out_detail:
@@ -242,8 +225,7 @@ def action(args):
             hits = filter(lambda h: h['query'] not in clusters, hits)
 
         # remaining hits go in the 'no match' category
-        if hits:
-           categories[etc] = hits
+        categories[etc] = hits
 
         # include the remaining hits in the clusters set
         clusters |= set(map(itemgetter('query'), hits))
@@ -253,23 +235,25 @@ def action(args):
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
         sort_by_reads = lambda c: sum(int(args.weights.get(q, 1)) for q in set(c['query'] for c in c[1]))
         for cat, hits in sorted(categories.items(), key=sort_by_reads, reverse=True):
-            clusters = set(map(itemgetter('query'), hits))
-            coverages = set(map(itemgetter('coverage'), hits))
-            percents = set(map(itemgetter('pident'), hits))
-            reads = sum(float(args.weights.get(c, 1)) for c in clusters)
+            # only output categories with hits
+            if hits:
+                clusters = set(map(itemgetter('query'), hits))
+                coverages = set(map(itemgetter('coverage'), hits))
+                percents = set(map(itemgetter('pident'), hits))
+                reads = sum(float(args.weights.get(c, 1)) for c in clusters)
 
-            out.writerow({
-                'hi':args.max_identity,
-                'low':args.min_identity,
-                'rank':args.target_rank,
-                'specimen':specimen,
-                'tax_name':cat,
-                'reads':int(reads),
-                'pct_reads': reads / total_reads * 100,
-                'clusters':len(clusters),
-                'max_percent':max(percents) if percents else 0,
-                'min_percent':min(percents) if percents else 0,
-                'max_coverage':max(coverages)if coverages else 0,
-                'min_coverage':min(coverages)if coverages else 0,
-                })
+                out.writerow({
+                    'hi':args.max_identity,
+                    'low':args.min_identity,
+                    'rank':args.target_rank,
+                    'specimen':specimen,
+                    'tax_name':cat,
+                    'reads':int(reads),
+                    'pct_reads':'{0:.2f}'.format(reads / total_reads * 100),
+                    'clusters':len(clusters),
+                    'max_percent':'{0:.2f}'.format(max(percents)),
+                    'min_percent':'{0:.2f}'.format(min(percents)),
+                    'max_coverage':'{0:.2f}'.format(max(coverages)),
+                    'min_coverage':'{0:.2f}'.format(min(coverages)),
+                    })
 
