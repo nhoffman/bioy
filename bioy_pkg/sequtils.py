@@ -675,10 +675,7 @@ def format_taxonomy(names, selectors, asterisk = '*'):
     """
     Create a friendly formatted string of taxonomy names. Names will have an asterisk
     value appended *only* if the cooresponding element in the selectors evaluates to True.
-
-    FIXME: default and length difference between names and selectors to False.
     """
-    assert len(names) == len(selectors)
 
     taxons = defaultdict(lambda: defaultdict(bool))
 
@@ -686,7 +683,8 @@ def format_taxonomy(names, selectors, asterisk = '*'):
         name = name.split(None, 1)
         subject = name[0]
         predicate = name[1] if name[1:] else None
-        taxons[subject][predicate] |= selectors[i]
+        selector = selectors[i] if selectors[i:] else False
+        taxons[subject][predicate] |= selector
 
     taxonomy = []
     for tax, preds in sorted(taxons.items()):
