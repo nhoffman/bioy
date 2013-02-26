@@ -199,24 +199,23 @@ def action(args):
         # filter out categories
         for cat, fltr in groups:
             matches = filter(fltr, hits)
-            if matches:
-                if cat:
-                    categories[cat] = matches
-                else:
-                    # create sets of tax_rank_id
-                    cats = defaultdict(list)
-                    for _, queries in groupby(matches, itemgetter('query')):
-                        queries = list(queries)
-                        target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
-                        cats[target_ids].extend(queries)
+            if cat:
+                categories[cat] = matches
+            else:
+                # create sets of tax_rank_id
+                cats = defaultdict(list)
+                for _, queries in groupby(matches, itemgetter('query')):
+                    queries = list(queries)
+                    target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
+                    cats[target_ids].extend(queries)
 
-                    # and finally add to categories
-                    for _, queries in cats.items():
-                        queries = list(queries)
-                        names = map(itemgetter('target_rank_name'), queries)
-                        selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
-                        tax = format_taxonomy(names, selectors, '*')
-                        categories[tax].extend(queries)
+                # and finally add to categories
+                for _, queries in cats.items():
+                    queries = list(queries)
+                    names = map(itemgetter('target_rank_name'), queries)
+                    selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
+                    tax = format_taxonomy(names, selectors, '*')
+                    categories[tax].extend(queries)
 
             # add query ids that were matched to a filter
             clusters |= set(map(itemgetter('query'), matches))
