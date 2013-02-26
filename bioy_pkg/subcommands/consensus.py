@@ -40,7 +40,7 @@ def action(args):
     if args.seqname:
         seqname = args.seqname
     else:
-        seqname = 'consensus' if args.infile.name == '<stdin>' else splitext(basename(args.infile.name))[0]
+        seqname = 'consensus' if args.infile is sys.stdin else splitext(basename(args.infile.name))[0]
 
     seqs = list(fastalite(args.infile, 'fasta'))
 
