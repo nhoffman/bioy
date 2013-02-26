@@ -14,11 +14,11 @@ def build_parser(parser):
             help = 'Input fasta file')
     parser.add_argument('rlefile',
             type = Csv2Dict(),
-            help='csv file (may be bzip encoded) containing columns "name","rle"')
+            help = 'csv file (may be bzip encoded) containing columns "name","rle"')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
             default = sys.stdout,
-            help='Name of output file (default is stdout)')
+            help = 'Name of output file')
 
 def action(args):
     for s in fastalite(args.infile):
