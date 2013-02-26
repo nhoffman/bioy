@@ -125,23 +125,19 @@ def action(args):
     ]
 
     ### Columns
-    out_header = [
+    out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
         'specimen', 'reads', 'pct_reads', 'clusters', 'tax_name',
         'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
         'rank', 'hi', 'low',
-        ]
-
-    out = DictWriter(args.out, out_header, extrasaction = 'ignore')
+        ])
     out.writeheader()
 
-    detail_header = [
-        'specimen', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
-        'target_rank_id', 'target_rank_name', 'accession', 'species_id',
-        'tax_id', 'tax_name', 'rank'
-        ]
-
     if args.out_detail:
-        detail = DictWriter(args.out_detail, detail_header, extrasaction = 'ignore')
+        detail = DictWriter(args.out_detail, extrasaction = 'ignore', fieldnames = [
+            'specimen', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
+            'target_rank_id', 'target_rank_name', 'accession', 'species_id',
+            'tax_id', 'tax_name', 'rank'
+            ])
         detail.writeheader()
     ###
 
