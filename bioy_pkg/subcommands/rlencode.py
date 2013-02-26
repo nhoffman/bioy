@@ -1,10 +1,10 @@
 """Run-length encode a fasta file"""
 
 import logging
-import csv
 import sys
 
 from itertools import imap, chain
+from csv import DictWriter
 
 from bioy_pkg.sequtils import homoencode, to_ascii, fastalite
 from bioy_pkg.utils import Opener
@@ -22,20 +22,15 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'Name of output file; default: %(default)s')
     parser.add_argument('-r','--rlefile',
-            type = Opener('w'),
+            type = lambda f: DictWriter(Opener('w')(f), fieldnames=['name', 'rle']),
             help = """Name of output file for run length encoding; default is to
                       append .csv.bz2 to --outfile basename.""")
 
 def action(args):
-    counts = []
     for seq in chain.from_iterable(imap(fastalite, args.infiles)):
         seqstr, count = homoencode(seq.seq)
         assert len(seqstr) == len(count)
         args.outfile.write('>{}\n{}\n'.format(seq.description, seqstr))
-        counts.append([seq.description, to_ascii(count)])
-
-    if args.rlefile:
-        writer = csv.writer(args.rlefile)
-        writer.writerow(['name', 'rle'])
-        writer.writerows(counts)
+        if args.rlefile:
+            args.rlefile.writerow(dict({'name':seq.description, 'rle':to_ascii(count)}))
 
