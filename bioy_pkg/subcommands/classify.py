@@ -249,13 +249,13 @@ def action(args):
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
                     })
 
-            if args.out_detail:
-                detail.writerows(dict({
-                    'specimen':specimen,
-                    'tax_name':cat,
-                    'hi':args.max_identity,
-                    'low':args.min_identity,
-                    'target_rank':args.target_rank,
-                    }, **h) for h in hits)
+                if args.out_detail:
+                    detail.writerows(dict({
+                        'specimen':specimen,
+                        'tax_name':cat,
+                        'hi':args.max_identity,
+                        'low':args.min_identity,
+                        'target_rank':args.target_rank,
+                        }, **h) for h in hits)
 
 
