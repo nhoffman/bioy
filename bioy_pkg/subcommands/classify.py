@@ -237,7 +237,7 @@ def action(args):
                 out.writerow({
                     'hi':args.max_identity,
                     'low':args.min_identity,
-                    'rank':args.target_rank,
+                    'target_rank':args.target_rank,
                     'specimen':specimen,
                     'tax_name':cat,
                     'reads':int(reads),
