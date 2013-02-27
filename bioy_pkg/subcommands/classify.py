@@ -100,7 +100,7 @@ def update_blast_results(b, seq_info, taxonomy, target_rank):
     b['tax_id'] = info['tax_id']
     b['accession'] = info['accession']
     b['ambig_count'] = int(info['ambig_count'])
-    b['tax_name'] = tax['tax_name']
+    b['full_name'] = tax['tax_name']
     b['rank'] = tax['rank']
 
     b['target_rank_id'] = tax[target_rank]
@@ -128,15 +128,15 @@ def action(args):
     out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
         'specimen', 'reads', 'pct_reads', 'clusters', 'tax_name',
         'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
-        'rank', 'hi', 'low',
+        'target_rank', 'hi', 'low',
         ])
     out.writeheader()
 
     if args.out_detail:
         detail = DictWriter(args.out_detail, extrasaction = 'ignore', fieldnames = [
-            'specimen', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
-            'target_rank_id', 'target_rank_name', 'accession', 'species_id',
-            'tax_id', 'tax_name', 'rank'
+            'specimen', 'tax_name', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
+            'target_rank_id', 'target_rank_name', 'accession', 'tax_id',
+            'full_name', 'target_rank', 'hi', 'low'
             ])
         detail.writeheader()
     ###
@@ -184,9 +184,6 @@ def action(args):
 
     for specimen, hits in groupby(blast_results, specimen_grouper):
         hits = list(hits)
-
-        if args.out_detail:
-            detail.writerows(dict({'specimen':specimen}, **h) for h in hits)
 
         categories = defaultdict(list)
         # clusters will hold the query ids as hits are matched to categories
@@ -251,4 +248,14 @@ def action(args):
                     'max_coverage':'{0:.2f}'.format(max(coverages)),
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
                     })
+
+            if args.out_detail:
+                detail.writerows(dict({
+                    'specimen':specimen,
+                    'tax_name':cat,
+                    'hi':args.max_identity,
+                    'low':args.min_identity,
+                    'target_rank':args.target_rank,
+                    }, **h) for h in hits)
+
 
