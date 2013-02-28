@@ -11,7 +11,7 @@ dependencies
 ============
 
 * Python 2.7.x
-* Tested on Linux and OS X.
+* Tested on Ubuntu and OS X.
 
 
 execution
