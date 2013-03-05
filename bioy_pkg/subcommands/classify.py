@@ -126,8 +126,8 @@ def action(args):
 
     ### Columns
     out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
-        'specimen', 'reads', 'pct_reads', 'clusters', 'tax_name',
-        'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
+        'max_percent', 'min_percent', 'max_coverage', 'min_coverage', 'tax_name',
+        'specimen', 'reads', 'pct_reads', 'clusters',
         'target_rank', 'hi', 'low',
         ])
     out.writeheader()
