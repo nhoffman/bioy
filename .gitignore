@@ -7,3 +7,4 @@ data/ver
 MANIFEST
 dist
 *.egg-info
+*_ignore.py
