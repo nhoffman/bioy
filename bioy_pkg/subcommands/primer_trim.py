@@ -39,7 +39,7 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'trimmed fasta output file')
     parser.add_argument('--rle',
-            type = Csv2Dict('name'),
+            type = Csv2Dict(fieldnames=['name','rle']),
             help = 'rle file')
     parser.add_argument('-O', '--out-rle',
             type = Opener('w'),
