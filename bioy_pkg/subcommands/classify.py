@@ -60,11 +60,11 @@ def build_parser(parser):
             help = """csv file with column "tax_id" providing a set of tax_ids
                       to exclude from the results""")
     parser.add_argument('-w', '--weights',
-            type = Csv2Dict('name', 'weight', ['name', 'weight']),
+            type = Csv2Dict('name', 'weight', fieldnames = ['name', 'weight']),
             default = {},
             help = 'Provides a weight (number of reads) associated with each id')
     parser.add_argument('-m', '--map',
-            type = Csv2Dict('name', 'specimen', ['name', 'specimen']),
+            type = Csv2Dict('name', 'specimen', fieldnames = ['name', 'specimen']),
             default = {},
             help = 'map file with sequence ids to specimen names')
     parser.add_argument('--not-all-one-group',
@@ -117,7 +117,7 @@ def action(args):
     ### Rows
     etc = 'no match' # This row will hold all unmatched
 
-    # groups have list prioritization!
+    # groups have list position prioritization
     groups = [
         ('> {}%'.format(args.max_identity), lambda h: h['pident'] > args.max_identity),
         (None, lambda h: args.max_identity >= h['pident'] > args.min_identity),
@@ -216,7 +216,7 @@ def action(args):
             # remove all hits corresponding to a matched query id (cluster)
             hits = filter(lambda h: h['query'] not in clusters, hits)
 
-        # remaining hits go in the 'no match' category
+        # remaining hits go in the etc ('no match') category
         categories[etc] = hits
 
         # include the remaining hits in the clusters set
