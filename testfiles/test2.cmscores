@@ -1,0 +1,25 @@
+# cmalign :: align sequences to an RNA CM
+# INFERNAL 1.0.2 (October 2009)
+# Copyright (C) 2009 HHMI Janelia Farm Research Campus
+# Freely distributed under the GNU General Public License (GPLv3)
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# command: cmalign --mpi -1 --dna --sub --hbanded -o output/uwdb.sto data/bacteria16S_508_mod5.cm /shared/silo_researcher/Matsen_F/MatsenGrp/working/nhoffman/mad_data/2013-03-07/uwdb_seqs.fasta
+# date:    Mon Mar 11 15:42:46 2013
+# nproc:   12
+#
+# cm name                    algorithm  config  sub  bands     tau
+# -------------------------  ---------  ------  ---  -----  ------
+# bacteria16S_508_mod5-1       opt acc  global  yes    hmm   1e-07
+#
+#                               bit scores
+#                           ------------------
+# seq idx  seq name          len     total    struct  avg prob      elapsed
+# -------  --------------  -----  --------  --------  --------  -----------
+        1  FUM0LCO01B97N3    248    385.89     43.47     1.000  00:00:00.07
+        2  FUM0LCO01EZTWO    248    385.89     43.47     1.000  00:00:00.07
+        3  FUM0LCO01ALN4O    241    374.25     44.48     0.990  00:00:00.07
+        4  FUM0LCO01D7IKL    242    385.80     45.69     1.000  00:00:00.08
+
+# Alignment saved in file output/uwdb.sto.
+#
+# CPU time: 1608.31u 142.45s 00:29:10.75 Elapsed: 00:02:26
