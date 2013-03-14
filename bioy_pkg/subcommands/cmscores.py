@@ -6,10 +6,9 @@ if present.
 """
 
 import logging
-import os
 import sys
 import csv
-import argparse
+
 from itertools import imap, groupby, ifilter
 
 from bioy_pkg.utils import Opener
@@ -17,6 +16,17 @@ from bioy_pkg.utils import Opener
 log = logging.getLogger(__name__)
 
 CMALIGN_SCORE_FIELDS = ['name','len','total','struct','prob']
+
+def build_parser(parser):
+    parser.add_argument('infile',
+            type = Opener('r'),
+            default = sys.stdin,
+            nargs = '?',
+            help = 'File containing stdout of call to cmalign')
+    parser.add_argument('-o','--outfile',
+            type = Opener('w'),
+            default = sys.stdout,
+            help = 'Output file in csv format (default is stdout)')
 
 def read_scores(infile):
 
@@ -32,11 +42,14 @@ def read_scores(infile):
 
     Note that elapsed seems to be omitted when cmalign is run with mpi
     """
+    groups = groupby(infile, lambda line: line.startswith('#'))
 
-    blocks = groupby(infile, lambda line: line.startswith('#'))
+    is_comment, data = next(groups)
 
-    _, comments = blocks.next()
-    header, = [line.strip() for line in comments if line.startswith('# seq idx')]
+    assert is_comment is True
+
+    # parse header from comments
+    header, = [line.strip() for line in data if line.startswith('# seq idx')]
 
     # Throw out the first column; also throw out the last column if
     # it's called "elapsed" (only present when cmalign is run without
@@ -46,18 +59,19 @@ def read_scores(infile):
     else:
         rowmap = lambda row: row.split()[1:]
 
-    _, data = blocks.next()
-    return imap(rowmap, ifilter(lambda row: bool(row.strip()), data))
+    # parse data
+    is_comment, data = next(groups)
 
-def build_parser(parser):
-    parser.add_argument('infile', type = Opener('r'),
-                        help='File containing stdout of call to cmalign')
-    parser.add_argument('-o','--outfile', type = Opener('w'),
-                        default=sys.stdout,
-                        help='Output file in csv format (default is stdout)')
+    assert is_comment is False
+
+    data = ifilter(lambda row: bool(row.strip()), data)
+
+    data = imap(rowmap, data)
+
+    return data
 
 def action(args):
-
     writer = csv.writer(args.outfile)
     writer.writerow(CMALIGN_SCORE_FIELDS)
     writer.writerows(read_scores(args.infile))
+
