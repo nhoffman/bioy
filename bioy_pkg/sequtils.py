@@ -21,9 +21,14 @@ BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
 # use BLAST_FORMAT as input to blastn -outfmt
 BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
 
+INFO_HEADER = ['seqname','tax_id','accession','description',
+                    'length','ambig_count','is_type','rdp_lineage']
+
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
+
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
+
 IUPAC = {('A',): 'A',
         ('A', 'C'): 'M',
         ('A', 'C', 'G'): 'V',
@@ -601,7 +606,6 @@ def parse_primer_alignments(hits, lprimer = 'lprimer', rprimer = 'rprimer'):
     d['name'] = hit['q_name']
     return d
 
-
 def wrap(text, width=60):
     """
     Wraps input string [text] to [width] characters. Return a list of
@@ -730,3 +734,39 @@ def _iterfasta(handle):
 
 def fastalite(handle, readfile = True):
     return _readfasta(handle) if readfile else _iterfasta(handle)
+
+### Taken from Connor McCoy's Deenurp
+def tax_of_genbank(gb):
+    """
+    Get the tax id from a genbank record, returning None if no taxonomy is
+    available.
+    """
+    # Check for bad name
+    try:
+        source = next(i for i in gb.features if i.type == 'source')
+        return re.findall('\d+', next(i[6:] for i in source.qualifiers.get('db_xref', [])
+                     if i.startswith('taxon:')))[0]
+    except StopIteration:
+        return None
+
+def count_ambiguous(seq):
+    s = frozenset('ACGT')
+    return sum(i not in s for i in seq)
+
+def is_type(gb):
+    """
+    Returns a boolean indicating whether a sequence is a member of a type strain,
+    as indicated by the presence of the string '(T)' within the record description.
+    """
+    return '(T)' in gb.description
+
+
+def gb2info(record, seqname = None):
+    """
+    Return a seqinfo dict from a BioPython seq object
+    """
+    return {'seqname':seqname or record.name, 'tax_id':tax_of_genbank(record),
+            'accession':record.id, 'description':record.description, 'length':len(record.seq),
+            'ambig_count':count_ambiguous(record.seq), 'is_type':is_type(record),
+            'rdp_lineage':';'.join(record.annotations.get('taxonomy', [])).replace('"', '')}
+
