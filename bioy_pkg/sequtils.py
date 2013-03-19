@@ -44,7 +44,9 @@ IUPAC = {('A',): 'A',
         ('G', 'A', 'T', 'C'): 'N',
         ('G', 'T'): 'K',
         ('T',): 'T'}
+
 gap = '-'
+
 homogap = '='
 
 # provides criteria for defining matching tax_ids as "unclassified"
@@ -677,8 +679,9 @@ def show_errors(errorlist, width = 40):
 
 def format_taxonomy(names, selectors, asterisk = '*'):
     """
-    Create a friendly formatted string of taxonomy names. Names will have an asterisk
-    value appended *only* if the cooresponding element in the selectors evaluates to True.
+    Create a friendly formatted string of taxonomy names. Names will
+    have an asterisk value appended *only* if the cooresponding
+    element in the selectors evaluates to True.
     """
 
     taxons = defaultdict(lambda: defaultdict(bool))
@@ -760,7 +763,6 @@ def is_type(gb):
     """
     return '(T)' in gb.description
 
-
 def gb2info(record, seqname = None):
     """
     Return a seqinfo dict from a BioPython seq object
@@ -769,4 +771,4 @@ def gb2info(record, seqname = None):
             'accession':record.id, 'description':record.description, 'length':len(record.seq),
             'ambig_count':count_ambiguous(record.seq), 'is_type':is_type(record),
             'rdp_lineage':';'.join(record.annotations.get('taxonomy', [])).replace('"', '')}
-
+###
