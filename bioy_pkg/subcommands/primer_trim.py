@@ -53,20 +53,19 @@ def action(args):
 
     aligns = [(q, parse_primer_alignments(h, lprimer = 'lprimer', rprimer = 'rprimer')) for q,h in ssearch]
 
-    aligns = ifilter(lambda (q,h): keep_left(h['l']) and keep_right(h['r']), aligns)
-
-    # a place to put open file handles
-    if args.out_rle:
-        args.out_rle.writeheader()
+    aligns = ifilter(lambda (q,p): keep_left(p['l']) and keep_right(p['r']), aligns)
 
     seqs = {f.description:f for f in args.fasta}
 
     # parse the sequences
+    rle_rows = []
     for name, pdict in aligns:
         seq = seqs[name]
         start, stop = pdict['l']['stop'], pdict['r']['start']
         args.out_fasta.write('>{}\n{}\n'.format(seq.description, seq.seq[start:stop]))
+        rle_rows.append({'name':seq.name, 'rle':args.rle[seq.name][start:stop]})
 
-        if args.out_rle and args.rle:
-            args.out_rle.writerow({'name':seq.name, 'rle':args.rle[seq.name][start:stop]})
+    if args.out_rle and args.rle:
+        args.out_rle.writeheader()
+        args.out_rle.writerows(rle_rows)
 
