@@ -37,15 +37,17 @@ def build_parser(parser):
 
 def action(args):
     def groupfun(seq):
-        lineage = args.seq_info[seq.description]
-        if args.secondary_group:
-            return lineage[args.primary_group] or lineage[args.secondary_group]
+        if args.seq_info:
+            lineage = args.seq_info[seq.description]
+            if args.secondary_group:
+                return lineage[args.primary_group] or lineage[args.secondary_group]
+            else:
+                return lineage[args.primary_group]
         else:
-            return lineage[args.primary_group]
+            lambda s: 'all'
 
-    if args.seq_info:
-        for grp, seqs in groupby(sorted(args.sequences, key = groupfun), groupfun):
-            seqs = list(seqs)
-            deduped = dedup([s.seq for s in seqs])
-            for i in deduped.keys():
-                args.out.write('>{}\n{}\n'.format(seqs[i].description, seqs[i].seq))
+    for _, seqs in groupby(sorted(args.sequences, key = groupfun), groupfun):
+        seqs = list(seqs)
+        deduped = dedup([s.seq for s in seqs])
+        for i in deduped.keys():
+            args.out.write('>{}\n{}\n'.format(seqs[i].description, seqs[i].seq))
