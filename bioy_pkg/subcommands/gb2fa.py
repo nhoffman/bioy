@@ -28,9 +28,10 @@ def build_parser(parser):
     parser.add_argument('-f', '--filter',
             action = 'store_true',
             help = 'Filter against UNCLASSIFIED_REGEX: {}'.format(UNCLASSIFIED_REGEX))
-    parser.add_argument('--products',
+    parser.add_argument('--features',
             action = 'append',
-            help = 'parse ribosomal subunits from genbank record')
+            help = """parse genome features (ex ribosomal subunits (16S, 18S, etc))
+                      from genbank record""")
     parser.add_argument('-t', '--type-strains',
             action = 'store_true',
             help = 'Only return type strain sequences')
@@ -52,11 +53,13 @@ def action(args):
 
     info = []
 
-    if args.products:
+    if args.features:
+        # Parse out product locations
         for r in records:
             for f in r.features:
+                p_fltr = lambda p: next(ifilter(lambda a: a in p, args.features), False)
                 products = f.qualifiers.get('product', [])
-                if any(r in products for r in args.products):
+                if next(ifilter(p_fltr, products), None):
                     tag = f.qualifiers.get('locus_tag', ['unspecified'])[0]
                     start, end = f.location.start.position, f.location.end.position
                     seq = r.seq[start:end]
@@ -68,16 +71,16 @@ def action(args):
                     args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
                     info.append(gb2info(r, seqname = name))
     else:
+        # if no product specified output entire seq
         for r in records:
-            src = next(ifilter(lambda f: f.type == 'source', r.features), False)
-            if src:
-                seq = r.seq
+            seq = r.seq
 
-                if (args.minus and src.location.strand == 1) or src.location.strand == -1:
-                    seq = seq.reverse_complement()
+            src = next(ifilter(lambda f: f.type == 'source', r.features), None)
+            if src and ((args.minus and src.location.strand == 1) or src.location.strand == -1):
+                seq = seq.reverse_complement()
 
-                args.out.write('>{} {} {}\n{}\n'.format(r.name, r.id, r.description, seq))
-                info.append(gb2info(r, seqname = r.name))
+            args.out.write('>{} {} {}\n{}\n'.format(r.name, r.id, r.description, seq))
+            info.append(gb2info(r, seqname = r.name))
 
     if args.info_out:
         args.info_out.writeheader()
