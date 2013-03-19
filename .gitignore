@@ -8,3 +8,4 @@ MANIFEST
 dist
 *.egg-info
 *_ignore.py
+*env/

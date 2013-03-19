@@ -7,7 +7,7 @@ import logging
 
 from bioy_pkg.subcommands import cmscores
 
-from . import TestBase, datadir
+from __init__ import TestBase, datadir
 
 log = logging.getLogger(__name__)
 
