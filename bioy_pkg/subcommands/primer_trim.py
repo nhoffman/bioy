@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import islice, groupby, ifilter
+from itertools import islice, groupby, ifilter, imap
 
 from bioy_pkg.sequtils import parse_ssearch36, parse_primer_alignments, fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -49,11 +49,12 @@ def action(args):
     keep_right = make_fun(args.keep_right)
 
     # parse primer alignments
-    ssearch = islice(groupby(parse_ssearch36(args.primer_aligns), lambda hit: hit['q_name']), args.limit)
+    aligns = islice(groupby(parse_ssearch36(args.primer_aligns), lambda hit: hit['q_name']), args.limit)
 
-    aligns = [(q, parse_primer_alignments(h, lprimer = 'lprimer', rprimer = 'rprimer')) for q,h in ssearch]
+    aligns = imap(
+            lambda (q,h): (q, parse_primer_alignments(h, lprimer = 'lprimer', rprimer = 'rprimer')), aligns)
 
-    aligns = ifilter(lambda (q,p): keep_left(p['l']) and keep_right(p['r']), aligns)
+    aligns = ifilter(lambda (q,h): keep_left(h['l']) and keep_right(h['r']), aligns)
 
     seqs = {f.description:f for f in args.fasta}
 
@@ -63,9 +64,11 @@ def action(args):
         seq = seqs[name]
         start, stop = pdict['l']['stop'], pdict['r']['start']
         args.out_fasta.write('>{}\n{}\n'.format(seq.description, seq.seq[start:stop]))
-        rle_rows.append({'name':seq.name, 'rle':args.rle[seq.name][start:stop]})
 
-    if args.out_rle and args.rle:
+        if args.rle:
+            rle_rows.append({'name':seq.description, 'rle':args.rle[seq.description][start:stop]})
+
+    if args.out_rle:
         args.out_rle.writeheader()
         args.out_rle.writerows(rle_rows)
 
