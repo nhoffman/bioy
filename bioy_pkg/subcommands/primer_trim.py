@@ -7,6 +7,7 @@ import sys
 
 from csv import DictWriter
 from itertools import islice, groupby, ifilter, imap
+from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, parse_primer_alignments, fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -29,7 +30,7 @@ def build_parser(parser):
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
-    parser.add_argument('-o', '--out-fasta',
+    parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
             help = 'trimmed fasta output file')
@@ -49,10 +50,12 @@ def action(args):
     keep_right = make_fun(args.keep_right)
 
     # parse primer alignments
-    aligns = islice(groupby(parse_ssearch36(args.primer_aligns), lambda hit: hit['q_name']), args.limit)
+    query = lambda hit: itemgetter('q_name')
+    aligns = islice(groupby(parse_ssearch36(args.primer_aligns), query), args.limit)
 
-    aligns = imap(
-            lambda (q,h): (q, parse_primer_alignments(h, lprimer = 'lprimer', rprimer = 'rprimer')), aligns)
+    primer_data = lambda (q,h): (q, parse_primer_alignments(
+        h, lprimer = 'lprimer', rprimer = 'rprimer'))
+    aligns = imap(primer_data, aligns)
 
     aligns = ifilter(lambda (q,h): keep_left(h['l']) and keep_right(h['r']), aligns)
 
@@ -63,10 +66,11 @@ def action(args):
     for name, pdict in aligns:
         seq = seqs[name]
         start, stop = pdict['l']['stop'], pdict['r']['start']
-        args.out_fasta.write('>{}\n{}\n'.format(seq.description, seq.seq[start:stop]))
+        args.out.write('>{}\n{}\n'.format(seq.description, seq.seq[start:stop]))
 
         if args.rle:
-            rle_rows.append({'name':seq.description, 'rle':args.rle[seq.description][start:stop]})
+            row = {'name':seq.description, 'rle':args.rle[seq.description][start:stop]}
+            rle_rows.append(row)
 
     if args.out_rle:
         args.out_rle.writeheader()
