@@ -44,7 +44,7 @@ def action(args):
             else:
                 return lineage[args.primary_group]
         else:
-            lambda s: 'all'
+            return 'all'
 
     for _, seqs in groupby(sorted(args.sequences, key = groupfun), groupfun):
         seqs = list(seqs)
