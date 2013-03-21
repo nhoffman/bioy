@@ -7,7 +7,7 @@ import sys
 import logging
 
 from csv import DictReader, DictWriter
-from collections import defaultdict, Counter
+from collections import defaultdict
 from itertools import groupby, imap, ifilter
 from operator import itemgetter
 
@@ -28,8 +28,11 @@ def build_parser(parser):
             help = """Tab delimited list of classifications by species
                    [specimen, species, reads, clusters, max_percent, min_percent[]""")
     parser.add_argument('-O', '--out-detail',
-            type  = Opener('w'),
-            help = 'Add detailed csv file')
+            type  = lambda f: DictWriter(Opener('w')(f), extrasaction = 'ignore', fieldnames = [
+                'specimen', 'assignment', 'assignment_id', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
+                'target_rank_id', 'target_rank_name', 'accession', 'tax_id', 'tax_name', 'target_rank', 'hi', 'low'
+                ]),
+             help = 'Add detailed csv file')
     parser.add_argument('-s', '--seq-info',
             required = True,
             type = Csv2Dict('seqname'),
@@ -136,15 +139,6 @@ def action(args):
         ])
     out.writeheader()
 
-    if args.out_detail:
-        detail = DictWriter(args.out_detail, extrasaction = 'ignore', fieldnames = [
-            'specimen', 'assignment', 'assignment_id', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
-            'target_rank_id', 'target_rank_name', 'accession', 'tax_id',
-            'tax_name', 'target_rank', 'hi', 'low'
-            ])
-        detail.writeheader()
-    ###
-
     ### filter and format format blast data
     blast_fmt = args.blast_fmt.split()
 
@@ -187,6 +181,7 @@ def action(args):
         specimen_grouper = lambda s: s['qseqid']
 
     assignments = [] # assignment list for assignment ids
+    details = [] # hit details
     for specimen, hits in groupby(blast_results, specimen_grouper):
         hits = list(hits)
 
@@ -261,13 +256,16 @@ def action(args):
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
                     })
 
-                if args.out_detail:
-                    detail.writerows(dict({
+                details.extend([dict({
                         'specimen':specimen,
                         'assignment':cat,
                         'assignment_id':assignment_id,
                         'hi':args.max_identity,
                         'low':args.min_identity,
                         'target_rank':args.target_rank,
-                        }, **h) for h in hits)
+                        }, **h) for h in hits])
+
+    if args.out_detail:
+        args.out_detail.writeheader()
+        args.out_detail.writerows(details)
 
