@@ -7,7 +7,7 @@ import sys
 import logging
 
 from csv import DictReader, DictWriter
-from collections import defaultdict
+from collections import defaultdict, Counter
 from itertools import groupby, imap, ifilter
 from operator import itemgetter
 
@@ -100,7 +100,7 @@ def update_blast_results(b, seq_info, taxonomy, target_rank):
     b['tax_id'] = info['tax_id']
     b['accession'] = info['accession']
     b['ambig_count'] = int(info['ambig_count'])
-    b['full_name'] = tax['tax_name']
+    b['tax_name'] = tax['tax_name']
     b['rank'] = tax['rank']
 
     b['target_rank_id'] = tax[target_rank]
@@ -126,17 +126,17 @@ def action(args):
 
     ### Columns
     out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
-        'max_percent', 'min_percent', 'max_coverage', 'min_coverage', 'tax_name',
-        'specimen', 'reads', 'pct_reads', 'clusters',
+        'max_percent', 'min_percent', 'max_coverage', 'min_coverage', 'assignment_id',
+        'assignment', 'specimen', 'reads', 'pct_reads', 'clusters',
         'target_rank', 'hi', 'low',
         ])
     out.writeheader()
 
     if args.out_detail:
         detail = DictWriter(args.out_detail, extrasaction = 'ignore', fieldnames = [
-            'specimen', 'tax_name', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
+            'specimen', 'assignment', 'assignment_id', 'query', 'subject', 'pident', 'coverage', 'ambig_count',
             'target_rank_id', 'target_rank_name', 'accession', 'tax_id',
-            'full_name', 'target_rank', 'hi', 'low'
+            'tax_name', 'target_rank', 'hi', 'low'
             ])
         detail.writeheader()
     ###
@@ -182,6 +182,7 @@ def action(args):
     else:
         specimen_grouper = lambda s: s['qseqid']
 
+    assignments = [] # assignment list for assignment ids
     for specimen, hits in groupby(blast_results, specimen_grouper):
         hits = list(hits)
 
@@ -202,7 +203,7 @@ def action(args):
                     target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
                     cats[target_ids].extend(queries)
 
-                # and finally add to categories
+                # and finally, text out category assignments
                 for _, queries in cats.items():
                     queries = list(queries)
                     names = map(itemgetter('target_rank_name'), queries)
@@ -229,6 +230,11 @@ def action(args):
         for cat, hits in sorted(categories.items(), key=sort_by_reads, reverse=True):
             # only output categories with hits
             if hits:
+                # assignment indexing
+                if cat not in assignments:
+                    assignments.append(cat)
+
+                assignment_id = assignments.index(cat)
                 clusters = set(map(itemgetter('query'), hits))
                 coverages = set(map(itemgetter('coverage'), hits))
                 percents = set(map(itemgetter('pident'), hits))
@@ -239,7 +245,8 @@ def action(args):
                     'low':args.min_identity,
                     'target_rank':args.target_rank,
                     'specimen':specimen,
-                    'tax_name':cat,
+                    'assignment_id':assignment_id,
+                    'assignment':cat,
                     'reads':int(reads),
                     'pct_reads':'{0:.2f}'.format(reads / total_reads * 100),
                     'clusters':len(clusters),
@@ -252,10 +259,11 @@ def action(args):
                 if args.out_detail:
                     detail.writerows(dict({
                         'specimen':specimen,
-                        'tax_name':cat,
+                        'assignment':cat,
+                        'assignment_id':assignment_id,
                         'hi':args.max_identity,
                         'low':args.min_identity,
                         'target_rank':args.target_rank,
                         }, **h) for h in hits)
 
-
+                assignment_id += 1
