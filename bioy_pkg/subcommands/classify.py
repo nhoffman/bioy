@@ -59,6 +59,10 @@ def build_parser(parser):
             default = {},
             help = """csv file with column "tax_id" providing a set of tax_ids
                       to exclude from the results""")
+    parser.add_argument('--max-ambiguous',
+            default = 3,
+            type = int,
+            help = 'Maximum ambiguous count in reference sequences [%(default)s]')
     parser.add_argument('-w', '--weights',
             type = Csv2Dict('name', 'weight', fieldnames = ['name', 'weight']),
             default = {},
@@ -168,8 +172,8 @@ def action(args):
             lambda b: b['target_rank_id'] not in args.exclude_by_taxid, blast_results)
 
     # (Optional) In some cases you want to filter some target hits
+    blast_results = ifilter(lambda b: b['ambig_count'] <= args.max_ambiguous, blast_results)
 #    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
-#    blast_results = ifilter(lambda b: b['ambig_count'] < 3, blast_results)
 #    blast_results = ifilter(
 #            lambda b: not UNCLASSIFIED_REGEX.search(b['target_rank_name']), blast_results)
     ###
@@ -229,12 +233,13 @@ def action(args):
         sort_by_reads = lambda c: sum(int(args.weights.get(q, 1)) for q in set(c['query'] for c in c[1]))
         for cat, hits in sorted(categories.items(), key=sort_by_reads, reverse=True):
             # only output categories with hits
+            if cat not in assignments:
+                assignments.append(cat)
+
+            assignment_id = assignments.index(cat)
+
             if hits:
                 # assignment indexing
-                if cat not in assignments:
-                    assignments.append(cat)
-
-                assignment_id = assignments.index(cat)
                 clusters = set(map(itemgetter('query'), hits))
                 coverages = set(map(itemgetter('coverage'), hits))
                 percents = set(map(itemgetter('pident'), hits))
@@ -256,14 +261,13 @@ def action(args):
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
                     })
 
-                if args.out_detail:
-                    detail.writerows(dict({
-                        'specimen':specimen,
-                        'assignment':cat,
-                        'assignment_id':assignment_id,
-                        'hi':args.max_identity,
-                        'low':args.min_identity,
-                        'target_rank':args.target_rank,
-                        }, **h) for h in hits)
+            if args.out_detail:
+                detail.writerows(dict({
+                    'specimen':specimen,
+                    'assignment':cat,
+                    'assignment_id':assignment_id,
+                    'hi':args.max_identity,
+                    'low':args.min_identity,
+                    'target_rank':args.target_rank,
+                    }, **h) for h in hits)
 
-                assignment_id += 1
