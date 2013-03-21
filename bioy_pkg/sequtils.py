@@ -762,13 +762,4 @@ def is_type(gb):
     as indicated by the presence of the string '(T)' within the record description.
     """
     return '(T)' in gb.description
-
-def gb2info(record, seqname = None):
-    """
-    Return a seqinfo dict from a BioPython seq object
-    """
-    return {'seqname':seqname or record.name, 'tax_id':tax_of_genbank(record),
-            'accession':record.id, 'description':record.description, 'length':len(record.seq),
-            'ambig_count':count_ambiguous(record.seq), 'is_type':is_type(record),
-            'rdp_lineage':';'.join(record.annotations.get('taxonomy', [])).replace('"', '')}
 ###
