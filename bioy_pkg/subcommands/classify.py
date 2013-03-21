@@ -233,12 +233,12 @@ def action(args):
         sort_by_reads = lambda c: sum(int(args.weights.get(q, 1)) for q in set(c['query'] for c in c[1]))
         for cat, hits in sorted(categories.items(), key=sort_by_reads, reverse=True):
             # only output categories with hits
-            if cat not in assignments:
-                assignments.append(cat)
-
-            assignment_id = assignments.index(cat)
-
             if hits:
+                if cat not in assignments:
+                    assignments.append(cat)
+
+                assignment_id = assignments.index(cat)
+
                 # assignment indexing
                 clusters = set(map(itemgetter('query'), hits))
                 coverages = set(map(itemgetter('coverage'), hits))
@@ -261,13 +261,13 @@ def action(args):
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
                     })
 
-            if args.out_detail:
-                detail.writerows(dict({
-                    'specimen':specimen,
-                    'assignment':cat,
-                    'assignment_id':assignment_id,
-                    'hi':args.max_identity,
-                    'low':args.min_identity,
-                    'target_rank':args.target_rank,
-                    }, **h) for h in hits)
+                if args.out_detail:
+                    detail.writerows(dict({
+                        'specimen':specimen,
+                        'assignment':cat,
+                        'assignment_id':assignment_id,
+                        'hi':args.max_identity,
+                        'low':args.min_identity,
+                        'target_rank':args.target_rank,
+                        }, **h) for h in hits)
 
