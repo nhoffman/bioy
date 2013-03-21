@@ -38,7 +38,7 @@ def build_parser(parser):
 def action(args):
     def groupfun(seq):
         if args.seq_info:
-            lineage = args.seq_info[seq.description]
+            lineage = args.seq_info[seq.id]
             if args.secondary_group:
                 return lineage[args.primary_group] or lineage[args.secondary_group]
             else:
