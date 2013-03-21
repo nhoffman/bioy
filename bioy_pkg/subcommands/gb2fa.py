@@ -10,7 +10,7 @@ from csv import DictWriter
 
 from itertools import ifilter, islice
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, INFO_HEADER, is_type, gb2info
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, INFO_HEADER, tax_of_genbank, count_ambiguous, is_type
 
 def build_parser(parser):
     parser.add_argument('infile',
@@ -42,6 +42,11 @@ def build_parser(parser):
             action = 'store_true',
             help = 'seq is in minus strand orientation')
 
+def gb2info(seqname, seq, record):
+    return {'seqname':seqname, 'tax_id':tax_of_genbank(record),
+            'accession':record.id, 'description':record.description,
+            'length':len(seq), 'ambig_count':count_ambiguous(seq)}
+
 def action(args):
     records = islice(SeqIO.parse(args.infile, 'genbank'), args.limit)
 
@@ -61,15 +66,15 @@ def action(args):
                 products = f.qualifiers.get('product', [])
                 if next(ifilter(p_fltr, products), None):
                     tag = f.qualifiers.get('locus_tag', ['unspecified'])[0]
+                    name = '{}_{}'.format(r.name, tag)
                     start, end = f.location.start.position, f.location.end.position
                     seq = r.seq[start:end]
-                    name = '{}_{}_{}'.format(tag, start, end)
 
                     if (args.minus and f.location.strand == 1) or f.location.strand == -1:
                         seq = seq.reverse_complement()
 
                     args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
-                    info.append(gb2info(r, seqname = name))
+                    info.append(gb2info(name, seq, r))
     else:
         # if no product specified output entire seq
         for r in records:
@@ -80,7 +85,7 @@ def action(args):
                 seq = seq.reverse_complement()
 
             args.out.write('>{} {} {}\n{}\n'.format(r.name, r.id, r.description, seq))
-            info.append(gb2info(r, seqname = r.name))
+            info.append(gb2info(r.name, seq.seq, r))
 
     if args.info_out:
         args.info_out.writeheader()
