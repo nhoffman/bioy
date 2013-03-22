@@ -21,9 +21,6 @@ BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
 # use BLAST_FORMAT as input to blastn -outfmt
 BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
 
-INFO_HEADER = ['seqname','tax_id','accession','description',
-                    'length','ambig_count','is_type','rdp_lineage']
-
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',

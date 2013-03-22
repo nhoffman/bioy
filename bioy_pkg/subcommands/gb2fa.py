@@ -10,7 +10,7 @@ from csv import DictWriter
 
 from itertools import ifilter, islice
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, INFO_HEADER, tax_of_genbank, count_ambiguous, is_type
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX,tax_of_genbank, count_ambiguous, is_type
 
 def build_parser(parser):
     parser.add_argument('infile',
@@ -23,7 +23,8 @@ def build_parser(parser):
             type = Opener('w'),
             help = 'ouput fasta file')
     parser.add_argument('-O', '--info-out',
-            type = lambda f: DictWriter(Opener('w')(f), fieldnames = INFO_HEADER),
+            type = lambda f: DictWriter(Opener('w')(f), fieldnames =
+                ['seqname','tax_id','accession','description','length','ambig_count']),
             help = 'Output seq info file')
     parser.add_argument('-f', '--filter',
             action = 'store_true',
