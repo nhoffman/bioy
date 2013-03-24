@@ -11,7 +11,7 @@ from collections import defaultdict
 from itertools import groupby, imap, ifilter
 from operator import itemgetter
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy
+from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy, BLAST_HEADER
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -85,9 +85,6 @@ def build_parser(parser):
             default = 0,
             type = int,
             help = 'minimum cluster size to include in classification output')
-    parser.add_argument('--blast-fmt',
-            help = 'blast header (default: qseqid sseqid pident qstart qend qlen)',
-            default = 'qseqid sseqid pident qstart qend qlen')
     parser.add_argument('--target-rank',
             help = 'Rank at which to classify. Default: "%(default)s"',
             default = 'species')
@@ -140,13 +137,12 @@ def action(args):
     out.writeheader()
 
     ### filter and format format blast data
-    blast_fmt = args.blast_fmt.split()
-
-    blast_results = DictReader(args.blast_file, fieldnames = blast_fmt, delimiter = '\t')
+    blast_results = DictReader(args.blast_file, fieldnames = BLAST_HEADER)
 
     # add some preliminary values to blast results
     blast_results = imap(lambda b: dict({
-        'coverage':coverage(b['qstart'], b['qend'], b['qlen']),
+        'coverage':coverage(
+            b['qstart'], b['qend'], b['qlen'] or (float(b['qend']) - float(b['qstart']) + 1)),
         }, **b), blast_results)
 
     # some raw filtering
