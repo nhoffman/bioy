@@ -1,5 +1,5 @@
 """
-Parse region between primers from fasta file
+Run usearch global and produce classify friendly output
 """
 
 import logging
