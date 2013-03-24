@@ -82,5 +82,5 @@ def action(args):
     if args.header:
         out.writeheader()
 
-    out.writerows(dict(zip(fieldnames, r.split())) for r in StringIO(results))
+    out.writerows(dict(zip(fieldnames, r.strip().split('\t'))) for r in StringIO(results))
 

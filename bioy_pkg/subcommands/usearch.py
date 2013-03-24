@@ -84,6 +84,6 @@ def action(args):
         out.writeheader()
 
     for r in StringIO(results).readlines()[6:]:
-        vals = r.split('\t')
+        vals = r.strip().split('\t')
         vals = vals[:3] + [vals[6], vals[7] , '']
         out.writerow(dict(zip(fieldnames, vals)))
