@@ -20,6 +20,7 @@ BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
 
 # use BLAST_FORMAT as input to blastn -outfmt
 BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
+BLAST_HEADER = BLAST_FORMAT.split()[1:]
 
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
