@@ -5,6 +5,7 @@ Run blastn and produce classify friendly output
 import logging
 import sys
 
+from itertools import imap, izip
 from subprocess import Popen, PIPE
 from csv import DictWriter
 from cStringIO import StringIO
@@ -77,10 +78,14 @@ def action(args):
 
     fieldnames = BLAST_FORMAT.split()[1:]
 
+    lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
+    lines = imap(lambda l: izip(fieldnames, l), lines)
+    lines = imap(lambda l: dict(l), lines)
+
     out = DictWriter(args.out, fieldnames = fieldnames)
 
     if args.header:
         out.writeheader()
 
-    out.writerows(dict(zip(fieldnames, r.strip().split('\t'))) for r in StringIO(results))
+    out.writerows(lines)
 

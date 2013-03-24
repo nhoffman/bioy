@@ -5,6 +5,7 @@ Run usearch global and produce classify friendly output
 import logging
 import sys
 
+from itertools import izip, ifilter, imap
 from subprocess import Popen, PIPE
 from csv import DictWriter
 from cStringIO import StringIO
@@ -78,12 +79,16 @@ def action(args):
 
     fieldnames = BLAST_FORMAT.split()[1:]
 
+    lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
+    lines = ifilter(lambda l: len(l) == 12, lines)
+    lines = imap(lambda l: l[:3] + [l[6], l[7] , ''], lines)
+    lines = imap(lambda l: izip(fieldnames, l), lines)
+    lines = imap(lambda l: dict(l), lines)
+
     out = DictWriter(args.out, fieldnames = fieldnames)
 
     if args.header:
         out.writeheader()
 
-    for r in StringIO(results).readlines()[6:]:
-        vals = r.strip().split('\t')
-        vals = vals[:3] + [vals[6], vals[7] , '']
-        out.writerow(dict(zip(fieldnames, vals)))
+    out.writerows(lines)
+
