@@ -81,7 +81,8 @@ def action(args):
 
     lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
     lines = ifilter(lambda l: len(l) == 12, lines)
-    lines = imap(lambda l: l[:3] + [l[6], l[7] , ''], lines)
+    lines = imap(lambda l:
+            l[:3] + [l[6], l[7] , (int(l[7]) - int(l[6]) + 1)], lines)
     lines = imap(lambda l: izip(fieldnames, l), lines)
     lines = imap(lambda l: dict(l), lines)
 

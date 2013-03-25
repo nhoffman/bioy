@@ -141,8 +141,7 @@ def action(args):
 
     # add some preliminary values to blast results
     blast_results = imap(lambda b: dict({
-        'coverage':coverage(
-            b['qstart'], b['qend'], b['qlen'] or (float(b['qend']) - float(b['qstart']) + 1)),
+        'coverage':coverage(b['qstart'], b['qend'], b['qlen'])
         }, **b), blast_results)
 
     # some raw filtering
