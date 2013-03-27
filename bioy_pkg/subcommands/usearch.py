@@ -28,15 +28,9 @@ def build_parser(parser):
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
-    parser.add_argument('--raw',
-            action = 'store_true',
-            help = 'raw tabular blast output')
     parser.add_argument('--header',
             action = 'store_true',
             help = 'output header')
-    parser.add_argument('-u', '--usearch',
-            action = 'store_true',
-            help = 'usearch against a fasta file')
     parser.add_argument('--strand',
             default = 'plus',
             choices = ['plus', 'minus', 'both'],
@@ -46,13 +40,6 @@ def build_parser(parser):
             default = '1',
             help = """Number of threads (CPUs) to use in the BLAST search.
                       default = %(default)s""")
-    parser.add_argument('--time',
-            action = 'store_true',
-            help = 'include blast time output')
-    parser.add_argument('--log',
-            default = sys.stderr,
-            type = Opener('w'),
-            help = 'log file, default: stderr')
     parser.add_argument('--id',
             default = 0.9,
             type = float,
