@@ -7,7 +7,6 @@ import sys
 
 from csv import DictWriter
 from itertools import islice, groupby, ifilter, imap
-from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, parse_primer_alignments, fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -50,7 +49,7 @@ def action(args):
     keep_right = make_fun(args.keep_right)
 
     # parse primer alignments
-    query = lambda hit: itemgetter('q_name')
+    query = lambda hit: hit['q_name']
     aligns = islice(groupby(parse_ssearch36(args.primer_aligns), query), args.limit)
 
     primer_data = lambda (q,h): (q, parse_primer_alignments(
