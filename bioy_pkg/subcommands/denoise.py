@@ -10,57 +10,42 @@ sequences.
 import logging
 import sys
 import csv
-from itertools import groupby, islice
+from itertools import groupby, islice, imap, ifilter
 from random import shuffle
 from collections import defaultdict
 
-from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, from_ascii, fastalite
-from bioy_pkg.utils import chunker, Opener
+from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, fastalite, from_ascii
+from bioy_pkg.utils import chunker, Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
-
-def grouper(groups, rledict = None, min_clust_size = 0, max_clust_size = sys.maxint):
-    """
-    Return iterator of (seqlist, rlelist) tuples. Clusters are broken
-    into chunks no larger than 0.5*max_clust_size
-    """
-
-    for cluster_id, cluster in groups:
-        # must be a list to determine the cluster size
-        cluster = list(cluster)
-        if len(cluster) < min_clust_size:
-            continue
-        elif len(cluster) > max_clust_size:
-            shuffle(cluster)
-            # combine trailing chunk with next to last if less than
-            # half the target chunk size
-            combine_last = max_clust_size * 0.5
-            for chunk in chunker(cluster, max_clust_size, combine_last):
-                rlelist = [rledict[s.id] for s in chunk] if rledict else None
-                yield (chunk, rlelist)
-        else:
-            rlelist = [rledict[s.id] for s in cluster] if rledict else None
-            yield (cluster, rlelist)
 
 def build_parser(parser):
     parser.add_argument('fastafile',
             nargs = '?',
             default = sys.stdin,
-            type = Opener(),
+            type = lambda f: fastalite(Opener()(f)),
             help = 'input fasta file containing original clustered reads (default stdin).')
     parser.add_argument('clusters',
-            help = 'Clusters file (output of "usearch -uc")',
-            type = Opener())
+            type = lambda c: parse_uc(Opener()(c))[0],
+            help = 'Clusters file (output of "usearch -uc")')
+    parser.add_argument('--sample',
+            help = 'sample name')
     parser.add_argument('-r','--rlefile',
-            type = Opener(),
+            type = Csv2Dict(fieldnames=['name','rle']),
             help='An optional file containing run length encoding for infile (.csv.bz2)')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
             default = sys.stdout,
             help='Output fasta file.')
-    parser.add_argument('-m','--mapfile',
-            type = Opener('w'),
+    parser.add_argument('--readmap',
+            type = lambda m: csv.writer(Opener('w')(m)),
             help = 'Output file with columns (readname,clustername)')
+    parser.add_argument('--clustermap',
+            type = lambda m: csv.writer(Opener('w')(m)),
+            help = 'Output file with columns (clustername,samplename)')
+    parser.add_argument('-w', '--weights',
+            type = lambda w: csv.writer(Opener('w')(w)),
+            help = 'Output file with columns (clustername,weight)')
     parser.add_argument('--max-clust-size',
             type = int,
             default = 100, help = 'default %(default)s')
@@ -71,41 +56,63 @@ def build_parser(parser):
             type = int,
             help = 'use no more than N seqs')
 
+def ichunker(seqs, rledict = None, min_clust_size = 0, max_clust_size = sys.maxint):
+    """
+    Return iterator of (seqlist, rlelist) tuples. Clusters are broken
+    into chunks no larger than 0.5*max_clust_size
+    """
+
+    for cluster in seqs:
+        if len(cluster) > max_clust_size:
+            shuffle(cluster)
+            # combine trailing chunk with next to last if less than
+            # half the target chunk size
+            combine_last = max_clust_size * 0.5
+            for chunk in chunker(cluster, max_clust_size, combine_last):
+                rlelist = [from_ascii(rledict[s.id]) for s in chunk] if rledict else None
+                yield (chunk, rlelist)
+        else:
+            rlelist = [from_ascii(rledict[s.id]) for s in cluster] if rledict else None
+            yield (cluster, rlelist)
+
 def action(args):
-    log.info('reading {}'.format(args.clusters))
-    cluster_ids, cluster_sizes = parse_uc(args.clusters)
-
     # sort and group by cluster_id
-    get_cluster = lambda s: cluster_ids[s.description]
-    seqs = islice(fastalite(args.fastafile), args.limit)
-    groups = groupby(sorted(seqs, key = get_cluster), key = get_cluster)
+    seqs = islice(args.fastafile, args.limit)
 
-    log.info('reading {}'.format(args.rlefile))
-    if args.rlefile:
-        rledict = {r['name']:from_ascii(r['rle']) for r in csv.DictReader(args.rlefile)}
-    else:
-        rledict = None
+    seqs = sorted(seqs, key = lambda s: args.clusters[s.description])
 
-    clusters = grouper(groups, rledict,
-                       args.min_clust_size, args.max_clust_size)
+    seqs = groupby(seqs, lambda s: args.clusters[s.description])
+
+    seqs = imap(lambda (_,s): list(s), seqs)
+
+    seqs = ifilter(lambda s: len(s) >= args.min_clust_size, seqs)
+
+    seqs = ichunker(seqs, args.rlefile, args.min_clust_size, args.max_clust_size)
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
     exemplars = defaultdict(list)
-    for i, (cluster, rlelist) in enumerate(clusters):
+    for i, (cluster, rlelist) in enumerate(seqs):
         log.info('aligning cluster {} len {}'.format(i, len(cluster)))
         cons = consensus(run_muscle(cluster), rlelist)
         exemplars[cons].extend([s.id for s in cluster])
 
     # write each consensus sequence
-    if args.mapfile:
-        mapfile = csv.writer(args.mapfile)
-
-    items = sorted(exemplars.items(), key = lambda x: -1*len(x[1]))
+    items = sorted(exemplars.items(), key = lambda x: -1 * len(x[1]))
     for i, (cons, names) in enumerate(items, start = 1):
-        consname = 'cons%04i|%s' % (i, len(names))
+        weight = len(names)
+        consname = 'cons%04i|%s' % (i, weight)
+
         log.info('writing {}'.format(consname))
+
         args.outfile.write('>{}\n{}\n'.format(consname, cons))
 
-        if args.mapfile:
-            mapfile.writerows((name, consname) for name in names)
+        if args.readmap:
+            args.readmap.writerows((name, consname) for name in names)
+
+        if args.clustermap and args.sample:
+            args.clustermap.writerow((consname, args.sample))
+
+        if args.weights:
+            args.weights.writerow((consname, weight))
+
