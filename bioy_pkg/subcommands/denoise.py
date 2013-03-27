@@ -56,7 +56,7 @@ def build_parser(parser):
             type = int,
             help = 'use no more than N seqs')
 
-def ichunker(seqs, rledict = None, min_clust_size = 0, max_clust_size = sys.maxint):
+def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
     """
     Return iterator of (seqlist, rlelist) tuples. Clusters are broken
     into chunks no larger than 0.5*max_clust_size
@@ -87,7 +87,7 @@ def action(args):
 
     seqs = ifilter(lambda s: len(s) >= args.min_clust_size, seqs)
 
-    seqs = ichunker(seqs, args.rlefile, args.min_clust_size, args.max_clust_size)
+    seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
@@ -101,7 +101,7 @@ def action(args):
     items = sorted(exemplars.items(), key = lambda x: -1 * len(x[1]))
     for i, (cons, names) in enumerate(items, start = 1):
         weight = len(names)
-        consname = 'cons%04i|%s' % (i, weight)
+        consname = 'cons{:04}|{}'.format(i, weight)
 
         log.info('writing {}'.format(consname))
 
