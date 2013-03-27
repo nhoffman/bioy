@@ -28,8 +28,8 @@ def build_parser(parser):
     parser.add_argument('clusters',
             type = lambda c: parse_uc(Opener()(c))[0],
             help = 'Clusters file (output of "usearch -uc")')
-    parser.add_argument('--sample',
-            help = 'sample name')
+    parser.add_argument('--specimen',
+            help = 'sample name for mapfile')
     parser.add_argument('-r','--rlefile',
             type = Csv2Dict(fieldnames=['name','rle']),
             help='An optional file containing run length encoding for infile (.csv.bz2)')
@@ -110,9 +110,8 @@ def action(args):
         if args.readmap:
             args.readmap.writerows((name, consname) for name in names)
 
-        if args.clustermap and args.sample:
-            args.clustermap.writerow((consname, args.sample))
+        if args.clustermap and args.specimen:
+            args.clustermap.writerow((consname, args.specimen))
 
         if args.weights:
             args.weights.writerow((consname, weight))
-
