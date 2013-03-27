@@ -4,6 +4,7 @@ Run blastn and produce classify friendly output
 
 import logging
 import sys
+import os
 
 from itertools import imap, izip
 from subprocess import Popen, PIPE
@@ -39,17 +40,20 @@ def build_parser(parser):
     parser.add_argument('--threads',
             default = '1',
             help = """Number of threads (CPUs) to use in the BLAST search.
-                      default = %(default)s""")
+                   Can also specify with environment variable BLAST_THREADS
+                   default = %(default)s""")
     parser.add_argument('--id',
             default = '90',
             help = 'minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
             help = 'maximum number of alignments to keep')
+    parser.add_argument('-n', '--dry-run', action = 'store_true',
+                        default = False, help = 'print blast command and exit')
 
 def action(args):
     command = ['blastn']
     command += ['-query', args.fasta]
-    command += ['-num_threads', args.threads]
+    command += ['-num_threads', os.environ.get('BLAST_THREADS') or args.threads]
     command += ['-perc_identity', args.id]
     command += ['-outfmt', BLAST_FORMAT]
     command += ['-db', args.database]
@@ -57,6 +61,11 @@ def action(args):
 
     if args.max:
         command += ['-max_target_seqs', args.max]
+
+    print ' '.join(map(str, command))
+    if args.dry_run:
+        print 'dry run - exiting'
+        sys.exit(0)
 
     pipe = Popen(command, stdout = PIPE, stderr = PIPE)
     results, errors = pipe.communicate()
@@ -75,4 +84,3 @@ def action(args):
         out.writeheader()
 
     out.writerows(lines)
-
