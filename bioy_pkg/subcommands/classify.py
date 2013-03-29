@@ -175,6 +175,8 @@ def action(args):
     else:
         specimen_grouper = lambda s: s['qseqid']
 
+    blast_results = sorted(blast_results, key = specimen_grouper)
+
     assignments = [] # assignment list for assignment ids
     details = [] # hit details
     for specimen, hits in groupby(blast_results, specimen_grouper):
