@@ -3,6 +3,7 @@ Outputs a standard Genbank Record File into fasta file format and optional seqin
 """
 
 import sys
+import logging
 
 from bioy_pkg.utils import Opener
 from Bio import SeqIO
@@ -11,6 +12,8 @@ from csv import DictWriter
 from itertools import ifilter, islice
 
 from bioy_pkg.sequtils import UNCLASSIFIED_REGEX,tax_of_genbank, count_ambiguous, is_type
+
+log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('infile',
@@ -42,6 +45,10 @@ def build_parser(parser):
     parser.add_argument('-m', '--minus',
             action = 'store_true',
             help = 'seq is in minus strand orientation')
+    parser.add_argument('--max-ambiguous',
+            type = int,
+            default = 0,
+            help = 'ambiguous base count threshold default = %(default)s')
 
 def gb2info(seqname, seq, record):
     return {'seqname':seqname, 'tax_id':tax_of_genbank(record),
@@ -74,8 +81,14 @@ def action(args):
                     if (args.minus and f.location.strand == 1) or f.location.strand == -1:
                         seq = seq.reverse_complement()
 
-                    args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
-                    info.append(gb2info(name, seq, r))
+                    ambig_count = count_ambiguous(seq)
+
+                    if ambig_count <= args.max_ambiguous:
+                        args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
+                        info.append(gb2info(name, seq, r))
+                    else:
+                        log.warning('dropping seq {} because of {} ambiguous bases'.format(
+                            name, ambig_count))
     else:
         # if no product specified output entire seq
         for r in records:
