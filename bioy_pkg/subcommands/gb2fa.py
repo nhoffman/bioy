@@ -47,7 +47,7 @@ def build_parser(parser):
             help = 'seq is in minus strand orientation')
     parser.add_argument('--max-ambiguous',
             type = int,
-            default = 0,
+            default = sys.maxint,
             help = 'ambiguous base count threshold default = %(default)s')
 
 def gb2info(seqname, seq, record):
