@@ -32,7 +32,7 @@ def build_parser(parser):
     parser.add_argument('-f', '--filter',
             action = 'store_true',
             help = 'Filter against UNCLASSIFIED_REGEX: {}'.format(UNCLASSIFIED_REGEX))
-    parser.add_argument('--features',
+    parser.add_argument('--feature',
             action = 'append',
             help = """parse genome features (ex ribosomal subunits (16S, 18S, etc))
                       from genbank record""")
@@ -49,6 +49,12 @@ def build_parser(parser):
             type = int,
             default = sys.maxint,
             help = 'ambiguous base count threshold default = %(default)s')
+    parser.add_argument('--min-length',
+            type = int,
+            default = 0,
+            help = 'minimum length for reference sequences')
+    parser.add_arguments('--show-products',
+            help = 'pattern match and show show products.  For all products use empty string ("") (NOT IMPLEMENTED)')
 
 def gb2info(seqname, seq, record):
     return {'seqname':seqname, 'tax_id':tax_of_genbank(record),
@@ -66,13 +72,12 @@ def action(args):
 
     info = []
 
-    if args.features:
+    if args.feature:
         # Parse out product locations
         for r in records:
             for f in r.features:
-                p_fltr = lambda p: next(ifilter(lambda a: a in p, args.features), False)
                 products = f.qualifiers.get('product', [])
-                if next(ifilter(p_fltr, products), None):
+                if set(products) & set(args.feature):
                     tag = f.qualifiers.get('locus_tag', ['unspecified'])[0]
                     name = '{}_{}'.format(r.name, tag)
                     start, end = f.location.start.position, f.location.end.position
@@ -82,13 +87,19 @@ def action(args):
                         seq = seq.reverse_complement()
 
                     ambig_count = count_ambiguous(seq)
+                    length = len(seq)
 
-                    if ambig_count <= args.max_ambiguous:
-                        args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
-                        info.append(gb2info(name, seq, r))
-                    else:
+                    if length < args.min_length:
+                        log.warning('dropping seq {} because of length {}'.format(name, length))
+                        log.debug('Record and Feature information for short seq:')
+                        log.debug(r)
+                        log.debug(f)
+                    elif  ambig_count > args.max_ambiguous:
                         log.warning('dropping seq {} because of {} ambiguous bases'.format(
                             name, ambig_count))
+                    else:
+                        args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
+                        info.append(gb2info(name, seq, r))
     else:
         # if no product specified output entire seq
         for r in records:
