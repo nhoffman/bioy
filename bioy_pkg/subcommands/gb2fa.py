@@ -53,7 +53,7 @@ def build_parser(parser):
             type = int,
             default = 0,
             help = 'minimum length for reference sequences')
-    parser.add_arguments('--show-products',
+    parser.add_argument('--show-products',
             help = 'pattern match and show show products.  For all products use empty string ("") (NOT IMPLEMENTED)')
 
 def gb2info(seqname, seq, record):
