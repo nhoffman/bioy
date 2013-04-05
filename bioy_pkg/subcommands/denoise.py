@@ -38,13 +38,13 @@ def build_parser(parser):
             default = sys.stdout,
             help='Output fasta file.')
     parser.add_argument('--readmap',
-            type = lambda m: csv.writer(Opener('w')(m)),
+            type = lambda f: csv.writer(Opener('w')(f)),
             help = 'Output file with columns (readname,clustername)')
     parser.add_argument('--clustermap',
-            type = lambda m: csv.writer(Opener('w')(m)),
+            type = lambda f: csv.writer(Opener('w')(f)),
             help = 'Output file with columns (clustername,samplename)')
     parser.add_argument('-w', '--weights',
-            type = lambda w: csv.writer(Opener('w')(w)),
+            type = lambda f: csv.writer(Opener('w')(f)),
             help = 'Output file with columns (clustername,weight)')
     parser.add_argument('--max-clust-size',
             type = int,
@@ -76,17 +76,11 @@ def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
             yield (cluster, rlelist)
 
 def action(args):
-    # sort and group by cluster_id
     seqs = islice(args.fastafile, args.limit)
-
     seqs = sorted(seqs, key = lambda s: args.clusters[s.description])
-
     seqs = groupby(seqs, lambda s: args.clusters[s.description])
-
     seqs = imap(lambda (_,s): list(s), seqs)
-
     seqs = ifilter(lambda s: len(s) >= args.min_clust_size, seqs)
-
     seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
 
     # calculate consensus for each cluster, then accumulate names of
