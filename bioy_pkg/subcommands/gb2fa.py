@@ -34,6 +34,7 @@ def build_parser(parser):
             help = 'Filter against UNCLASSIFIED_REGEX: {}'.format(UNCLASSIFIED_REGEX))
     parser.add_argument('--feature',
             action = 'append',
+            dest = 'features',
             help = """parse genome features (ex ribosomal subunits (16S, 18S, etc))
                       from genbank record""")
     parser.add_argument('-t', '--type-strains',
@@ -72,12 +73,13 @@ def action(args):
 
     info = []
 
-    if args.feature:
+    if args.features:
+        args.features = set(args.features)
         # Parse out product locations
         for r in records:
             for f in r.features:
-                products = f.qualifiers.get('product', [])
-                if set(products) & set(args.feature):
+                products = set(f.qualifiers.get('product', []))
+                if products & args.features:
                     tag = f.qualifiers.get('locus_tag', ['unspecified'])[0]
                     name = '{}_{}'.format(r.name, tag)
                     start, end = f.location.start.position, f.location.end.position
@@ -110,7 +112,7 @@ def action(args):
                 seq = seq.reverse_complement()
 
             args.out.write('>{} {} {}\n{}\n'.format(r.name, r.id, r.description, seq))
-            info.append(gb2info(r.name, seq.seq, r))
+            info.append(gb2info(r.name, seq, r))
 
     if args.info_out:
         args.info_out.writeheader()
