@@ -1,5 +1,5 @@
 """
-Return degapped fasta of aligned target region from ssearch results
+Returns a fasta of target regions from an ssearch36 result
 """
 
 import logging
