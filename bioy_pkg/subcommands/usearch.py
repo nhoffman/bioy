@@ -10,7 +10,7 @@ from subprocess import Popen, PIPE
 from csv import DictWriter
 from cStringIO import StringIO
 
-from bioy_pkg.sequtils import BLAST_FORMAT
+from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT
 from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def build_parser(parser):
             type = float,
             help = 'minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
-            help = 'maximum number of alignments to keep')
+            help = 'maximum number of alignments to keep default = 1')
 
 def action(args):
     command = ['usearch6_64']
@@ -64,16 +64,17 @@ def action(args):
 
     log.error(errors)
 
-    fieldnames = BLAST_FORMAT.split()[1:]
-
     lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
+
+    # usearch has strange commenting at the top it's alignment.
+    # we just just want the lines seperated by 12 tabs
     lines = ifilter(lambda l: len(l) == 12, lines)
     lines = imap(lambda l:
             l[:3] + [l[6], l[7] , (int(l[7]) - int(l[6]) + 1)], lines)
-    lines = imap(lambda l: izip(fieldnames, l), lines)
+    lines = imap(lambda l: izip(BLAST_HEADER, l), lines)
     lines = imap(lambda l: dict(l), lines)
 
-    out = DictWriter(args.out, fieldnames = fieldnames)
+    out = DictWriter(args.out, fieldnames = BLAST_HEADER)
 
     if args.header:
         out.writeheader()
