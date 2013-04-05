@@ -46,7 +46,7 @@ def build_parser(parser):
             default = '90',
             help = 'minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
-            help = 'maximum number of alignments to keep')
+            help = 'maximum number of alignments to keep default = (all)')
     parser.add_argument('-n', '--dry-run', action = 'store_true',
                         default = False, help = 'print blast command and exit')
 
