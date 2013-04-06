@@ -37,10 +37,13 @@ def action(args):
         sys.exit('the following filednames are required: '.format(
             ''.join(required)))
 
-    fields_out = ['specimen'] + fields_in
+    # remove empty columns
+    fields_out = [f for f in ['specimen'] + fields_in if f.strip()]
 
-    writer = csv.DictWriter(args.out, fieldnames = fields_out)
+    writer = csv.DictWriter(args.out, fieldnames = fields_out,
+                            extrasaction = 'ignore')
     writer.writeheader()
     for d in reader:
-        d['specimen'] = format_label(args.data_id, d['barcode_id'])
-        writer.writerow(d)
+        if d['barcode_id']:
+            d['specimen'] = format_label(args.data_id, d['barcode_id'])
+            writer.writerow(d)
