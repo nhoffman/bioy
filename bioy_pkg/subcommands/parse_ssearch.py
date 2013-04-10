@@ -1,112 +1,64 @@
 """
-Parse ssearch36 -m10 output and print specified contents
+Returns a fasta of target regions from an ssearch36 result
 """
 
 import logging
 import sys
-import pprint
-import csv
-from itertools import islice
 
-from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
+from csv import DictWriter
+from itertools import islice, ifilter
+
+from bioy_pkg.sequtils import parse_ssearch36, count_ambiguous
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
+INFO_HEADER = ['seqname', 'tax_id', 'accession', 'description', 'length', 'ambig_count']
+
 def build_parser(parser):
-    parser.add_argument(
-        'alignments',
-        default = sys.stdin,
-        type = Opener('r'),
-        nargs = '?',
-        help = 'ssearch -m 10 formatted file')
-    parser.add_argument(
-        '-o', '--out',
-        default = sys.stdout,
-        type = Opener('w'),
-        help = '(default csv)-formatted output')
-    parser.add_argument(
-        '-p', '--print-one',
-        default = False, action = 'store_true',
-        help = 'pretty print first alignment and exit')
-    parser.add_argument(
-        '-f', '--fieldnames',
-        default = 'q_name,t_name,sw_ident',
-        help = 'comma-delimited list of field names to include in output [%(default)s]')
-    parser.add_argument(
-            '--all-fieldnames',
-            help = 'Output all ssearch fieldnames.  Overrides --fieldnames'
-            )
-    parser.add_argument(
-        '--limit',
+    parser.add_argument('aligns',
+        type = lambda f: parse_ssearch36(Opener()(f)),
+        help = 'ssearch36 output to pull parsing coordinates')
+    parser.add_argument('--info',
+        type = Csv2Dict('seqname', fieldnames = INFO_HEADER),
+        help = 'seq info file of target seqs')
+    parser.add_argument('--min-zscore',
+        help = 'minimum z-score',
+        type = float)
+    parser.add_argument('--rle',
+        type = Csv2Dict('name'),
+        help = 'run length encoded file (NOT IMPLEMENTED)')
+    parser.add_argument('--limit',
         type = int,
-        metavar = 'N',
-        help = 'Print no more than N alignments')
-    parser.add_argument(
-        '--expr',
-        help = """Filter output according to a python expression.
-                  Each alignment is represented by a dict called "a".
-                  Example: --expr="a['sw_zscore'] > 550" """)
-    parser.add_argument('--no-header',
-        dest='header',
-        action = 'store_false')
-    parser.add_argument('-d', '--decode',
-        type = Csv2Dict('name', 'rle'),
-        default = [],
-        nargs = '+',
-        help = 'Decode alignment')
-    parser.add_argument('--fasta',
-            choices = ['t_seq','t_name', 'q_seq', 'q_name', 'all'],
-            help = """creates a fasta format of the alignment by
-                      query ('q_seq' or 'q_name'), target ('t_seq' or 't_name') or 'all'""")
+        help = 'maximum number of query sequences to read from the alignment')
+    parser.add_argument('-O', '--out-info',
+        type = lambda f: DictWriter(Opener('w')(f), fieldnames = INFO_HEADER),
+        help = 'out info file')
+    parser.add_argument('-o', '--out',
+        type = Opener('w'),
+        default = sys.stdout,
+        help = 'output file for fasta reads')
 
 def action(args):
-    tot = 0
-    rledict = {}
-    for r in args.decode:
-        rledict.update(r)
-        tot += len(r)
-        log.info('read {} sequences'.format(len(r)))
-    # detect name collisions among rle files
-    assert len(rledict) == tot
+    aligns = ifilter(lambda a: float(a['sw_zscore']) >= args.min_zscore, args.aligns)
+    aligns = islice(aligns, args.limit)
 
-    aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
-
-    if args.print_one:
-        pprint.pprint(aligns.next())
-        sys.exit()
-
-    if not args.fasta:
-        if args.all_fieldnames:
-            aligns = list(aligns)
-            fieldnames = aligns[0]
-        else:
-            fieldnames = args.fieldnames.split(',')
-
-        writer = csv.DictWriter(
-            args.out, fieldnames=fieldnames,
-            extrasaction = 'ignore')
-
-        if args.header:
-            writer.writeheader()
+    if args.out_info:
+        args.out_info.writeheader()
 
     for a in aligns:
-        if args.expr:
-            if not eval(args.expr):
-                continue
+        start = int(a['t_al_start']) - int(a['t_al_display_start'])
+        stop = int(a['t_al_stop']) - int(a['t_al_display_start']) + 1
+        seq = a['t_seq'].replace('-', '')[start:stop]
+        args.out.write('>{}\n{}\n'.format(a['t_description'], seq))
 
-        if rledict:
-            a['t_seq'], a['q_seq'] = homodecodealignment(
-                a['t_seq'], from_ascii(rledict[a['t_name']]),
-                a['q_seq'], from_ascii(rledict[a['q_name']]))
+        if args.info and args.out_info:
+            seqname = a['t_name']
+            info = args.info[seqname]
+            info.update({
+                'seqname':seqname,
+                'length':len(seq),
+                'ambig_count':count_ambiguous(seq)
+                })
+            args.out_info.writerow(info)
 
-        if args.fasta:
-            if args.fasta == 'all':
-                args.out.write('>{}\n{}\n'.format(a['q_name'], a['q_seq']))
-                args.out.write('>{}\n{}\n'.format(a['t_description'], a['t_seq']))
-            elif args.fasta in ('q_seq', 'q_name'):
-                args.out.write('>{}\n{}\n'.format(a['q_name'], a['q_seq']))
-            else:
-                args.out.write('>{}\n{}\n'.format(a['t_description'], a['t_seq']))
-        else:
-            writer.writerow(a)
