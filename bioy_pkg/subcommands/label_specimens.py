@@ -10,18 +10,20 @@ from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
+def format_label(data_id, barcode_id):
+    return '{:03}_{:02}'.format(int(data_id), int(barcode_id))
 
 def build_parser(parser):
     parser.add_argument('labels',
                         default = sys.stdin, type = Opener('rU'),
                         help = ('csv format file (minimally) with '
                                 'headers "barcode_id,label"'))
+    parser.add_argument('data_id', type = int,
+                        help = 'integer identifying the data set')
     parser.add_argument('-o', '--out',
                         type = Opener('w'),
                         default = sys.stdout,
                         help = 'csv file with headers "specimen,label,..."')
-    parser.add_argument('run',
-                        help = 'string identifying run in specimen labels')
 
 
 def action(args):
@@ -35,10 +37,13 @@ def action(args):
         sys.exit('the following filednames are required: '.format(
             ''.join(required)))
 
-    fields_out = ['specimen'] + fields_in
+    # remove empty columns
+    fields_out = [f for f in ['specimen'] + fields_in if f.strip()]
 
-    writer = csv.DictWriter(args.out, fieldnames = fields_out)
+    writer = csv.DictWriter(args.out, fieldnames = fields_out,
+                            extrasaction = 'ignore')
     writer.writeheader()
     for d in reader:
-        d['specimen'] = '{}s{:02}'.format(args.run, int(d['barcode_id']))
-        writer.writerow(d)
+        if d['barcode_id']:
+            d['specimen'] = format_label(args.data_id, d['barcode_id'])
+            writer.writerow(d)
