@@ -88,19 +88,19 @@ def action(args):
                     name = '{}_{}'.format(r.name, tag)
                     start, end = f.location.start.position, f.location.end.position
                     seq = r.seq[start:end]
+                    length = len(seq)
 
                     if (args.minus and f.location.strand == 1) or f.location.strand == -1:
                         seq = seq.reverse_complement()
 
                     ambig_count = count_ambiguous(seq)
-                    length = len(seq)
 
                     if length < args.min_length:
                         log.warning('dropping seq {} because of length {}'.format(name, length))
                         log.debug('Record and Feature information for short seq:')
                         log.debug(r)
                         log.debug(f)
-                    elif  ambig_count > args.max_ambiguous:
+                    elif ambig_count > args.max_ambiguous:
                         log.warning('dropping seq {} because of {} ambiguous bases'.format(
                             name, ambig_count))
                     else:
@@ -112,15 +112,25 @@ def action(args):
             if args.region:
                 start, end = args.region[0], args.region[1]
                 seq = r.seq[start:end]
+                name = '{}_{}_{}'.format(r.name, start, end)
             else:
                 seq = r.seq
+                name = r.name
 
-            src = next(ifilter(lambda f: f.type == 'source', r.features), None)
-            if src and ((args.minus and src.location.strand == 1) or src.location.strand == -1):
-                seq = seq.reverse_complement()
+            length = len(seq)
 
-            args.out.write('>{} {} {}\n{}\n'.format(r.name, r.id, r.description, seq))
-            info.append(gb2info(r.name, seq, r))
+            if length < args.min_length:
+                log.warning('dropping seq {} because of length {}'.format(name, length))
+                log.debug('Record and Feature information for short seq:')
+                log.debug(r)
+                log.debug(f)
+            else:
+                src = next(ifilter(lambda f: f.type == 'source', r.features), None)
+                if src and ((args.minus and src.location.strand == 1) or src.location.strand == -1):
+                    seq = seq.reverse_complement()
+
+                args.out.write('>{} {} {}\n{}\n'.format(name, r.id, r.description, seq))
+                info.append(gb2info(name, seq, r))
 
     if args.info_out:
         args.info_out.writeheader()
