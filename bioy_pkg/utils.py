@@ -149,9 +149,9 @@ class Csv2Dict(object):
 
         results = {}
         for r in reader:
-            key = r.pop(self.index)
+            key = r[self.index]
             if len(r) == 1:
-                results[key] = r.popitem()[1]
+                results[key] = r[1]
             elif self.value:
                 results[key] = r[self.value]
             else:
