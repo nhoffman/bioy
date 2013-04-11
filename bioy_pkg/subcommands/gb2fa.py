@@ -56,6 +56,10 @@ def build_parser(parser):
             help = 'minimum length for reference sequences')
     parser.add_argument('--show-products',
             help = 'pattern match and show show products.  For all products use empty string ("") (NOT IMPLEMENTED)')
+    parser.add_argument('--region',
+            metavar = 'start:end',
+            type = lambda r: map(int, r.split(':')),
+            help = 'parse specific region from genbank record')
 
 def gb2info(seqname, seq, record):
     return {'seqname':seqname, 'tax_id':tax_of_genbank(record),
@@ -105,7 +109,11 @@ def action(args):
     else:
         # if no product specified output entire seq
         for r in records:
-            seq = r.seq
+            if args.region:
+                start, end = args.region[0], args.region[1]
+                seq = r.seq[start:end]
+            else:
+                seq = r.seq
 
             src = next(ifilter(lambda f: f.type == 'source', r.features), None)
             if src and ((args.minus and src.location.strand == 1) or src.location.strand == -1):
