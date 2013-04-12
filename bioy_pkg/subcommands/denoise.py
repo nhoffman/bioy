@@ -31,7 +31,7 @@ def build_parser(parser):
     parser.add_argument('--specimen',
             help = 'sample name for mapfile')
     parser.add_argument('-r','--rlefile',
-            type = Csv2Dict(fieldnames=['name','rle']),
+            type = Csv2Dict(fieldnames=['name','rle'], value = 'rle'),
             help='An optional file containing run length encoding for infile (.csv.bz2)')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
