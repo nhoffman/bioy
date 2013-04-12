@@ -7,7 +7,9 @@ of identical sequences.
 
 import logging
 import sys
-from itertools import groupby
+
+from csv import DictWriter
+from itertools import groupby, imap, chain, tee
 
 from bioy_pkg.deduplicate import dedup
 from bioy_pkg.sequtils import fastalite
@@ -17,26 +19,34 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('sequences',
-            type = lambda f: list(fastalite(opener(f))),
+            type = lambda f: fastalite(opener(f), readfile = False),
             help = 'input fasta file')
     parser.add_argument('-i', '--seq-info',
             type = Csv2Dict('seqname'),
             help = """csv file containing column "seqname" plus
                       another column for grouping sequences prior to deduplication""")
     parser.add_argument('--primary-group',
-            help='string specifying column in seq_info to use for grouping [default %(default)s]',
+            help = 'string specifying column in seq_info to use for grouping [default %(default)s]',
             default = 'species')
     parser.add_argument('--secondary-group',
             help = """string specifying column in seq_info to use for grouping
                       if primary_group is undefined for a given row [default %(default)s]""",
             default = 'tax_id')
+    parser.add_argument('-O', '--out-info',
+            type = Opener('w'),
+            help = 'deduplicate seq info file')
     parser.add_argument('-o','--out',
             type = Opener('w'),
             default = sys.stdout,
-            help = 'Output fasta file.')
+            help = 'Output fasta file')
+
+def dedups(seqs):
+    d = dedup([s.seq for s in seqs]).keys()
+    d = map(lambda i: seqs[i], d)
+    return d
 
 def action(args):
-    def groupfun(seq):
+    def seq_group(seq):
         if args.seq_info:
             lineage = args.seq_info[seq.id]
             if args.secondary_group:
@@ -46,8 +56,17 @@ def action(args):
         else:
             return 'all'
 
-    for _, seqs in groupby(sorted(args.sequences, key = groupfun), groupfun):
-        seqs = list(seqs)
-        deduped = dedup([s.seq for s in seqs])
-        for i in deduped.keys():
-            args.out.write('>{}\n{}\n'.format(seqs[i].description, seqs[i].seq))
+    seqs = sorted(args.sequences, key = seq_group)
+    seqs = groupby(seqs, seq_group)
+    seqs = imap(lambda (_,s): dedups(list(s)), seqs)
+    seqs = chain(*seqs)
+    seqs, info = tee(seqs)
+
+    for s in seqs:
+        args.out.write('>{}\n{}\n'.format(s.description, s.seq))
+
+    if args.out_info:
+        fieldnames = next(iter(args.seq_info.values())).keys()
+        info_out = DictWriter(args.out_info, fieldnames = fieldnames)
+        info_out.writeheader()
+        info_out.writerows([args.seq_info[s.id] for s in info])
