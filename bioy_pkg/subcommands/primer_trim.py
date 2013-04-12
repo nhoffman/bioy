@@ -26,6 +26,12 @@ def build_parser(parser):
     parser.add_argument('-r','--keep-right',
             help = 'python expression defining criteria for keeping left primer',
             default = "200 <= d.get('start') <= 320 and d.get('sw_zscore') > 50")
+    parser.add_argument('--left-primer-name',
+            default = 'lprimer',
+            help = 'name of left primer. default = %(default)s')
+    parser.add_argument('--right-primer-name',
+            default = 'rprimer',
+            help = 'name of right primer. default = %(default)s')
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
@@ -50,15 +56,17 @@ def action(args):
 
     # parse primer alignments
     query = lambda hit: hit['q_name']
+
     aligns = islice(groupby(parse_ssearch36(args.primer_aligns), query), args.limit)
 
     primer_data = lambda (q,h): (q, parse_primer_alignments(
-        h, lprimer = 'lprimer', rprimer = 'rprimer'))
+        h, lprimer = args.left_primer_name, rprimer = args.right_primer_name))
+
     aligns = imap(primer_data, aligns)
+    aligns = ifilter(lambda (q,h): keep_left(h['l']), aligns)
+    aligns = ifilter(lambda (q,h): keep_right(h['r']), aligns)
 
-    aligns = ifilter(lambda (q,h): keep_left(h['l']) and keep_right(h['r']), aligns)
-
-    seqs = {f.description:f for f in args.fasta}
+    seqs = {f.id:f for f in args.fasta}
 
     # parse the sequences
     rle_rows = []
