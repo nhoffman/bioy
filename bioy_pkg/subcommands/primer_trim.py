@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('fasta',
-            type = lambda f: fastalite(Opener()(f)),
+            type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file')
     parser.add_argument('primer_aligns',
             type = Opener(),
@@ -40,7 +40,7 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'trimmed fasta output file')
     parser.add_argument('--rle',
-            type = Csv2Dict(fieldnames=['name','rle']),
+            type = Csv2Dict(fieldnames = ['name','rle'], value = 'rle'),
             help = 'rle file')
     parser.add_argument('-O', '--out-rle',
             type = lambda f: DictWriter(Opener('w')(f), fieldnames = ['name','rle']),
