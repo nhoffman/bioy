@@ -155,7 +155,8 @@ class Csv2Dict(object):
             elif self.value:
                 results[key] = r[self.value]
             else:
-                results[key] = r
+                fields = lambda k: reader.fieldnames.index(k[0])
+                results[key] = OrderedDict(sorted(r.items(), key = fields))
 
         return results
 
