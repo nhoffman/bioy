@@ -26,7 +26,7 @@ def build_parser(parser):
         help = 'minimum z-score',
         type = float)
     parser.add_argument('--rle',
-        type = Csv2Dict('name'),
+        type = Csv2Dict('name', fieldnames = ['name', 'rle'], value = 'rle'),
         help = 'run length encoded file (NOT IMPLEMENTED)')
     parser.add_argument('--limit',
         type = int,

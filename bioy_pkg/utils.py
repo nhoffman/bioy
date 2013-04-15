@@ -129,6 +129,9 @@ def opener(pth, mode = 'r', bufsize = -1):
 class Csv2Dict(object):
     """Easy way to convert a csv file into a dictionary using the argparse type function
 
+    If no arguments the first column of the csv will be the key and every column
+    will be the value in an OrderedDict.
+
     Keyword Arguments:
         - index -- csv column to key index the dictionary
         - value -- csv column to value the dictionary

@@ -13,7 +13,7 @@ def build_parser(parser):
             type = Opener(),
             help = 'Input fasta file')
     parser.add_argument('rlefile',
-            type = Csv2Dict(),
+            type = Csv2Dict(value = 'rle'),
             help = 'csv file (may be bzip encoded) containing columns "name","rle"')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
