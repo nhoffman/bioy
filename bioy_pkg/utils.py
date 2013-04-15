@@ -150,9 +150,7 @@ class Csv2Dict(object):
         results = {}
         for r in reader:
             key = r[self.index]
-            if len(r) == 1:
-                results[key] = r[1]
-            elif self.value:
+            if self.value:
                 results[key] = r[self.value]
             else:
                 fields = lambda k: reader.fieldnames.index(k[0])
