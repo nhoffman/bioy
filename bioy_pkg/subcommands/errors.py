@@ -71,7 +71,7 @@ def action(args):
         row.update(args.extra_fields)
 
         if args.output_alignment:
-            row.update({'alignment':show_errors(a)})
+            row.update({'alignment':show_errors(a['errors'])})
 
         tallies.writerow(row)
 
