@@ -380,7 +380,7 @@ def itemize_errors(ref, query):
      * ref - reference sequence
      * query - sequence on which error calculation is performed
 
-     Return an iterable of dicts with keys
+     Returns a dict of itemized errors
 
       * i - position relative to ref
       * ref - base or bases in ref
@@ -393,12 +393,21 @@ def itemize_errors(ref, query):
 
     t = h = 0
     m = min(len(query), len(ref))
+    results = []
     while t < m:
         h += max(_find_homochar_length(ref[t:]), _find_homochar_length(query[t:]))
+
         assert (t < h) # strange chars found or miss-alignment
-        yield {'i':len(ref[:t].replace(gap, '').replace(homogap, '')),
-                'ref':ref[t:h], 'query':query[t:h]}
+
+        results.append({
+            'i':len(ref[:t].replace(gap, '').replace(homogap, '')),
+            'ref':ref[t:h],
+            'query':query[t:h]
+            })
+
         t = h
+
+    return results
 
 def _find_homochar_length(s, char = '', ignore = [gap, homogap]):
     '''
