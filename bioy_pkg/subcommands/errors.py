@@ -8,10 +8,9 @@ import sys
 from collections import Counter
 from csv import DictWriter, writer, DictReader
 from itertools import imap, tee
-from os import devnull
 
 from bioy_pkg import sequtils
-from bioy_pkg.sequtils import itemize_errors, error_count
+from bioy_pkg.sequtils import itemize_errors, error_count, show_errors
 from bioy_pkg.utils import Opener, parse_extras
 
 log = logging.getLogger(__name__)
@@ -27,8 +26,8 @@ def build_parser(parser):
             type = Opener('w'),
             help = 'csv file tallying each error category for each read')
     parser.add_argument('-m', '--homopolymer-matrix',
-            type = Opener('w'),
-            default = devnull,
+            dest = 'matrix',
+            type = lambda f: writer(Opener('w')(f)),
             help = 'csv file containing transition matrix of homopolymer lengths')
     parser.add_argument('-M', '--homopolymer-max',
             default = 6,
@@ -45,16 +44,6 @@ def build_parser(parser):
             action='store_true',
             help = 'Include the actual alignment in csv output')
 
-def tallie_errors(align, alignment = False):
-    errors = itemize_errors(align['t_seq'], align['q_seq'])
-    errors['q_name'] = align['q_name']
-    errors['t_name'] = align['t_name']
-
-    if alignment:
-
-
-    return errors
-
 def action(args):
     fieldnames = ['t_name', 'q_name', 'length', 'snp']
     fieldnames += ['indel', 'homoindel','compound']
@@ -64,55 +53,54 @@ def action(args):
         fieldnames += ['alignment']
 
     aligns = DictReader(args.aligns)
-    errors = imap(tallie_errors, aligns)
-    errors, matrix = tee(errors)
-
-
-    # Set up homopolymer matrix vars:
-    cnt = Counter()
-    gtceil = 'geq{}'.format(args.homopolymer_max)
-    ###
+    itemizer = lambda a: dict({'errors':itemize_errors(a['t_seq'], a['q_seq'])}, **a)
+    aligns = imap(itemizer, aligns)
+    aligns, matrix = tee(aligns)
 
     tallies = DictWriter(args.out,
             fieldnames = fieldnames,
             extrasaction = 'ignore')
     tallies.writeheader()
 
+    # output error counts:
     for a in aligns:
-        e = itemize_errors(a['t_seq'], a['q_seq'])
-
         # instantiate d with zero counts for each error type
-        d = {k:0 for k in fieldnames[2:]}
-        d['q_name'], d['t_name'] = a['q_name'], a['t_name']
-        d.update(error_count(e))
-        d.update(args.extra_fields)
+        row = {k:0 for k in fieldnames[2:]}
+        row['q_name'], row['t_name'] = a['q_name'], a['t_name']
+        row.update(error_count(a['errors']))
+        row.update(args.extra_fields)
 
         if args.output_alignment:
-            d.update({'alignment':sequtils.show_errors(e)})
+            row.update({'alignment':show_errors(a)})
 
-        tallies.writerow(d)
-
-
-
-        for d in e:
-            r, q = d['ref'].strip('=-'), d['query'].strip('=-')
-            # count indels or homoindels; exclude compound errors and snps
-            if len(set(r+q)) == 1:
-                cnt[(len(r) if len(r) <= args.homopolymer_max else gtceil,
-                    len(q) if len(q) <= args.homopolymer_max else gtceil)] += 1
+        tallies.writerow(row)
 
         log.debug(a['q_name'])
         log.debug('\n' + sequtils.format_alignment(a['t_seq'], a['q_seq']))
         log.debug(a['q_seq'].replace('-','').replace('=',''))
-        log.debug(sequtils.show_errors(e))
+        log.debug(show_errors(a['errors']))
 
         if args.step:
             raw_input()
 
-    # reference counts in rows, query in column
-    ii = range(args.homopolymer_max)
-    margins = ii + [gtceil]
-    w = writer(args.homopolymer_matrix)
-    w.writerow(['q{}'.format(i) for i in ii] + [gtceil])
-    for i_ref in margins:
-        w.writerow(['r{}'.format(i_ref)] + [cnt[i_ref,i_query] for i_query in margins])
+    # output homopolymer matrix if specified
+    if args.matrix:
+        homopolymers = Counter()
+        gtceil = 'geq{}'.format(args.homopolymer_max)
+
+        for m in matrix:
+            for e in m['errors']:
+                r, q = e['ref'].strip('=-'), e['query'].strip('=-')
+                # count indels or homoindels; exclude compound errors and snps
+                if len(set(r + q)) == 1:
+                    ref_count = len(r) if len(r) <= args.homopolymer_max else gtceil
+                    query_count = len(q) if len(q) <= args.homopolymer_max else gtceil
+                    homopolymers[(ref_count, query_count)] += 1
+
+        # reference counts in rows, query in column
+        ii = range(args.homopolymer_max)
+        margins = ii + [gtceil]
+        args.matrix.writerow(['q{}'.format(i) for i in ii] + [gtceil])
+        for i_ref in margins:
+            cols = [homopolymers[i_ref, i_query] for i_query in margins]
+            args.matrix.writerow(['r{}'.format(i_ref)] + cols)
