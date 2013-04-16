@@ -6,7 +6,9 @@ import logging
 import sys
 import pprint
 import csv
-from itertools import islice, ifilter, imap, chain
+
+from itertools import islice, ifilter, imap, chain, groupby
+from operator import itemgetter
 
 from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -45,24 +47,28 @@ def build_parser(parser):
         type = float,
         metavar = 'X',
         help = 'Exclude alignments with z-score < X')
-
-def get_fieldnames(aligns):
-    top = next(aligns)
-    fieldnames = top.keys()
-    aligns = chain([top], aligns)
-    return fieldnames, aligns
+    parser.add_argument('-a', '--all-alignments',
+        default = False, action = 'store_true',
+        help = """By default, use only the top hit for each.
+                  query; provide this option to include all.""")
 
 def action(args):
-    def decode(aligns):
-        aligns['t_seq'], aligns['q_seq'] = homodecodealignment(
-                aligns['t_seq'], from_ascii(args.decode[aligns['t_name']]),
-                aligns['q_seq'], from_ascii(args.decode[aligns['q_name']]))
-        return aligns
-
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
-    aligns = ifilter(lambda a: a >= args.min_zscore, aligns)
+    aligns = ifilter(lambda a: float(a['sw_zscore']) >= args.min_zscore, aligns)
+    aligns = groupby(aligns, key = itemgetter('q_name'))
+
+    if args.all_alignments:
+        aligns = imap(lambda (_,a): list(a), aligns)
+        aligns = chain(*aligns)
+    else:
+        aligns = imap(lambda (_,a): next(a), aligns)
 
     if args.decode:
+        def decode(aligns):
+            aligns['t_seq'], aligns['q_seq'] = homodecodealignment(
+                    aligns['t_seq'], from_ascii(args.decode[aligns['t_name']]),
+                    aligns['q_seq'], from_ascii(args.decode[aligns['q_name']]))
+            return aligns
         aligns = imap(lambda a: decode(a), aligns)
 
     if args.print_one:
@@ -72,7 +78,9 @@ def action(args):
     if args.fieldnames:
         fieldnames = args.fieldnames
     else:
-        fieldnames, aligns = get_fieldnames(aligns)
+        top = next(aligns, {})
+        fieldnames = top.keys()
+        aligns = chain([top], aligns)
 
     writer = csv.DictWriter(args.out,
             extrasaction = 'ignore',
