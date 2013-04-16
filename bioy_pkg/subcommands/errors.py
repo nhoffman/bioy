@@ -46,7 +46,7 @@ def build_parser(parser):
 
 def action(args):
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
-    fieldnames = ['t_name', 'q_name', 'length', 'snp', 
+    fieldnames = ['t_name', 'q_name', 'length', 'snp',
             'indel', 'homoindel','compound'] + extras.keys()
 
     if args.output_alignment:
@@ -66,7 +66,7 @@ def action(args):
     tallies.writeheader()
 
     for a in DictReader(args.alignments):
-        e = list(itemize_errors(a['t_align'], a['q_align']))
+        e = list(itemize_errors(a['t_seq'], a['q_seq']))
 
         # instantiate d with zero counts for each error type
         d = {k:0 for k in fieldnames[2:]}
@@ -87,8 +87,8 @@ def action(args):
                     len(q) if len(q) <= args.homopolymer_max else gtceil)] += 1
 
         log.debug(a['q_name'])
-        log.debug('\n' + sequtils.format_alignment(a['t_align'], a['q_align']))
-        log.debug(a['q_align'].replace('-','').replace('=',''))
+        log.debug('\n' + sequtils.format_alignment(a['t_seq'], a['q_seq']))
+        log.debug(a['q_seq'].replace('-','').replace('=',''))
         log.debug(sequtils.show_errors(e))
 
         if args.step:
