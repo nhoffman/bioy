@@ -38,8 +38,8 @@ def build_parser(parser):
         dest='header',
         action = 'store_false')
     parser.add_argument('-d', '--decode',
-        type = Csv2Dict('name', 'rle'),
-        default = [],
+        type = Csv2Dict(index = 'name', value = 'rle',
+            fieldnames = ['name', 'rle']),
         nargs = '+',
         help = 'Decode alignment')
     parser.add_argument('--min-zscore',
@@ -64,12 +64,13 @@ def action(args):
         aligns = imap(lambda (_,a): next(a), aligns)
 
     if args.decode:
+        decoding = {k:v for d in args.decode for k,v in d.items()}
         def decode(aligns):
             aligns['t_seq'], aligns['q_seq'] = homodecodealignment(
-                    aligns['t_seq'], from_ascii(args.decode[aligns['t_name']]),
-                    aligns['q_seq'], from_ascii(args.decode[aligns['q_name']]))
+                    aligns['t_seq'], from_ascii(decoding[aligns['t_name']]),
+                    aligns['q_seq'], from_ascii(decoding[aligns['q_name']]))
             return aligns
-        aligns = imap(lambda a: decode(a), aligns)
+        aligns = imap(decode, aligns)
 
     if args.print_one:
         pprint.pprint(aligns.next())

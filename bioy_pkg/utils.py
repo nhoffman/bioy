@@ -161,6 +161,6 @@ class Csv2Dict(object):
 
         return results
 
-def csv2dict(pth, index, value, *args, **kwds):
+def csv2dict(pth, index = None, value = None, *args, **kwds):
     return Csv2Dict(index, value, args, kwds)(pth)
 
