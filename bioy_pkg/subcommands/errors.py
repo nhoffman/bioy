@@ -53,7 +53,9 @@ def action(args):
         fieldnames += ['alignment']
 
     aligns = DictReader(args.aligns)
+
     itemizer = lambda a: dict({'errors':itemize_errors(a['t_seq'], a['q_seq'])}, **a)
+
     aligns = imap(itemizer, aligns)
     aligns, matrix = tee(aligns)
 
