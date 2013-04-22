@@ -480,9 +480,15 @@ def parse_ssearch36(lines, numeric = False):
         elif line.startswith(';') and keeplines:
             k, v = line.lstrip('; ').split(':', 1)
             k = k.replace(gap,'').replace(' ','_').lower()
-            hit[prefix + k] = cast(v) if numeric else v.strip()
+            if k == 'al_cons':
+                hit[k] = ''
+            else:
+                hit[prefix + k] = cast(v) if numeric else v.strip()
         elif prefix and keeplines:
-            hit[prefix + 'seq'] += line.strip()
+            if 'al_cons' in hit:
+                hit['al_cons'] += line.strip()
+            else:
+                hit[prefix + 'seq'] += line.strip()
 
     yield hit
     log.info('%s queries, %s hits' % (query_count, hit_count))
