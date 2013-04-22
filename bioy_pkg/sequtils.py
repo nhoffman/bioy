@@ -39,7 +39,7 @@ IUPAC = {('A',): 'A',
         ('C', 'G', 'T'): 'B',
         ('C', 'T'): 'Y',
         ('G',): 'G',
-        ('G', 'A', 'T', 'C'): 'N',
+        ('A', 'C', 'G', 'T'): 'N',
         ('G', 'T'): 'K',
         ('T',): 'T'}
 
@@ -191,6 +191,8 @@ def cons_rle(c):
     Counter object `c`. Choose the most common run length count. In
     the case of ties, choose the smaller value.
     """
+
+    # TODO: return counts for only chosen cons base
     if len(c) == 1:
         return c.keys()[0]
 
@@ -208,11 +210,19 @@ def cons_char(c):
     ## handled. Look in BioPython to see how they generate consensus
     ## sequences.
 
-    if len(c) == 1:
-        return c.keys()[0]
+    # if gap char freq more than half then return gaps, else remove gap char
+    if float(c[gap]) / sum(c.values()) > 0.5:
+        return gap
 
-    (c1, n1), (c2, n2) = c.most_common(2)
-    return c1 if n1 > n2 else 'N'
+    del c[gap]
+
+    most_common = c.most_common()
+    _,top_freq = most_common[0]
+    most_common = filter(lambda (c,n): n == top_freq, most_common)
+    most_common = map(lambda (c,_): c.upper(), most_common)
+    most_common = sorted(most_common)
+
+    return IUPAC[tuple(most_common)]
 
 def get_char_counts(seqs):
     """
@@ -269,6 +279,7 @@ def consensus(seqs, rlelist = None, degap = True):
 
     return ''.join(cons).replace(gap,'') if degap else ''.join(cons)
 
+
 def show_consensus(seqs, rlelist):
     writer = csv.writer(sys.stdout)
     position = itertools.count(1)
@@ -291,24 +302,6 @@ def fasta_tempfile(seqs, tmpdir = None, cleanup = True):
     (db_fd, db_name) = tempfile.mkstemp(text=True, dir=tmpdir)
     db_handle = os.fdopen(db_fd, 'w')
     db_handle.write(''.join('>{s.description}\n{s.seq}\n'.format(s=s) for s in seqs))
-    db_handle.close()
-
-    try:
-        yield db_name
-    finally:
-        if cleanup:
-            os.unlink(db_name)
-
-@contextlib.contextmanager
-def tempseq(seqname, seqstr, tmpdir = None, cleanup = True):
-    """Creates a temporary FASTA file containing a single sequence
-    seqstr with name seqname. Returns the name of a temorary file and,
-    then deletes it at the end of the with block.
-    """
-
-    (db_fd, db_name) = tempfile.mkstemp(text=True, dir=tmpdir)
-    db_handle = os.fdopen(db_fd, 'w')
-    db_handle.write('>%s\n%s\n' % (seqname, seqstr))
     db_handle.close()
 
     try:
@@ -380,7 +373,7 @@ def itemize_errors(ref, query):
      * ref - reference sequence
      * query - sequence on which error calculation is performed
 
-     Returns a dict of itemized errors
+     Return an iterable of dicts with keys
 
       * i - position relative to ref
       * ref - base or bases in ref
@@ -393,21 +386,12 @@ def itemize_errors(ref, query):
 
     t = h = 0
     m = min(len(query), len(ref))
-    results = []
     while t < m:
         h += max(_find_homochar_length(ref[t:]), _find_homochar_length(query[t:]))
-
         assert (t < h) # strange chars found or miss-alignment
-
-        results.append({
-            'i':len(ref[:t].replace(gap, '').replace(homogap, '')),
-            'ref':ref[t:h],
-            'query':query[t:h]
-            })
-
+        yield {'i':len(ref[:t].replace(gap, '').replace(homogap, '')),
+                'ref':ref[t:h], 'query':query[t:h]}
         t = h
-
-    return results
 
 def _find_homochar_length(s, char = '', ignore = [gap, homogap]):
     '''
@@ -445,89 +429,6 @@ def error_count(errors):
 
     return cnt
 
-def encode_and_align(ref, query, args = []):
-    """
-    Given two strings ref and query, homoencode, Smith-Waterman align,
-    and return decoded alignments.
-
-    ssearch36 parameters: +5/-4 matrix (5:-4), open/ext: -12/-1
-    """
-
-    r, rcounts = homoencode(ref)
-    q, qcounts = homoencode(query)
-    alignment = ssearch36_strings(q, r, args = args).next()
-
-    return homodecodealignment(alignment['t_seq'], rcounts, alignment['q_seq'], qcounts)
-
-def run_ssearch36(q_file, t_file, defaults = ['-a','-n','-3'], args = [],
-                  numeric = True, ssearch_out = None):
-    """
-    Run ssearch36 to align sequenecs in fasta files q_file and t_file.
-    defaults include:
-      '-a' include full length sequence
-      '-n' force nucleotide
-      '-3' compare forward strand only
-
-    TODO: needs to write ssearch36 to disk (in either a tempfile or
-    named by ssearch_out) and parse alignmnets from that.
-    """
-
-    command = ['ssearch36',
-               '-m','10' # parseable output format
-               ] + defaults + args + [q_file, t_file]
-
-    log.debug('ssearch36 params %s' % command)
-
-    with open(os.devnull) as devnull:
-        pipe = Popen(command, stdout=PIPE, stderr=devnull)
-        (alignment, _) = pipe.communicate()
-
-    return parse_ssearch36(alignment.splitlines(), numeric)
-
-def ssearch36_objs(q_seqs, t_seqs, defaults = ['-a','-n','-3'], args = [],
-                   numeric = True, tmpdir = None, cleanup = True):
-    """
-    Run ssearch36 to align one or more query sequences against one or
-    more target sequences given iterables of sequence objects `q_seqs`
-    and `t_seqs` (assumes both have attributes `decsription` and
-    `seq`): '-a' include full length sequence '-n' force nucleotide
-    '-3' compare forward strand only
-    """
-
-    with fasta_tempfile(q_seqs) as q, fasta_tempfile(t_seqs) as t, open(os.devnull) as devnull:
-        command = ['ssearch36',
-                '-m','10' # parseable output format
-                ] + defaults + args + [q, t]
-
-        log.debug('ssearch36 params %s' % command)
-        pipe = Popen(command, stderr=devnull, stdout=PIPE, stdin=PIPE)
-        (alignment, _) = pipe.communicate()
-
-    return parse_ssearch36(alignment.splitlines(), numeric)
-
-def ssearch36_strings(q_seq, t_seq, q_name = 'query', t_name = 'target',
-        defaults = ['-a','-n','-3'], args = [],
-        numeric = True, tmpdir = None, cleanup = True):
-    """
-    Run ssearch36 to align single strings qseq and tseq.
-    defaults include:
-      '-a' include full length sequence
-      '-n' force nucleotide
-      '-3' compare forward strand only
-    """
-
-    with tempseq(t_name, t_seq) as t, open(os.devnull) as devnull:
-        command = ['ssearch36',
-                '-m','10' # parseable output format
-                ] + defaults + args + ['@', t]
-
-        log.debug('ssearch36 params %s' % command)
-
-        pipe = Popen(command, stderr=devnull, stdout=PIPE, stdin=PIPE)
-        (alignment, _) = pipe.communicate('>%s\n%s\n' % (q_name, q_seq))
-
-    return parse_ssearch36(alignment.splitlines(), numeric)
-
 def parse_ssearch36(lines, numeric = False):
     """
     Parse output of 'ssearch36 -m 10 query.fasta library.fasta'
@@ -557,7 +458,7 @@ def parse_ssearch36(lines, numeric = False):
         elif line.startswith('>>>'):
             # start of a new hit
             if not line.startswith('>>>///'):
-                query_count += 1
+                query_count +=1
             q_name = line.lstrip('>').split(',')[0]
         elif line.startswith('>>') or line.startswith('>--'):
             # hit-specific results; keep results starting here
@@ -579,15 +480,9 @@ def parse_ssearch36(lines, numeric = False):
         elif line.startswith(';') and keeplines:
             k, v = line.lstrip('; ').split(':', 1)
             k = k.replace(gap,'').replace(' ','_').lower()
-            if k == 'al_cons':
-                hit[k] = ''
-            else:
-                hit[prefix + k] = cast(v) if numeric else v.strip()
+            hit[prefix + k] = cast(v) if numeric else v.strip()
         elif prefix and keeplines:
-            if 'al_cons' in hit:
-                hit['al_cons'] += line.strip()
-            else:
-                hit[prefix + 'seq'] += line.strip()
+            hit[prefix + 'seq'] += line.strip()
 
     yield hit
     log.info('%s queries, %s hits' % (query_count, hit_count))
