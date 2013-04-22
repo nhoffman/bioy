@@ -21,8 +21,6 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('fastafile',
-            nargs = '?',
-            default = sys.stdin,
             type = lambda f: fastalite(Opener()(f)),
             help = 'input fasta file containing original clustered reads (default stdin).')
     parser.add_argument('clusters',
@@ -31,7 +29,7 @@ def build_parser(parser):
     parser.add_argument('--specimen',
             help = 'sample name for mapfile')
     parser.add_argument('-r','--rlefile',
-            type = Csv2Dict(fieldnames=['name','rle'], value = 'rle'),
+            type = Csv2Dict('name', 'rle', fieldnames=['name','rle']),
             help='An optional file containing run length encoding for infile (.csv.bz2)')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
@@ -51,7 +49,7 @@ def build_parser(parser):
             default = 100, help = 'default %(default)s')
     parser.add_argument('--min-clust-size',
             type = int,
-            default = 10, help = 'default %(default)s')
+            default = 1, help = 'default %(default)s')
     parser.add_argument('--limit', metavar = 'N',
             type = int,
             help = 'use no more than N seqs')
