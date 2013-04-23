@@ -19,6 +19,8 @@ from bioy_pkg.utils import chunker, Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
+CLUSTER_NAME_DELIMITER = '_'
+
 def build_parser(parser):
     parser.add_argument('fastafile',
             type = lambda f: fastalite(Opener()(f)),
@@ -57,7 +59,7 @@ def build_parser(parser):
             help = 'A string to prepend to each cluster name.')
     parser.add_argument('--name-suffix',
             help = 'A string to append to each cluster name.')
-    parser.add_argument('--name-delimiter', default = '_',
+    parser.add_argument('--name-delimiter', default = CLUSTER_NAME_DELIMITER,
                         metavar = 'CHAR',
                         help = 'A character used to delimit elements in cluster names [default "%(default)s"]')
 
