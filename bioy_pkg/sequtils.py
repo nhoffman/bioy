@@ -175,13 +175,13 @@ def to_ascii(nums):
     if max(nums) > 78:
         raise ValueError('values over 78 are not allowed')
 
-    return ''.join([chr(i+48) for i in nums])
+    return ''.join([chr(i + 48) for i in nums])
 
 def from_ascii(chars):
     """
     Decode an ascii-encoded list of integers.
     """
-    return [ord(c)-48 for c in chars]
+    return [ord(c) - 48 for c in chars]
 
 def cons_rle(c, ceiling = False):
     """
@@ -231,7 +231,6 @@ def get_char_counts(seqs):
     # counters, sorted by position
     return [count for position, count in sorted(counter.items())]
 
-import sys
 def get_rle_counts(seqs, rlelist):
     """
     Return a list of two-tuples: (char_count, rle_count) where
