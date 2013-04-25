@@ -56,11 +56,13 @@ def action(args):
     keep_left = make_fun(args.keep_left)
     keep_right = make_fun(args.keep_right)
 
+    # apply custom primer function to each alignment
     primer_data = lambda (q,h): (q, parse_primer_alignments(
         h, lprimer = args.left_primer_name, rprimer = args.right_primer_name))
 
     # combine ssearch aligns
-    aligns = chain(*(parse_ssearch36(s) for s in args.primer_aligns))
+    aligns = (parse_ssearch36(s) for s in args.primer_aligns)
+    aligns = chain(*aligns)
     aligns = sorted(aligns, key = itemgetter('q_name'))
     aligns = groupby(aligns, itemgetter('q_name'))
     aligns = islice(aligns, args.limit)
