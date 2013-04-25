@@ -6,7 +6,8 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import islice, groupby, ifilter, imap
+from itertools import islice, groupby, ifilter, imap, tee, chain
+from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, parse_primer_alignments, fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -18,6 +19,7 @@ def build_parser(parser):
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file')
     parser.add_argument('primer_aligns',
+            nargs = '+',
             type = Opener(),
             help = 'ssearch36 output (may be bz2-encoded)')
     parser.add_argument('-l','--keep-left',
@@ -40,7 +42,7 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'trimmed fasta output file')
     parser.add_argument('--rle',
-            type = Csv2Dict(fieldnames = ['name','rle'], value = 'rle'),
+            type = Csv2Dict('name', 'rle', fieldnames = ['name','rle']),
             help = 'rle file')
     parser.add_argument('-O', '--out-rle',
             type = lambda f: DictWriter(Opener('w')(f), fieldnames = ['name','rle']),
@@ -54,32 +56,35 @@ def action(args):
     keep_left = make_fun(args.keep_left)
     keep_right = make_fun(args.keep_right)
 
-    # parse primer alignments
-    query = lambda hit: hit['q_name']
-
-    aligns = islice(groupby(parse_ssearch36(args.primer_aligns), query), args.limit)
-
     primer_data = lambda (q,h): (q, parse_primer_alignments(
         h, lprimer = args.left_primer_name, rprimer = args.right_primer_name))
 
-    aligns = imap(primer_data, aligns)
+    # combine ssearch aligns
+    aligns = chain(*(parse_ssearch36(s) for s in args.primer_aligns))
+    aligns = sorted(aligns, key = itemgetter('q_name'))
+    aligns = groupby(aligns, itemgetter('q_name'))
+    aligns = islice(aligns, args.limit)
+    aligns = imap(primer_data, aligns) # parse primer information
     aligns = ifilter(lambda (q,h): keep_left(h['l']), aligns)
     aligns = ifilter(lambda (q,h): keep_right(h['r']), aligns)
+
+    aligns, aligns_rle = tee(aligns)
 
     seqs = {f.id:f for f in args.fasta}
 
     # parse the sequences
-    rle_rows = []
     for name, pdict in aligns:
         seq = seqs[name]
         start, stop = pdict['l']['stop'], pdict['r']['start']
-        args.out.write('>{}\n{}\n'.format(seq.description, seq.seq[start:stop]))
+        fasta = '>{}\n{}\n'.format(seq.description, seq.seq[start:stop])
+        args.out.write(fasta)
 
-        if args.rle:
-            row = {'name':seq.description, 'rle':args.rle[seq.description][start:stop]}
-            rle_rows.append(row)
-
+    # parse the rle's
     if args.out_rle:
         args.out_rle.writeheader()
-        args.out_rle.writerows(rle_rows)
+        for name, pdict in aligns_rle:
+            seq = seqs[name]
+            row = {'name':seq.description,
+                   'rle':args.rle[seq.description][start:stop]}
+            args.out_rle.writerow(row)
 
