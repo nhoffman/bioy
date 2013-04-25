@@ -19,6 +19,8 @@ from bioy_pkg.utils import chunker, Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
+CLUSTER_NAME_DELIMITER = '_'
+
 def build_parser(parser):
     parser.add_argument('fastafile',
             type = lambda f: fastalite(Opener()(f)),
@@ -53,6 +55,14 @@ def build_parser(parser):
     parser.add_argument('--limit', metavar = 'N',
             type = int,
             help = 'use no more than N seqs')
+    parser.add_argument('--name-prefix',
+            help = 'A string to prepend to each cluster name.')
+    parser.add_argument('--name-suffix',
+            help = 'A string to append to each cluster name.')
+    parser.add_argument('--name-delimiter', default = CLUSTER_NAME_DELIMITER,
+                        metavar = 'CHAR',
+                        help = 'A character used to delimit elements in cluster names [default "%(default)s"]')
+
 
 def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
     """
@@ -92,8 +102,17 @@ def action(args):
     # write each consensus sequence
     items = sorted(exemplars.items(), key = lambda x: -1 * len(x[1]))
     for i, (cons, names) in enumerate(items, start = 1):
-        weight = len(names)
-        consname = 'cons{:04}|{}'.format(i, weight)
+        weight = str(len(names))
+        name_elements = []
+        if args.name_prefix:
+            name_elements.append(args.name_prefix)
+
+        name_elements.extend(['cons{:04}'.format(i), weight])
+
+        if args.name_suffix:
+            name_elements.append(args.name_suffix)
+
+        consname = args.name_delimiter.join(name_elements)
 
         log.info('writing {}'.format(consname))
 

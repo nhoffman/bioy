@@ -46,7 +46,7 @@ def build_parser(parser):
 
 def action(args):
     fieldnames = ['t_name', 'q_name', 'length', 'snp']
-    fieldnames += ['indel', 'homoindel','compound']
+    fieldnames += ['indel', 'homoindel','compound', 'sw_zscore']
     fieldnames += args.extra_fields.keys()
 
     if args.output_alignment:
@@ -69,6 +69,7 @@ def action(args):
         # instantiate d with zero counts for each error type
         row = {k:0 for k in fieldnames[2:]}
         row['q_name'], row['t_name'] = a['q_name'], a['t_name']
+        row.update(a)
         row.update(error_count(a['errors']))
         row.update(args.extra_fields)
 

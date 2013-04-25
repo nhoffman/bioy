@@ -1,5 +1,3 @@
-import sys
-import itertools
 import csv
 import contextlib
 import tempfile
@@ -177,15 +175,15 @@ def to_ascii(nums):
     if max(nums) > 78:
         raise ValueError('values over 78 are not allowed')
 
-    return ''.join([chr(i+48) for i in nums])
+    return ''.join([chr(i + 48) for i in nums])
 
 def from_ascii(chars):
     """
     Decode an ascii-encoded list of integers.
     """
-    return [ord(c)-48 for c in chars]
+    return [ord(c) - 48 for c in chars]
 
-def cons_rle(c):
+def cons_rle(c, ceiling = False):
     """
     Choose a consensus run length given counts of run lengths in
     Counter object `c`. Choose the most common run length count. In
@@ -193,33 +191,28 @@ def cons_rle(c):
     """
 
     # TODO: return counts for only chosen cons base
-    if len(c) == 1:
-        return c.keys()[0]
+    most_common = c.most_common()
+    _,top_freq = most_common[0]
+    most_common = [cnt for cnt,freq in most_common if freq == top_freq]
+    most_common = sorted(most_common, reverse = ceiling)
 
-    (c1, n1), (c2, n2) = c.most_common(2)
-    return c1 if n1 > n2 else min([c1, c2])
+    return most_common[0]
 
-def cons_char(c):
+def cons_char(c, gap_ratio = 0.5):
     """
     Choose a consensus character given counts of characters in Counter
     object `c`.
     """
 
-    ## TODO: Return ambiguity characters when appropriate. Also
-    ## probably need to think more carefully about how gaps are
-    ## handled. Look in BioPython to see how they generate consensus
-    ## sequences.
-
     # if gap char freq more than half then return gaps, else remove gap char
-    if float(c[gap]) / sum(c.values()) > 0.5:
+    if float(c[gap]) / sum(c.values()) > gap_ratio:
         return gap
 
     del c[gap]
 
     most_common = c.most_common()
     _,top_freq = most_common[0]
-    most_common = filter(lambda (c,n): n == top_freq, most_common)
-    most_common = map(lambda (c,_): c.upper(), most_common)
+    most_common = [ch.upper() for ch,freq in most_common if freq == top_freq]
     most_common = sorted(most_common)
 
     return IUPAC[tuple(most_common)]
@@ -252,10 +245,10 @@ def get_rle_counts(seqs, rlelist):
     char_counter = defaultdict(Counter)
     rle_counter = defaultdict(Counter)
     for seq, rle_counts in izip_longest(seqs, rlelist):
-        assert len(seq.seq.replace(gap,'')) == len(rle_counts)
+        assert len(seq.seq.replace(gap, '')) == len(rle_counts)
 
-        if not hasattr(rle_counts, 'next'):
-            rle_counts = iter(rle_counts)
+        rle_counts = iter(rle_counts)
+
         # for each non-gap character in seq, tally the run length; if
         # c is a gap, save a tally of 1
         for i, c in enumerate(seq.seq):
@@ -278,18 +271,6 @@ def consensus(seqs, rlelist = None, degap = True):
         cons = [cons_char(c) for c in get_char_counts(seqs)]
 
     return ''.join(cons).replace(gap,'') if degap else ''.join(cons)
-
-
-def show_consensus(seqs, rlelist):
-    writer = csv.writer(sys.stdout)
-    position = itertools.count(1)
-    for c, n in get_rle_counts(seqs, rlelist):
-        for i, base in enumerate(cons_char(c) * cons_rle(n)):
-            pos = '' if base == gap else position.next()
-            if i == 0:
-                writer.writerow([pos, base, c, n])
-            else:
-                writer.writerow([pos, base, '', ''])
 
 @contextlib.contextmanager
 def fasta_tempfile(seqs, tmpdir = None, cleanup = True):
