@@ -6,11 +6,11 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter, tee
+from itertools import groupby, ifilter, imap
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
-from bioy_pkg.utils import Opener, Csv2Dict
+from bioy_pkg.utils import Opener, Csv2Dict, cast
 
 log = logging.getLogger(__name__)
 
@@ -26,81 +26,128 @@ def build_parser(parser):
             help = 'right primer ssearch36 alignment results')
     parser.add_argument('--left-expr',
             help = 'python expression defining criteria for keeping left primer',
-            default = "0 <= d.get('start') <= 25 and d.get('sw_zscore') > 50")
+            default = "0 <= d.get('q_al_start') <= 25 and d.get('sw_zscore') > 50")
     parser.add_argument('--right-expr',
             help = 'python expression defining criteria for keeping left primer',
-            default = "200 <= d.get('start') <= 320 and d.get('sw_zscore') > 50")
-    parser.add_argument('-o', '--out',
+            default = "200 <= d.get('q_al_start') <= 320 and d.get('sw_zscore') > 50")
+    parser.add_argument('-o', '--fasta-out',
             type = Opener('w'),
             default = sys.stdout,
             help = 'trimmed fasta output file')
     parser.add_argument('--rle',
             type = Csv2Dict('name', 'rle', fieldnames = ['name','rle']),
-            help = 'rle file')
-    parser.add_argument('-O', '--out-rle',
+                        help = 'rle input file (required if --rle-out)')
+    parser.add_argument('--rle-out',
             type = lambda f: DictWriter(Opener('w')(f), fieldnames = ['name','rle']),
             help = 'trimmed rle output file')
+    parser.add_argument('-i', '--include-primer',
+            action = 'store_true', default = False,
+            help = 'Include primer in trimmed sequence')
 
-def simple_data(hit):
-    d = {}
 
-    d['start']= int(hit['q_al_start']) - 1
-    d['stop'] = int(hit['q_al_stop'])
-    d['sw_zscore'] = float(hit['sw_zscore'])
-    d['q_name'] = hit['q_name']
+def primer_dict(parsed, side, keep = None, include = False):
+    """
+    For each alignment between reads (q_seq) and primers (t_seq),
+    return a dict of {q_name: position} given whether this is a left
+    or right primer (`side`) or whether to include the primer sequence
+    (`include`). `position` is a 0-index slice coordinate and is
+    defined as follows:
 
-    return d
+    side   include  -----------------------------------------------------
+                        L =======>                       R <=======
+    left   False                 ^ (q_al_stop)
+    left   True           ^        (q_al_start - 1)
+    right  False                                           ^        (q_al_start - 1)
+    right  True                                                   ^ (q_al_stop)
+    """
+
+    assert side in ('left', 'right')
+    assert include in (True, False)
+
+    positions = {
+        ('left', False): lambda hit: hit['q_al_stop'],
+        ('left', True): lambda hit: hit['q_al_start'] - 1,
+        ('right', False): lambda hit: hit['q_al_stop'],
+        ('right', True): lambda hit: hit['q_al_start'] - 1
+    }
+
+    # 'best' hit is assumed to be first in each group
+    hits = (grp.next() for _, grp in groupby(parsed, itemgetter('q_name')))
+
+    # ensure that certain fields are numeric
+    def as_numeric(hit):
+        return dict(hit, **{k: cast(hit[k]) for k in ['q_al_start', 'q_al_stop', 'sw_zscore']})
+
+    hits = imap(as_numeric, hits)
+
+    if keep:
+        hits = ifilter(keep, hits)
+
+    return {hit['q_name']: positions[(side, include)](hit) for hit in hits}
+
+
+def make_fun(expression):
+    # I only want eval() to happen once...
+    return lambda d: eval(expression)
+
 
 def action(args):
-    # I only want eval() to happen once...
-    def make_fun(expression):
-        return lambda d: eval(expression)
-
-    keep_left = make_fun(args.left_expr)
-    keep_right = make_fun(args.right_expr)
-
-    top_hit = lambda h: sorted(h,
-            key = itemgetter('sw_zscore'), reverse = True)[0]
 
     seqs = args.fasta
 
-    left = right = {}
+    # right, left are dicts of {name: trim_position}
+    if args.right:
+        right = primer_dict(
+            args.right,
+            side='right',
+            keep = make_fun(args.right_expr) if args.right_expr else None,
+            include = args.include_primer)
+
+        msg = '{} sequences passed right primer criteria'.format(len(right))
+        if right:
+            log.debug(msg)
+        else:
+            sys.exit(msg)
 
     if args.left:
-        left = (simple_data(l) for l in args.left)
-        left = groupby(left, itemgetter('q_name'))
-        left = ((q, top_hit(h)) for q,h in left)
-        left = ifilter(lambda (q,h): keep_left(h), left)
-        left = dict(left)
-        seqs = (s for s in args.fasta if s.description in left)
+        left = primer_dict(
+            args.left,
+            side='left',
+            keep = make_fun(args.left_expr) if args.left_expr else None,
+            include = args.include_primer)
 
-    if args.right:
-        if args.left:
-            right = ifilter(lambda r: r['q_name'] in left, args.right)
+        msg = '{} sequences passed left primer criteria'.format(len(left))
+        if left:
+            log.debug(msg)
         else:
-            right = args.right
-        right = (simple_data(r) for r in right)
-        right = groupby(right, itemgetter('q_name'))
-        right = ((q, top_hit(h)) for q,h in right)
-        right = ifilter(lambda (q,h): keep_right(h), right)
-        right = dict(right)
-        seqs = (s for s in args.fasta if s.description in right)
+            sys.exit(msg)
 
-    seqs, rle = tee(seqs)
+    if args.rle_out:
+        if not args.rle:
+            sys.exit('--rle is required')
+        args.rle_out.writeheader()
 
     for s in seqs:
-        start = left.get(s.id, {}).get('stop')
-        stop = right.get(s.id, {}).get('start')
-        fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
-        args.out.write(fasta)
+        start, stop = 0, len(s)
 
-    # parse the rle's
-    if args.out_rle:
-        args.out_rle.writeheader()
-        for s in rle:
-            start = left.get(s.id, {}).get('stop')
-            stop = right.get(s.id, {}).get('start')
-            row = {'name':s.description,
-                   'rle':args.rle[s.description][start:stop]}
-            args.out_rle.writerow(row)
+        # try right first since failure here is more likely
+        if args.right:
+            try:
+                stop = right[s.id]
+            except KeyError:
+                continue
 
+        if args.left:
+            try:
+                start = left[s.id]
+            except KeyError:
+                continue
+
+        fasta = '>{}\n{}\n'.format(s.id, s.seq[start:stop])
+        args.fasta_out.write(fasta)
+
+        if args.rle_out:
+            args.rle_out.writerow({
+                'name': s.id,
+                'rle': args.rle[s.id][start:stop]
+            })
