@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter, tee
+from itertools import groupby, tee
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
@@ -51,14 +51,14 @@ def simple_data(hit):
 
     return d
 
-def filter_primer(aligns, fltr = lambda a: a):
+def filter_primer(aligns, keep = lambda a: a):
     top_hit = lambda h: sorted(h,
             key = itemgetter('sw_zscore'), reverse = True)[0]
 
     aligns = (simple_data(r) for r in aligns)
     aligns = groupby(aligns, itemgetter('q_name'))
     aligns = ((q, top_hit(h)) for q,h in aligns)
-    aligns = ifilter(lambda (q,h): fltr(h), aligns)
+    aligns = ((q,h) for q,h in aligns if keep(h))
 
     return dict(aligns)
 
@@ -81,7 +81,7 @@ def action(args):
 
     # filter out only seqs that matched the right
     if args.right and args.left:
-        args.left = ifilter(lambda r: r['q_name'] in right, args.left)
+        args.left = (l for l in args.left if l['q_name'] in right)
 
     if args.left:
         left = filter_primer(args.left, keep_left)
