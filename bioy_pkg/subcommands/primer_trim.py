@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter, imap, tee
+from itertools import groupby, ifilter, tee
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
@@ -61,18 +61,23 @@ def action(args):
     keep_left = make_fun(args.left_expr)
     keep_right = make_fun(args.right_expr)
 
+    top_hit = lambda h: sorted(h,
+            key = itemgetter('sw_zscore'), reverse = True)[0]
+
     left = (simple_data(l) for l in args.left)
     left = groupby(left, itemgetter('q_name'))
-    left = imap(lambda (q,h):
-            (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), left)
+    left = ((q, top_hit(h)) for q,h in left)
     left = ifilter(lambda (q,h): keep_left(h), left)
     left = dict(left)
 
-    right = ifilter(lambda r: r['q_name'] in left, args.right) if left else args.right
+    if left:
+        right = ifilter(lambda r: r['q_name'] in left, args.right)
+    else:
+        right = args.right
+
     right = (simple_data(r) for r in right)
     right = groupby(right, itemgetter('q_name'))
-    right = imap(lambda (q,h):
-            (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), right)
+    right = ((q, top_hit(h)) for q,h in right)
     right = ifilter(lambda (q,h): keep_right(h), right)
     right = dict(right)
 
