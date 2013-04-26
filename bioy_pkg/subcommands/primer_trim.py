@@ -6,10 +6,10 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import islice, groupby, ifilter, imap, tee, chain
+from itertools import groupby, ifilter, imap, tee
 from operator import itemgetter
 
-from bioy_pkg.sequtils import parse_ssearch36, parse_primer_alignments, fastalite
+from bioy_pkg.sequtils import parse_ssearch36, fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -18,22 +18,20 @@ def build_parser(parser):
     parser.add_argument('fasta',
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file')
-    parser.add_argument('primer_aligns',
-            nargs = '+',
-            type = Opener(),
-            help = 'ssearch36 output (may be bz2-encoded)')
-    parser.add_argument('-l','--keep-left',
+    parser.add_argument('-l', '--left',
+            type = lambda f: parse_ssearch36(Opener()(f)),
+            default = [],
+            help = 'left primer ssearch36 alignment results')
+    parser.add_argument('-r', '--right',
+            type = lambda f: parse_ssearch36(Opener()(f)),
+            default = [],
+            help = 'right primer ssearch36 alignment results')
+    parser.add_argument('--left-expr',
             help = 'python expression defining criteria for keeping left primer',
             default = "0 <= d.get('start') <= 25 and d.get('sw_zscore') > 50")
-    parser.add_argument('-r','--keep-right',
+    parser.add_argument('--right-expr',
             help = 'python expression defining criteria for keeping left primer',
             default = "200 <= d.get('start') <= 320 and d.get('sw_zscore') > 50")
-    parser.add_argument('--left-primer-name',
-            default = 'lprimer',
-            help = 'name of left primer. default = %(default)s')
-    parser.add_argument('--right-primer-name',
-            default = 'rprimer',
-            help = 'name of right primer. default = %(default)s')
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
@@ -48,43 +46,59 @@ def build_parser(parser):
             type = lambda f: DictWriter(Opener('w')(f), fieldnames = ['name','rle']),
             help = 'trimmed rle output file')
 
+def simple_data(hit):
+    d = {}
+
+    d['start']= int(hit['q_al_start']) - 1
+    d['stop'] = int(hit['q_al_stop'])
+    d['sw_zscore'] = float(hit['sw_zscore'])
+    d['q_name'] = hit['q_name']
+
+    return d
+
 def action(args):
     # I only want eval() to happen once...
     def make_fun(expression):
         return lambda d: eval(expression)
 
-    keep_left = make_fun(args.keep_left)
-    keep_right = make_fun(args.keep_right)
+    keep_left = make_fun(args.left_expr)
+    keep_right = make_fun(args.right_expr)
 
-    primer_data = lambda (q,h): (q, parse_primer_alignments(
-        h, lprimer = args.left_primer_name, rprimer = args.right_primer_name))
+    left = right = {}
 
-    # combine ssearch aligns
-    aligns = chain(*(parse_ssearch36(s) for s in args.primer_aligns))
-    aligns = sorted(aligns, key = itemgetter('q_name'))
-    aligns = groupby(aligns, itemgetter('q_name'))
-    aligns = islice(aligns, args.limit)
-    aligns = imap(primer_data, aligns) # parse primer information
-    aligns = ifilter(lambda (q,h): keep_left(h['l']), aligns)
-    aligns = ifilter(lambda (q,h): keep_right(h['r']), aligns)
+    if args.left:
+        left = (simple_data(l) for l in args.left)
+        left = groupby(left, itemgetter('q_name'))
+        left = imap(lambda (q,h):
+                (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), left)
+        left = ifilter(lambda (q,h): keep_left(h), left)
+        left = dict(left)
 
-    aligns, aligns_rle = tee(aligns)
+    if args.right:
+        right = ifilter(lambda r: r['q_name'] in left, args.right) if left else args.right
+        right = (simple_data(r) for r in right)
+        right = groupby(right, itemgetter('q_name'))
+        right = imap(lambda (q,h):
+                (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), right)
+        right = ifilter(lambda (q,h): keep_right(h), right)
+        right = dict(right)
 
-    seqs = {f.id:f for f in args.fasta}
+    seqs = (s for s in args.fasta if s.description in (right or left))
+    seqs, rle = tee(seqs)
 
-    # parse the sequences
-    for name, pdict in aligns:
-        seq = seqs[name]
-        start, stop = pdict['l']['stop'], pdict['r']['start']
-        fasta = '>{}\n{}\n'.format(seq.description, seq.seq[start:stop])
+    for s in seqs:
+        start = left.get('stop', None)
+        stop = right.get('start', None)
+        fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
     # parse the rle's
     if args.out_rle:
         args.out_rle.writeheader()
-        for name, pdict in aligns_rle:
-            seq = seqs[name]
-            row = {'name':seq.description,
-                   'rle':args.rle[seq.description][start:stop]}
+        for s in rle:
+            start = left.get('stop', None)
+            stop = right.get('start', None)
+            row = {'name':s.description,
+                   'rle':args.rle[s.description][start:stop]}
             args.out_rle.writerow(row)
 
