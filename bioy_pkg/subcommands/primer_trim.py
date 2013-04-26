@@ -66,6 +66,17 @@ def action(args):
 
     left = right = {}
 
+    if args.right:
+        right = (simple_data(r) for r in args.right)
+        right = groupby(right, itemgetter('q_name'))
+        right = ((q, top_hit(h)) for q,h in right)
+        right = ifilter(lambda (q,h): keep_right(h), right)
+        right = dict(right)
+        seqs = (s for s in args.fasta if s.description in right)
+
+    if args.right and args.left:
+        args.left = ifilter(lambda r: r['q_name'] in right, args.left)
+
     if args.left:
         left = (simple_data(l) for l in args.left)
         left = groupby(left, itemgetter('q_name'))
@@ -73,18 +84,6 @@ def action(args):
         left = ifilter(lambda (q,h): keep_left(h), left)
         left = dict(left)
         seqs = (s for s in args.fasta if s.description in left)
-
-    if args.right:
-        if args.left:
-            right = ifilter(lambda r: r['q_name'] in left, args.right)
-        else:
-            right = args.right
-        right = (simple_data(r) for r in right)
-        right = groupby(right, itemgetter('q_name'))
-        right = ((q, top_hit(h)) for q,h in right)
-        right = ifilter(lambda (q,h): keep_right(h), right)
-        right = dict(right)
-        seqs = (s for s in args.fasta if s.description in right)
 
     seqs, rle = tee(seqs)
 
