@@ -77,7 +77,7 @@ def action(args):
     # do the right first since it will be the most filtered
     if args.right:
         right = filter_primer(args.right, keep_right)
-        seqs = (s for s in args.fasta if s.description in right)
+        seqs = (s for s in args.fasta if s.id in right)
 
     # filter out only seqs that matched the right
     if args.right and args.left:
@@ -85,7 +85,7 @@ def action(args):
 
     if args.left:
         left = filter_primer(args.left, keep_left)
-        seqs = (s for s in args.fasta if s.description in left)
+        seqs = (s for s in args.fasta if s.id in left)
 
     seqs, rle = tee(seqs)
 
