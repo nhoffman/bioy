@@ -91,8 +91,8 @@ def action(args):
 
     # output fasta
     for s in seqs:
-        start = left.get(s.id, {}).get('stop')
-        stop = right.get(s.id, {}).get('start')
+        start = left[s.id]['stop'] if left else None
+        stop = right[s.id]['start'] if right else None
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
@@ -100,8 +100,8 @@ def action(args):
     if args.out_rle:
         args.out_rle.writeheader()
         for s in rle:
-            start = left.get(s.id, {}).get('stop')
-            stop = right.get(s.id, {}).get('start')
+            start = left[s.id]['stop'] if left else None
+            stop = right[s.id]['start'] if right else None
             row = {'name':s.description,
                    'rle':args.rle[s.description][start:stop]}
             args.out_rle.writerow(row)
