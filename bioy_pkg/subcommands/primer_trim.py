@@ -51,6 +51,17 @@ def simple_data(hit):
 
     return d
 
+def filter_primer(aligns, fltr = lambda a: a):
+    top_hit = lambda h: sorted(h,
+            key = itemgetter('sw_zscore'), reverse = True)[0]
+
+    aligns = (simple_data(r) for r in aligns)
+    aligns = groupby(aligns, itemgetter('q_name'))
+    aligns = ((q, top_hit(h)) for q,h in aligns)
+    aligns = ifilter(lambda (q,h): fltr(h), aligns)
+
+    return dict(aligns)
+
 def action(args):
     # I only want eval() to happen once...
     def make_fun(expression):
@@ -59,41 +70,33 @@ def action(args):
     keep_left = make_fun(args.left_expr)
     keep_right = make_fun(args.right_expr)
 
-    top_hit = lambda h: sorted(h,
-            key = itemgetter('sw_zscore'), reverse = True)[0]
-
     seqs = args.fasta
 
     left = right = {}
 
+    # do the right first since it will be the most filtered
     if args.right:
-        right = (simple_data(r) for r in args.right)
-        right = groupby(right, itemgetter('q_name'))
-        right = ((q, top_hit(h)) for q,h in right)
-        right = ifilter(lambda (q,h): keep_right(h), right)
-        right = dict(right)
+        right = filter_primer(args.right, keep_right)
         seqs = (s for s in args.fasta if s.description in right)
 
+    # filter out only seqs that matched the right
     if args.right and args.left:
         args.left = ifilter(lambda r: r['q_name'] in right, args.left)
 
     if args.left:
-        left = (simple_data(l) for l in args.left)
-        left = groupby(left, itemgetter('q_name'))
-        left = ((q, top_hit(h)) for q,h in left)
-        left = ifilter(lambda (q,h): keep_left(h), left)
-        left = dict(left)
+        left = filter_primer(args.left, keep_left)
         seqs = (s for s in args.fasta if s.description in left)
 
     seqs, rle = tee(seqs)
 
+    # output fasta
     for s in seqs:
         start = left.get(s.id, {}).get('stop')
         stop = right.get(s.id, {}).get('start')
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
-    # parse the rle's
+    # output rle's
     if args.out_rle:
         args.out_rle.writeheader()
         for s in rle:
