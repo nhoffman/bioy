@@ -484,35 +484,6 @@ def parse_ssearch36(lines, numeric = False):
     yield hit
     log.info('%s queries, %s hits' % (query_count, hit_count))
 
-def parse_primer_alignments(hits, lprimer = 'lprimer', rprimer = 'rprimer'):
-    """
-    Hits is a sequence of dictionaries containing alignment results
-    for a single query. 'lprimer' and 'rprimer' are left and right
-    primer names, respectively. It is assumed that 'q_*' identifies
-    attributes of the query sequence, and 't_*' identifies attributes
-    of the primer.
-    """
-
-    d = {'l':{}, 'r':{}}
-    # save the first (shoud be highest-scoring) alignment for each
-    # primer
-    for hit in hits:
-        for label, primer in [('l', lprimer), ('r', rprimer)]:
-            if not d[label] and hit['t_name'] == primer:
-                d[label]['start']= int(hit['q_al_start']) - 1
-                d[label]['stop'] = int(hit['q_al_stop'])
-                d[label]['align'] = (hit['q_seq'], hit['t_seq'])
-                d[label]['sw_expect'] = float(hit['sw_expect'])
-                d[label]['sw_ident'] = float(hit['sw_ident'])
-                d[label]['sw_zscore'] = float(hit['sw_zscore'])
-                d[label]['sw_overlap'] = int(hit['sw_overlap'])
-
-                # for key in ['sw_expect','sw_zscore','sw_ident','sw_overlap']:
-                #     d[label][key] = cast(hit[key])
-
-    d['name'] = hit['q_name']
-    return d
-
 def wrap(text, width=60):
     """
     Wraps input string [text] to [width] characters. Return a list of
