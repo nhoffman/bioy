@@ -32,9 +32,6 @@ def build_parser(parser):
     parser.add_argument('--right-expr',
             help = 'python expression defining criteria for keeping left primer',
             default = "200 <= d.get('start') <= 320 and d.get('sw_zscore') > 50")
-    parser.add_argument('--limit',
-            type = int,
-            help = 'maximum number of query sequences to read from the alignment')
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
@@ -64,31 +61,27 @@ def action(args):
     keep_left = make_fun(args.left_expr)
     keep_right = make_fun(args.right_expr)
 
-    left = right = {}
+    left = (simple_data(l) for l in args.left)
+    left = groupby(left, itemgetter('q_name'))
+    left = imap(lambda (q,h):
+            (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), left)
+    left = ifilter(lambda (q,h): keep_left(h), left)
+    left = dict(left)
 
-    if args.left:
-        left = (simple_data(l) for l in args.left)
-        left = groupby(left, itemgetter('q_name'))
-        left = imap(lambda (q,h):
-                (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), left)
-        left = ifilter(lambda (q,h): keep_left(h), left)
-        left = dict(left)
-
-    if args.right:
-        right = ifilter(lambda r: r['q_name'] in left, args.right) if left else args.right
-        right = (simple_data(r) for r in right)
-        right = groupby(right, itemgetter('q_name'))
-        right = imap(lambda (q,h):
-                (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), right)
-        right = ifilter(lambda (q,h): keep_right(h), right)
-        right = dict(right)
+    right = ifilter(lambda r: r['q_name'] in left, args.right) if left else args.right
+    right = (simple_data(r) for r in right)
+    right = groupby(right, itemgetter('q_name'))
+    right = imap(lambda (q,h):
+            (q, sorted(h, key = itemgetter('sw_zscore'), reverse = True)[0]), right)
+    right = ifilter(lambda (q,h): keep_right(h), right)
+    right = dict(right)
 
     seqs = (s for s in args.fasta if s.description in (right or left))
     seqs, rle = tee(seqs)
 
     for s in seqs:
-        start = left.get('stop', None)
-        stop = right.get('start', None)
+        start = left.get('stop')
+        stop = right.get('start')
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
@@ -96,8 +89,8 @@ def action(args):
     if args.out_rle:
         args.out_rle.writeheader()
         for s in rle:
-            start = left.get('stop', None)
-            stop = right.get('start', None)
+            start = left.get('stop')
+            stop = right.get('start')
             row = {'name':s.description,
                    'rle':args.rle[s.description][start:stop]}
             args.out_rle.writerow(row)
