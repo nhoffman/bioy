@@ -79,10 +79,11 @@ def action(args):
         right = filter_primer(args.right, keep_right)
         seqs = (s for s in args.fasta if s.description in right)
 
+    # filter out only seqs that matched the right
+    if args.right and args.left:
+        args.left = ifilter(lambda r: r['q_name'] in right, args.left)
+
     if args.left:
-        # filter out only seqs that matched the right
-        if args.right:
-            left = ifilter(lambda r: r['q_name'] in right, args.left)
         left = filter_primer(args.left, keep_left)
         seqs = (s for s in args.fasta if s.description in left)
 
