@@ -20,11 +20,9 @@ def build_parser(parser):
             help = 'input fasta file')
     parser.add_argument('-l', '--left',
             type = lambda f: parse_ssearch36(Opener()(f)),
-            default = [],
             help = 'left primer ssearch36 alignment results')
     parser.add_argument('-r', '--right',
             type = lambda f: parse_ssearch36(Opener()(f)),
-            default = [],
             help = 'right primer ssearch36 alignment results')
     parser.add_argument('--left-expr',
             help = 'python expression defining criteria for keeping left primer',
@@ -64,29 +62,35 @@ def action(args):
     top_hit = lambda h: sorted(h,
             key = itemgetter('sw_zscore'), reverse = True)[0]
 
-    left = (simple_data(l) for l in args.left)
-    left = groupby(left, itemgetter('q_name'))
-    left = ((q, top_hit(h)) for q,h in left)
-    left = ifilter(lambda (q,h): keep_left(h), left)
-    left = dict(left)
+    seqs = args.fasta
 
-    if left:
-        right = ifilter(lambda r: r['q_name'] in left, args.right)
-    else:
-        right = args.right
+    left = right = {}
 
-    right = (simple_data(r) for r in right)
-    right = groupby(right, itemgetter('q_name'))
-    right = ((q, top_hit(h)) for q,h in right)
-    right = ifilter(lambda (q,h): keep_right(h), right)
-    right = dict(right)
+    if args.left:
+        left = (simple_data(l) for l in args.left)
+        left = groupby(left, itemgetter('q_name'))
+        left = ((q, top_hit(h)) for q,h in left)
+        left = ifilter(lambda (q,h): keep_left(h), left)
+        left = dict(left)
+        seqs = (s for s in args.fasta if s.description in left)
 
-    seqs = (s for s in args.fasta if s.description in (right or left))
+    if args.right:
+        if args.left:
+            right = ifilter(lambda r: r['q_name'] in left, args.right)
+        else:
+            right = args.right
+        right = (simple_data(r) for r in right)
+        right = groupby(right, itemgetter('q_name'))
+        right = ((q, top_hit(h)) for q,h in right)
+        right = ifilter(lambda (q,h): keep_right(h), right)
+        right = dict(right)
+        seqs = (s for s in args.fasta if s.description in right)
+
     seqs, rle = tee(seqs)
 
     for s in seqs:
-        start = left[s.id].get('stop')
-        stop = right[s.id].get('start')
+        start = left.get(s.id, {}).get('stop')
+        stop = right.get(s.id, {}).get('start')
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
@@ -94,8 +98,8 @@ def action(args):
     if args.out_rle:
         args.out_rle.writeheader()
         for s in rle:
-            start = left[s.id].get('stop')
-            stop = right[s.id].get('start')
+            start = left.get(s.id, {}).get('stop')
+            stop = right.get(s.id, {}).get('start')
             row = {'name':s.description,
                    'rle':args.rle[s.description][start:stop]}
             args.out_rle.writerow(row)
