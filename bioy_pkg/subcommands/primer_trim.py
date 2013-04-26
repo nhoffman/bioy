@@ -80,8 +80,8 @@ def action(args):
     seqs, rle = tee(seqs)
 
     for s in seqs:
-        start = left.get('stop')
-        stop = right.get('start')
+        start = left[s.id].get('stop')
+        stop = right[s.id].get('start')
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.out.write(fasta)
 
@@ -89,8 +89,8 @@ def action(args):
     if args.out_rle:
         args.out_rle.writeheader()
         for s in rle:
-            start = left.get('stop')
-            stop = right.get('start')
+            start = left[s.id].get('stop')
+            stop = right[s.id].get('start')
             row = {'name':s.description,
                    'rle':args.rle[s.description][start:stop]}
             args.out_rle.writerow(row)
