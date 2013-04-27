@@ -83,7 +83,15 @@ def primer_dict(parsed, side, keep = None, include = False):
     if keep:
         hits = ifilter(keep, hits)
 
-    return {hit['q_name']: positions[(side, include)](hit) for hit in hits}
+    d = {hit['q_name']: positions[(side, include)](hit) for hit in hits}
+
+    msg = '{} sequences passed {} primer criteria'.format(side, len(d))
+    if d:
+        log.debug(msg)
+    else:
+        sys.exit(msg)
+
+    return d
 
 
 def make_fun(expression):
@@ -103,24 +111,12 @@ def action(args):
             keep = make_fun(args.right_expr) if args.right_expr else None,
             include = args.include_primer)
 
-        msg = '{} sequences passed right primer criteria'.format(len(right))
-        if right:
-            log.debug(msg)
-        else:
-            sys.exit(msg)
-
     if args.left:
         left = primer_dict(
             args.left,
             side='left',
             keep = make_fun(args.left_expr) if args.left_expr else None,
             include = args.include_primer)
-
-        msg = '{} sequences passed left primer criteria'.format(len(left))
-        if left:
-            log.debug(msg)
-        else:
-            sys.exit(msg)
 
     if args.rle_out:
         if not args.rle:
