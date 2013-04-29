@@ -56,12 +56,13 @@ def action(args):
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
     aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
+    aligns = (list(a) for _,a in aligns)
 
     if args.all_alignments:
-        aligns = (list(a) for _,a in aligns)
         aligns = chain(*aligns)
     else:
-        aligns = (next(a) for _,a in aligns)
+        aligns = (sorted(a, key = itemgetter('sw_zscore'), reverse = True) for a in aligns)
+        aligns = (a[0] for a in aligns)
 
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}
