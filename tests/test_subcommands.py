@@ -34,8 +34,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left', self.data('rle_100_left.ssearch.bz2'),
-            '--right', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
             '--fasta-out', trimmed
         ]
 
@@ -44,7 +44,7 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
         self.assertTrue(path.exists(trimmed))
 
         with open(trimmed) as f:
-            self.assertEqual(len(list(fastalite(f))), 62)
+            self.assertEqual(len(list(fastalite(f))), 99)
 
     def test02(self):
         """
@@ -57,8 +57,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left', self.data('rle_100_left.ssearch.bz2'),
-            '--right', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
             '--fasta-out', trimmed,
             '--rle-out', trimmed_rle
         ]
@@ -77,8 +77,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left', self.data('rle_100_left.ssearch.bz2'),
-            '--right', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
             '--fasta-out', trimmed,
             '--rle', self.data('rle_100.csv.bz2'),
             '--rle-out', trimmed_rle
@@ -88,6 +88,60 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         self.assertTrue(path.exists(trimmed))
         self.assertTrue(path.exists(trimmed_rle))
+
+        with open(trimmed) as f:
+            self.assertEqual(len(list(fastalite(f))), 99)
+
+        with open(trimmed_rle) as f:
+            self.assertEqual(len(f.readlines()), 100)
+
+    def test04(self):
+        """
+        Include an rle file.
+        """
+
+        out = self.mkoutdir()
+        trimmed = path.join(out, 'trimmed.fasta')
+        trimmed_rle = path.join(out, 'trimmed_rle.csv')
+
+        args = [
+            self.data('rle_100.fasta'),
+            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--right-zscore', '80',
+            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--fasta-out', trimmed,
+            '--rle', self.data('rle_100.csv.bz2'),
+            '--rle-out', trimmed_rle
+        ]
+
+        self.main(args)
+
+        with open(trimmed) as f:
+            self.assertEqual(len(list(fastalite(f))), 66)
+
+        with open(trimmed_rle) as f:
+            self.assertEqual(len(f.readlines()), 67)
+
+    def test05(self):
+        """
+        Include an rle file.
+        """
+
+        out = self.mkoutdir()
+        trimmed = path.join(out, 'trimmed.fasta')
+        trimmed_rle = path.join(out, 'trimmed_rle.csv')
+
+        args = [
+            self.data('rle_100.fasta'),
+            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--right-range', '200,350',
+            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--fasta-out', trimmed,
+            '--rle', self.data('rle_100.csv.bz2'),
+            '--rle-out', trimmed_rle
+        ]
+
+        self.main(args)
 
         with open(trimmed) as f:
             self.assertEqual(len(list(fastalite(f))), 62)

@@ -24,11 +24,11 @@ def build_parser(parser):
             help = 'right primer ssearch36 alignment results')
     parser.add_argument('--left-range', metavar = 'START,STOP',
                         help = 'Range of acceptable left primer start positions')
-    parser.add_argument('--left-zscore', metavar = 'VALUE',
+    parser.add_argument('--left-zscore', metavar = 'VALUE', type = float,
                         help = 'Min acceptable left primer z-score')
     parser.add_argument('--right-range', metavar = 'START,STOP',
                         help = 'Range of acceptable right primer start positions')
-    parser.add_argument('--right-zscore', metavar = 'VALUE',
+    parser.add_argument('--right-zscore', metavar = 'VALUE', type = float,
                         help = 'Min acceptable right primer z-score')
     parser.add_argument('--left-expr',
             help = 'python expression defining criteria for keeping left primer')
@@ -80,7 +80,7 @@ def primer_dict(parsed, side, keep = None, include = False):
     if keep:
         hits = ifilter(keep, hits)
 
-    d = {hit['q_name']: positions[(side, include)](hit) for hit in hits}
+    d = {hit['q_name']: int(positions[(side, include)](hit)) for hit in hits}
 
     msg = '{} sequences passed {} primer criteria'.format(side, len(d))
     if d:
@@ -110,7 +110,7 @@ def make_filter(rangestr, zscore):
             return minstart <= start <= maxstart
     elif zscore:
         def fun(d):
-            return int(d['sw_zscore']) >= zscore
+            return float(d['sw_zscore']) >= zscore
     else:
         raise ValueError('at least one of rangestr and zscore must be provided')
 
@@ -122,7 +122,7 @@ def action(args):
     seqs = args.fasta
 
     # right, left are dicts of {name: trim_position}
-    if args.right:
+    if args.right_aligns:
         if args.right_expr:
             keep = make_fun(args.right_expr)
         elif args.right_range or args.right_zscore:
@@ -131,12 +131,12 @@ def action(args):
             keep = None
 
         right = primer_dict(
-            parse_ssearch36(args.right, numeric = bool(args.right_expr)),
+            parse_ssearch36(args.right_aligns, numeric = bool(args.right_expr)),
             side='right',
             keep = keep,
             include = args.include_primer)
 
-    if args.left:
+    if args.left_aligns:
         if args.left_expr:
             keep = make_fun(args.left_expr)
         elif args.left_range or args.left_zscore:
@@ -145,7 +145,7 @@ def action(args):
             keep = None
 
         left = primer_dict(
-            parse_ssearch36(args.left, numeric = bool(args.left_expr)),
+            parse_ssearch36(args.left_aligns, numeric = bool(args.left_expr)),
             side='left',
             keep = keep,
             include = args.include_primer)
@@ -159,13 +159,13 @@ def action(args):
         start, stop = 0, len(s)
 
         # try right first since failure here is more likely
-        if args.right:
+        if args.right_aligns:
             try:
                 stop = right[s.id]
             except KeyError:
                 continue
 
-        if args.left:
+        if args.left_aligns:
             try:
                 start = left[s.id]
             except KeyError:
