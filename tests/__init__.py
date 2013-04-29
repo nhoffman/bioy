@@ -3,6 +3,7 @@ import logging
 import os
 from os import path
 import unittest
+import argparse
 
 from bioy_pkg.utils import mkdir
 
@@ -49,6 +50,10 @@ class TestBase(unittest.TestCase):
         mkdir(outdir, clobber)
         return outdir
 
+    def data(self, fname):
+        return path.join(datadir, fname)
+
+
 class TestCaseSuppressOutput(unittest.TestCase):
 
     def setUp(self):
@@ -62,3 +67,22 @@ class TestCaseSuppressOutput(unittest.TestCase):
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
 
+class TestSubcommand(unittest.TestCase):
+    """
+    Must define class variables action and build_parser in subclass.
+    """
+
+    def setUp(self):
+        self.funcname = '_'.join(self.id().split('.')[-2:])
+        self.suppress_output = log.getEffectiveLevel() >= logging.INFO
+        if self.suppress_output:
+            sys.stdout = sys.stderr = open(os.devnull, 'w')
+
+        parser = argparse.ArgumentParser()
+        self.build_parser(parser)
+        self.main = lambda args: self.action(parser.parse_args(args))
+
+    def tearDown(self):
+        if self.suppress_output:
+            sys.stdout = sys.__stdout__
+            sys.stderr = sys.__stderr__
