@@ -18,18 +18,22 @@ def build_parser(parser):
     parser.add_argument('fasta',
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file')
-    parser.add_argument('-l', '--left',
-            type = lambda f: parse_ssearch36(Opener()(f)),
+    parser.add_argument('-l', '--left-aligns', type = Opener(),
             help = 'left primer ssearch36 alignment results')
-    parser.add_argument('-r', '--right',
-            type = lambda f: parse_ssearch36(Opener()(f)),
+    parser.add_argument('-r', '--right-aligns', type = Opener(),
             help = 'right primer ssearch36 alignment results')
+    parser.add_argument('--left-range', metavar = 'START,STOP',
+                        help = 'Range of acceptable left primer start positions')
+    parser.add_argument('--left-zscore', metavar = 'VALUE',
+                        help = 'Min acceptable left primer z-score')
+    parser.add_argument('--right-range', metavar = 'START,STOP',
+                        help = 'Range of acceptable right primer start positions')
+    parser.add_argument('--right-zscore', metavar = 'VALUE',
+                        help = 'Min acceptable right primer z-score')
     parser.add_argument('--left-expr',
-            help = 'python expression defining criteria for keeping left primer',
-            default = "0 <= d.get('q_al_start') <= 25 and d.get('sw_zscore') > 50")
+            help = 'python expression defining criteria for keeping left primer')
     parser.add_argument('--right-expr',
-            help = 'python expression defining criteria for keeping left primer',
-            default = "200 <= d.get('q_al_start') <= 320 and d.get('sw_zscore') > 50")
+            help = 'python expression defining criteria for keeping left primer')
     parser.add_argument('-o', '--fasta-out',
             type = Opener('w'),
             default = sys.stdout,
@@ -43,7 +47,6 @@ def build_parser(parser):
     parser.add_argument('-i', '--include-primer',
             action = 'store_true', default = False,
             help = 'Include primer in trimmed sequence')
-
 
 def primer_dict(parsed, side, keep = None, include = False):
     """
@@ -74,18 +77,6 @@ def primer_dict(parsed, side, keep = None, include = False):
     # 'best' hit is assumed to be first in each group
     hits = (grp.next() for _, grp in groupby(parsed, itemgetter('q_name')))
 
-    # ensure that certain fields are numeric
-    def as_numeric(hit):
-        # return dict(hit, **{k: cast(hit[k]) for k in ['q_al_start', 'q_al_stop', 'sw_zscore']})
-        return {
-            'q_name': hit['q_name'],
-            'q_al_start': int(hit['q_al_start']),
-            'q_al_stop': int(hit['q_al_stop']),
-            'sw_zscore': float(hit['sw_zscore'])
-        }
-
-    hits = imap(as_numeric, hits)
-
     if keep:
         hits = ifilter(keep, hits)
 
@@ -105,23 +96,58 @@ def make_fun(expression):
     return lambda d: eval(expression)
 
 
+def make_filter(rangestr, zscore):
+
+    if rangestr and zscore:
+        minstart, maxstart = map(int, rangestr.split(','))
+        def fun(d):
+            start = int(d['q_al_start'])
+            return minstart <= start <= maxstart and int(d['sw_zscore']) >= zscore
+    elif rangestr:
+        minstart, maxstart = map(int, rangestr.split(','))
+        def fun(d):
+            start = int(d['q_al_start'])
+            return minstart <= start <= maxstart
+    elif zscore:
+        def fun(d):
+            return int(d['sw_zscore']) >= zscore
+    else:
+        raise ValueError('at least one of rangestr and zscore must be provided')
+
+    return fun
+
+
 def action(args):
 
     seqs = args.fasta
 
     # right, left are dicts of {name: trim_position}
     if args.right:
+        if args.right_expr:
+            keep = make_fun(args.right_expr)
+        elif args.right_range or args.right_zscore:
+            keep = make_filter(args.right_range, args.right_zscore)
+        else:
+            keep = None
+
         right = primer_dict(
-            args.right,
+            parse_ssearch36(args.right, numeric = bool(args.right_expr)),
             side='right',
-            keep = make_fun(args.right_expr) if args.right_expr else None,
+            keep = keep,
             include = args.include_primer)
 
     if args.left:
+        if args.left_expr:
+            keep = make_fun(args.left_expr)
+        elif args.left_range or args.left_zscore:
+            keep = make_filter(args.left_range, args.left_zscore)
+        else:
+            keep = None
+
         left = primer_dict(
-            args.left,
+            parse_ssearch36(args.left, numeric = bool(args.left_expr)),
             side='left',
-            keep = make_fun(args.left_expr) if args.left_expr else None,
+            keep = keep,
             include = args.include_primer)
 
     if args.rle_out:
