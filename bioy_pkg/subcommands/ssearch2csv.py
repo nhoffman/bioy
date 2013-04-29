@@ -29,6 +29,7 @@ def build_parser(parser):
         default = False, action = 'store_true',
         help = 'pretty print first alignment and exit')
     parser.add_argument('-f', '--fieldnames',
+        type = lambda f: f.split(','),
         help = 'comma-delimited list of field names to include in output')
     parser.add_argument('--limit',
         type = int,
@@ -47,22 +48,22 @@ def build_parser(parser):
         type = float,
         metavar = 'X',
         help = 'Exclude alignments with z-score < X')
-    parser.add_argument('-a', '--all-alignments',
+    parser.add_argument('-a', '--top-alignment',
         default = False, action = 'store_true',
-        help = """By default, use only the top hit for each.
-                  query; provide this option to include all.""")
+        help = """By default, return all alignments;
+                  provide this option to include
+                  only the top entry per query.""")
 
 def action(args):
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
     aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
-    aligns = (list(a) for _,a in aligns)
 
-    if args.all_alignments:
-        aligns = chain(*aligns)
+    if args.top_alignment:
+        aligns = (next(a) for _,a in aligns)
     else:
-        aligns = (sorted(a, key = itemgetter('sw_zscore'), reverse = True) for a in aligns)
-        aligns = (a[0] for a in aligns)
+        aligns = (list(a) for _,a in aligns)
+        aligns = chain(*aligns)
 
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}
