@@ -7,7 +7,7 @@ import sys
 import pprint
 import csv
 
-from itertools import islice, ifilter, imap, chain, groupby
+from itertools import islice, chain, groupby, imap
 from operator import itemgetter
 
 from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
@@ -54,14 +54,14 @@ def build_parser(parser):
 
 def action(args):
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
-    aligns = ifilter(lambda a: float(a['sw_zscore']) >= args.min_zscore, aligns)
+    aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
 
     if args.all_alignments:
-        aligns = imap(lambda (_,a): list(a), aligns)
+        aligns = (list(a) for _,a in aligns)
         aligns = chain(*aligns)
     else:
-        aligns = imap(lambda (_,a): next(a), aligns)
+        aligns = (next(a) for _,a in aligns)
 
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}

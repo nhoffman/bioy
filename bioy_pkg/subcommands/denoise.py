@@ -10,7 +10,7 @@ sequences.
 import logging
 import sys
 import csv
-from itertools import groupby, islice, imap, ifilter
+from itertools import groupby, islice
 from random import shuffle
 from collections import defaultdict
 
@@ -87,8 +87,8 @@ def action(args):
     seqs = islice(args.fastafile, args.limit)
     seqs = sorted(seqs, key = lambda s: args.clusters[s.description])
     seqs = groupby(seqs, lambda s: args.clusters[s.description])
-    seqs = imap(lambda (_,s): list(s), seqs)
-    seqs = ifilter(lambda s: len(s) >= args.min_clust_size, seqs)
+    seqs = (list(s) for _,s in seqs)
+    seqs = (s for s in seqs if len(s) >= args.min_clust_size)
     seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
 
     # calculate consensus for each cluster, then accumulate names of
