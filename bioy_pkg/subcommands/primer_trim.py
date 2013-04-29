@@ -76,7 +76,13 @@ def primer_dict(parsed, side, keep = None, include = False):
 
     # ensure that certain fields are numeric
     def as_numeric(hit):
-        return dict(hit, **{k: cast(hit[k]) for k in ['q_al_start', 'q_al_stop', 'sw_zscore']})
+        # return dict(hit, **{k: cast(hit[k]) for k in ['q_al_start', 'q_al_stop', 'sw_zscore']})
+        return {
+            'q_name': hit['q_name'],
+            'q_al_start': int(hit['q_al_start']),
+            'q_al_stop': int(hit['q_al_stop']),
+            'sw_zscore': float(hit['sw_zscore'])
+        }
 
     hits = imap(as_numeric, hits)
 
