@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter
+from itertools import groupby, ifilter, tee
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
@@ -83,6 +83,7 @@ def primer_dict(parsed, side, keep = None, include = False):
     d = {hit['q_name']: int(positions[(side, include)](hit)) for hit in hits}
 
     msg = '{} sequences passed {} primer criteria'.format(side, len(d))
+
     if d:
         log.debug(msg)
     else:
@@ -121,6 +122,8 @@ def action(args):
 
     seqs = args.fasta
 
+    left = right = {}
+
     # right, left are dicts of {name: trim_position}
     if args.right_aligns:
         if args.right_expr:
@@ -136,6 +139,8 @@ def action(args):
             keep = keep,
             include = args.include_primer)
 
+        seqs = (s for s in seqs if s.id in right)
+
     if args.left_aligns:
         if args.left_expr:
             keep = make_fun(args.left_expr)
@@ -150,32 +155,25 @@ def action(args):
             keep = keep,
             include = args.include_primer)
 
+        seqs = (s for s in seqs if s.id in left)
+
+    seqs, seqs_rle = tee(seqs)
+
+    for s in seqs:
+        start, stop = left.get(s.id), right.get(s.id)
+        fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
+        args.fasta_out.write(fasta)
+
     if args.rle_out:
         if not args.rle:
             sys.exit('--rle is required')
         args.rle_out.writeheader()
 
-    for s in seqs:
-        start, stop = 0, len(s)
+        for s in seqs_rle:
+            start, stop = left.get(s.id), right.get(s.id)
+            if args.rle_out:
+                args.rle_out.writerow({
+                    'name': s.id,
+                    'rle': args.rle[s.id][start:stop]
+                })
 
-        # try right first since failure here is more likely
-        if args.right_aligns:
-            try:
-                stop = right[s.id]
-            except KeyError:
-                continue
-
-        if args.left_aligns:
-            try:
-                start = left[s.id]
-            except KeyError:
-                continue
-
-        fasta = '>{}\n{}\n'.format(s.id, s.seq[start:stop])
-        args.fasta_out.write(fasta)
-
-        if args.rle_out:
-            args.rle_out.writerow({
-                'name': s.id,
-                'rle': args.rle[s.id][start:stop]
-            })
