@@ -62,8 +62,7 @@ def action(args):
     if args.top_alignment:
         aligns = (next(a) for _,a in aligns)
     else:
-        aligns = (list(a) for _,a in aligns)
-        aligns = chain(*aligns)
+        aligns = (a for _,i in aligns for a in i) # flatten groupby iters
 
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}
@@ -81,6 +80,7 @@ def action(args):
     if args.fieldnames:
         fieldnames = args.fieldnames
     else:
+        # peek at first row fieldnames
         top = next(aligns, {})
         fieldnames = top.keys()
         aligns = chain([top], aligns)
