@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter, tee
+from itertools import groupby, ifilter
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
@@ -157,23 +157,19 @@ def action(args):
 
         seqs = (s for s in seqs if s.id in left)
 
-    seqs, seqs_rle = tee(seqs)
+    if args.rle_out:
+        if not args.rle:
+            sys.exit('--rle is required')
+        args.rle_out.writeheader()
 
     for s in seqs:
         start, stop = left.get(s.id), right.get(s.id)
         fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
         args.fasta_out.write(fasta)
 
-    if args.rle_out:
-        if not args.rle:
-            sys.exit('--rle is required')
-        args.rle_out.writeheader()
-
-        for s in seqs_rle:
-            start, stop = left.get(s.id), right.get(s.id)
-            if args.rle_out:
-                args.rle_out.writerow({
-                    'name': s.id,
-                    'rle': args.rle[s.id][start:stop]
-                })
+        if args.rle_out:
+            args.rle_out.writerow({
+                'name': s.id,
+                'rle': args.rle[s.id][start:stop]
+            })
 
