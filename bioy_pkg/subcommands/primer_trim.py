@@ -6,11 +6,11 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, ifilter, imap
+from itertools import groupby, ifilter
 from operator import itemgetter
 
 from bioy_pkg.sequtils import parse_ssearch36, fastalite
-from bioy_pkg.utils import Opener, Csv2Dict, cast
+from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def make_filter(rangestr, zscore):
         minstart, maxstart = map(int, rangestr.split(','))
         def fun(d):
             start = int(d['q_al_start'])
-            return minstart <= start <= maxstart and int(d['sw_zscore']) >= zscore
+            return minstart <= start <= maxstart and float(d['sw_zscore']) >= zscore
     elif rangestr:
         minstart, maxstart = map(int, rangestr.split(','))
         def fun(d):
