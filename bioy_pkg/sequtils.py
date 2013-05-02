@@ -4,12 +4,13 @@ import tempfile
 import os
 import logging
 import re
+import subprocess
 
 from cStringIO import StringIO
 from itertools import tee, izip_longest, groupby, takewhile
 from collections import Counter, defaultdict, namedtuple
 from subprocess import Popen, PIPE
-from utils import cast
+from utils import cast, opener
 
 log = logging.getLogger(__name__)
 
@@ -291,34 +292,70 @@ def fasta_tempfile(seqs, tmpdir = None, cleanup = True):
         if cleanup:
             os.unlink(db_name)
 
+@contextlib.contextmanager
+def run_ssearch(query, target, outfile = None, cleanup = True,
+                ssearch = 'ssearch36', max_hits = None,
+                full_length = True, m10 = True, dna = True,
+                forward_only = True, args = None):
 
-def run_ssearch36(query, target, cleanup = True):
-    """Run ssearch36 to align sequences in fasta files query and target."""
+    """Align sequences in fasta-format files ``query`` and ``target``
+    using ssearch36. Returns a file-like object open for
+    reading. This is meant to be run in a with block. Other options are follows:
 
-    command = [
-        'ssearch36',
-        '-a',          # include full length sequence
-        '-d', '1',     # display only one alignment
-        '-m','10',     # output format
-        '-n',          # force nuceotide
-        '-3',          # compare forward strand only
-        query, target]
+    * max_hits      if provided an integer value, specify option '-d <value>'
+    * full_length   if True, specify '-a'
+    * m10           if True, specify '-m 10'
+    * dna           if True, specify '-n'
+    * forward_only  if True, specify '-3'
 
-    print ' '.join(command)
+    `args` is a list of options whicn overrides all of the above if
+    provided.
 
-    pipe = subprocess.Popen(command, stdout=subprocess.PIPE)
-    (alignment, _) = pipe.communicate()
+    Example:
 
-    if not cleanup:
-        (db_fd, db_name) = tempfile.mkstemp(
-            text=True,
-            prefix = path.basename(target),
-            suffix = '.ssearch36m10')
-        db_handle = os.fdopen(db_fd, 'w')
-        db_handle.write(alignment)
-        db_handle.close()
+        with run_ssearch(query, target) as f:
+            aligns = parse_ssearch36(f)
 
-    return parselines(iter(alignment.splitlines()), numeric = True)
+    """
+
+    if outfile:
+        filename = outfile
+    else:
+        handle = tempfile.NamedTemporaryFile(
+            mode='rw', suffix='.ssearch')
+        filename = handle.name
+
+    cmd = [ssearch]
+    if args:
+        cmd.extend(args)
+    else:
+        if max_hits:
+            cmd.extend(['-d', str(max_hits)])
+        if full_length:
+            cmd.append('-a')
+        if m10:
+            cmd.extend(['-m', '10'])
+        if dna:
+            cmd.append('-n')
+        if forward_only:
+            cmd.append('-3')
+
+    cmd.extend([query, target, '>', filename])
+    command = ' '.join(cmd)
+
+    log.info(command)
+
+    try:
+        p = Popen(command, shell=True)
+        p.communicate()
+        if outfile:
+            handle = open(filename, 'rU')
+        else:
+            handle.seek(0)
+        yield handle
+    finally:
+        if not outfile and cleanup:
+            handle.close()
 
 
 def run_muscle(seqs, tmpdir = None, keep_order = True):
