@@ -291,6 +291,36 @@ def fasta_tempfile(seqs, tmpdir = None, cleanup = True):
         if cleanup:
             os.unlink(db_name)
 
+
+def run_ssearch36(query, target, cleanup = True):
+    """Run ssearch36 to align sequences in fasta files query and target."""
+
+    command = [
+        'ssearch36',
+        '-a',          # include full length sequence
+        '-d', '1',     # display only one alignment
+        '-m','10',     # output format
+        '-n',          # force nuceotide
+        '-3',          # compare forward strand only
+        query, target]
+
+    print ' '.join(command)
+
+    pipe = subprocess.Popen(command, stdout=subprocess.PIPE)
+    (alignment, _) = pipe.communicate()
+
+    if not cleanup:
+        (db_fd, db_name) = tempfile.mkstemp(
+            text=True,
+            prefix = path.basename(target),
+            suffix = '.ssearch36m10')
+        db_handle = os.fdopen(db_fd, 'w')
+        db_handle.write(alignment)
+        db_handle.close()
+
+    return parselines(iter(alignment.splitlines()), numeric = True)
+
+
 def run_muscle(seqs, tmpdir = None, keep_order = True):
     """
     Write an iterable of SeqRecord objects to a temporary file, align
