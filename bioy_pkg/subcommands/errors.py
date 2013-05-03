@@ -45,8 +45,8 @@ def build_parser(parser):
             help = 'Include the actual alignment in csv output')
 
 def action(args):
-    fieldnames = ['t_name', 'q_name', 'length', 'snp']
-    fieldnames += ['indel', 'homoindel','compound', 'sw_zscore']
+    fieldnames = ['t_name', 'q_name', 'length', 'snp', 'indel']
+    fieldnames += ['homoindel','compound', 'total', 'sw_zscore']
     fieldnames += args.extra_fields.keys()
 
     if args.output_alignment:
