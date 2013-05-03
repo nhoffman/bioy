@@ -5,6 +5,7 @@ Test sequtils module.
 from os import path
 import unittest
 import logging
+from itertools import chain
 
 from bioy_pkg import sequtils
 
@@ -56,3 +57,19 @@ class TestRunSsearch(TestBase):
 
         # should not still exist
         self.assertFalse(path.exists(aligns.name))
+
+class TestAllPairwise(TestBase):
+
+    def test01(self):
+        with open(self.data('five.fasta')) as f:
+            seqs = list(sequtils.fastalite(f))
+            pairs = list(sequtils.all_pairwise(seqs))
+            self.assertEqual(len(pairs), (len(seqs)*(len(seqs)-1))/2)
+            self.assertEqual([s.id for s in seqs], list(sequtils.names_from_pairs(pairs)))
+
+    def test02(self):
+        with open(self.data('two.fasta')) as f:
+            seqs = list(sequtils.fastalite(f))
+            pairs = list(sequtils.all_pairwise(seqs))
+            self.assertEqual(len(pairs), (len(seqs)*(len(seqs)-1))/2)
+            self.assertEqual([s.id for s in seqs], list(sequtils.names_from_pairs(pairs)))
