@@ -68,10 +68,10 @@ def primer_dict(parsed, side, keep = None, include = False):
     assert include in (True, False)
 
     positions = {
-        ('left', True): lambda hit: hit['q_al_stop'],
-        ('left', False): lambda hit: hit['q_al_start'] - 1,
-        ('right', False): lambda hit: hit['q_al_stop'],
-        ('right', True): lambda hit: hit['q_al_start'] - 1
+        ('left', False): lambda hit: hit['q_al_stop'],
+        ('left', True): lambda hit: hit['q_al_start'] - 1,
+        ('right', True): lambda hit: hit['q_al_stop'],
+        ('right', False): lambda hit: hit['q_al_start'] - 1
     }
 
     # 'best' hit is assumed to be first in each group
