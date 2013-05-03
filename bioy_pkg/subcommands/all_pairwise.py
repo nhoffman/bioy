@@ -4,11 +4,7 @@ Calculate all Smith-Waterman pairwise distances among sequences.
 
 import logging
 import sys
-import pprint
 import csv
-
-from itertools import islice, chain, groupby, imap
-from operator import itemgetter
 
 from bioy_pkg.sequtils import fastalite, all_pairwise
 from bioy_pkg.utils import Opener
@@ -25,8 +21,9 @@ def build_parser(parser):
                         default=sys.stdout,
                         type=Opener('w'),
                         help='output file (default stdout)')
-    parser.add_argument('-d', '--distance', action='store_true',
-                        default=False, help = 'Calculate distance rather than identity.')
+    parser.add_argument('-d', '--distance', action='store_true', default=False,
+                        help = 'Calculate distance rather than identity.')
+
 
 def action(args):
 
