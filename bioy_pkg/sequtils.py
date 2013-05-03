@@ -4,12 +4,13 @@ import tempfile
 import os
 import logging
 import re
+import subprocess
 
 from cStringIO import StringIO
 from itertools import tee, izip_longest, groupby, takewhile
-from collections import Counter, defaultdict, namedtuple
+from collections import Counter, defaultdict, namedtuple, OrderedDict
 from subprocess import Popen, PIPE
-from utils import cast
+from utils import cast, opener
 
 log = logging.getLogger(__name__)
 
@@ -273,23 +274,117 @@ def consensus(seqs, rlelist = None, degap = True):
     return ''.join(cons).replace(gap,'') if degap else ''.join(cons)
 
 @contextlib.contextmanager
-def fasta_tempfile(seqs, tmpdir = None, cleanup = True):
+def fasta_tempfile(seqs, dir = None):
     """Creates a temporary FASTA file representing an iterable of
     objects *seqs* containing attributes `description` and `seq` (eg,
     SeqRecord or fastalite objects). Returns the name of a temorary
     file and, then deletes it at the end of the with block.
     """
 
-    (db_fd, db_name) = tempfile.mkstemp(text=True, dir=tmpdir)
-    db_handle = os.fdopen(db_fd, 'w')
-    db_handle.write(''.join('>{s.description}\n{s.seq}\n'.format(s=s) for s in seqs))
-    db_handle.close()
+    handle = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta',
+                                         dir=dir)
+
+    handle.write(''.join('>{s.id}\n{s.seq}\n'.format(s=s) for s in seqs))
+    handle.flush()
 
     try:
-        yield db_name
+        yield handle.name
     finally:
-        if cleanup:
-            os.unlink(db_name)
+        handle.close()
+
+
+@contextlib.contextmanager
+def run_ssearch(query, target, outfile = None, cleanup = True,
+                ssearch = 'ssearch36', max_hits = None,
+                full_length = True, m10 = True, dna = True,
+                forward_only = True, args = None):
+
+    """Align sequences in fasta-format files ``query`` and ``target``
+    using ssearch36. Returns a file-like object open for
+    reading. This is meant to be run in a with block. Other options are follows:
+
+    * max_hits      if provided an integer value, specify option '-d <value>'
+    * full_length   if True, specify '-a'
+    * m10           if True, specify '-m 10'
+    * dna           if True, specify '-n'
+    * forward_only  if True, specify '-3'
+
+    `args` is a list of options whicn overrides all of the above if
+    provided.
+
+    Example:
+
+        with run_ssearch(query, target) as f:
+            aligns = parse_ssearch36(f)
+
+    """
+
+    if outfile:
+        filename = outfile
+    else:
+        handle = tempfile.NamedTemporaryFile(
+            mode='rw', suffix='.ssearch')
+        filename = handle.name
+
+    cmd = [ssearch]
+    if args:
+        cmd.extend(args)
+    else:
+        if max_hits:
+            cmd.extend(['-d', str(max_hits)])
+        if full_length:
+            cmd.append('-a')
+        if m10:
+            cmd.extend(['-m', '10'])
+        if dna:
+            cmd.append('-n')
+        if forward_only:
+            cmd.append('-3')
+
+    cmd.extend([query, target, '>', filename])
+    command = ' '.join(cmd)
+
+    log.info(command)
+
+    try:
+        p = subprocess.check_call(command, shell=True)
+        if outfile:
+            handle = open(filename, 'rU')
+        else:
+            handle.seek(0)
+        yield handle
+    finally:
+        if not outfile and cleanup:
+            handle.close()
+
+def all_pairwise(seqs):
+    """
+    Perform all pairwise alignments among sequences in list of SeqRecords `seqs`
+    """
+
+    if not hasattr(seqs, 'len'):
+        seqs = list(seqs)
+
+    for i in xrange(len(seqs) - 1):
+        with fasta_tempfile([seqs[i]]) as target, fasta_tempfile(seqs[i+1:]) as query:
+            with run_ssearch(query, target, max_hits = 1) as aligned:
+                for d in parse_ssearch36(aligned):
+                    yield (d['t_name'], d['q_name'], float(d['sw_ident']))
+
+
+def names_from_pairs(pairs):
+
+    try:
+        first, second, _ = pairs.pop(0)
+    except AttributeError:
+        first, second, _ = pairs.next()
+
+    yield first
+    yield second
+    for q, t, _ in pairs:
+        if q == first:
+            yield t
+
 
 def run_muscle(seqs, tmpdir = None, keep_order = True):
     """
