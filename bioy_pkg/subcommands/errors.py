@@ -71,6 +71,10 @@ def action(args):
         row['q_name'], row['t_name'] = a['q_name'], a['t_name']
         row.update(a)
         row.update(error_count(a['errors']))
+
+        total = row['snp'] + row['indel'] + row['homoindel'] + row['compound']
+        row.update({'total':total})
+
         row.update(args.extra_fields)
 
         if args.output_alignment:
