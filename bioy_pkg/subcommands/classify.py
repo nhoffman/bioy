@@ -8,7 +8,7 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
-from itertools import groupby, imap, ifilter
+from itertools import groupby, imap
 from operator import itemgetter
 
 from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy, BLAST_HEADER
@@ -145,26 +145,25 @@ def action(args):
         }, **b), blast_results)
 
     # some raw filtering
-    blast_results = ifilter(lambda b:
-            float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size, blast_results)
-    blast_results = ifilter(lambda b: float(b['pident']) >= args.details_identity, blast_results)
-    blast_results = ifilter(lambda b: float(b['coverage']) >= args.coverage, blast_results)
+    blast_results = (b for b in blast_results
+            if float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size)
+    blast_results = (b for b in blast_results if float(b['pident']) >= args.details_identity)
+    blast_results = (b for b in blast_results if float(b['coverage']) >= args.coverage)
 
     # add required values for classification
     blast_results = imap(lambda b:
             update_blast_results(b, args.seq_info, args.taxonomy, args.target_rank), blast_results)
 
     # remove hits with no rank ids
-    blast_results = ifilter(lambda b: b['target_rank_id'], blast_results)
+    blast_results = (b for b in blast_results if b['target_rank_id'])
 
-    blast_results = ifilter(
-            lambda b: b['target_rank_id'] not in args.exclude_by_taxid, blast_results)
+    blast_results = (b for b in blast_results if b['target_rank_id'] not in args.exclude_by_taxid)
 
     # (Optional) In some cases you want to filter some target hits
-    blast_results = ifilter(lambda b: b['ambig_count'] <= args.max_ambiguous, blast_results)
-#    blast_results = ifilter(lambda b: b['qseqid'] != b['sseqid'], blast_results)
-#    blast_results = ifilter(
-#            lambda b: not UNCLASSIFIED_REGEX.search(b['target_rank_name']), blast_results)
+    blast_results = (b for b in blast_results if b['ambig_count'] <= args.max_ambiguous)
+#    blast_results = (b for b in blast_results if b['qseqid'] != b['sseqid'])
+#    blast_results = (b for b in blast_results
+#            if not UNCLASSIFIED_REGEX.search(b['target_rank_name']))
     ###
 
     # first, group by specimen
