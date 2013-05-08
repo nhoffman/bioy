@@ -677,16 +677,17 @@ def format_taxonomy(names, selectors, asterisk = '*'):
 
     return ';'.join(taxonomy)
 
+SeqLite = namedtuple('SeqLite', 'id, description, seq')
+
 def _readfasta(handle):
     """
     Lightweight fasta parser. Returns iterator of namedtuple instances
     with fields (id, description, seq) given file-like object `handle`.
     """
 
-    seqlite = namedtuple('SeqLite', 'id, description, seq')
     for h in handle.read().lstrip('> ').split('\n>'):
         part = h.find('\n')
-        yield seqlite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
+        yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
 
 def _iterfasta(handle):
     """
@@ -699,12 +700,12 @@ def _iterfasta(handle):
     for line in handle:
         if line.startswith('>'):
             if name:
-                yield seqlite(name.split()[0], name, seq)
+                yield SeqLite(name.split()[0], name, seq)
             name, seq = line[1:].strip(), ''
         else:
             seq += line.strip()
 
-    yield seqlite(name.split()[0], name, seq)
+    yield SeqLite(name.split()[0], name, seq)
 
 def fastalite(handle, readfile = True):
     return _readfasta(handle) if readfile else _iterfasta(handle)
