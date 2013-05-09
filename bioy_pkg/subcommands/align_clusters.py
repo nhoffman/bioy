@@ -52,6 +52,7 @@ def action(args):
     for cons, group in groups:
         if args.pattern and not re.search(r'' + args.pattern, cons):
             continue
+        log.info(cons)
         reads, _ = zip(*group)
         seqs = [seqdict[name] for name in reads]
         if len(seqs) > args.sample:
