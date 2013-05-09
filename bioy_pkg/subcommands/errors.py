@@ -107,7 +107,7 @@ def action(args):
         # reference counts in rows, query in column
         ii = range(args.homopolymer_max)
         margins = ii + [gtceil]
-        args.matrix.writerow(['q{}'.format(i) for i in ii] + [gtceil])
+        args.matrix.writerow([''] + ['q{}'.format(i) for i in ii] + [gtceil])
         for i_ref in margins:
             cols = [homopolymers[i_ref, i_query] for i_query in margins]
             args.matrix.writerow(['r{}'.format(i_ref)] + cols)
