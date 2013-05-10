@@ -5,9 +5,9 @@ Tally and classify errors given ./ion rlaligns reference and query sequences
 import logging
 import sys
 
-from collections import Counter
+from collections import Counter, defaultdict
 from csv import DictWriter, writer, DictReader
-from itertools import imap, tee
+from itertools import imap
 
 from bioy_pkg import sequtils
 from bioy_pkg.sequtils import itemize_errors, error_count, show_errors
@@ -57,12 +57,14 @@ def action(args):
     itemizer = lambda a: dict({'errors':itemize_errors(a['t_seq'], a['q_seq'])}, **a)
 
     aligns = imap(itemizer, aligns)
-    aligns, matrix = tee(aligns)
 
     tallies = DictWriter(args.out,
             fieldnames = fieldnames,
             extrasaction = 'ignore')
     tallies.writeheader()
+
+    homopolymers = defaultdict(Counter)
+    gtceil = 'geq{}'.format(args.homopolymer_max)
 
     # output error counts:
     for a in aligns:
@@ -72,6 +74,7 @@ def action(args):
         row.update(a)
         row.update(error_count(a['errors']))
 
+        # create total count to output
         total = row['snp'] + row['indel'] + row['homoindel'] + row['compound']
         row.update({'total':total})
 
@@ -90,24 +93,26 @@ def action(args):
         if args.step:
             raw_input()
 
+        # create homopolymer matrix
+        for e in a['errors']:
+            r, q = e['ref'].strip('=-'), e['query'].strip('=-')
+            # count indels or homoindels; exclude compound errors and snps
+            base = ''.join(set(r + q))
+            if len(base) == 1:
+                ref_count = len(r) if len(r) <= args.homopolymer_max else gtceil
+                query_count = len(q) if len(q) <= args.homopolymer_max else gtceil
+                homopolymers['total'][(ref_count, query_count)] += 1
+                homopolymers[base][(ref_count, query_count)] += 1
+
     # output homopolymer matrix if specified
     if args.matrix:
-        homopolymers = Counter()
-        gtceil = 'geq{}'.format(args.homopolymer_max)
-
-        for m in matrix:
-            for e in m['errors']:
-                r, q = e['ref'].strip('=-'), e['query'].strip('=-')
-                # count indels or homoindels; exclude compound errors and snps
-                if len(set(r + q)) == 1:
-                    ref_count = len(r) if len(r) <= args.homopolymer_max else gtceil
-                    query_count = len(q) if len(q) <= args.homopolymer_max else gtceil
-                    homopolymers[(ref_count, query_count)] += 1
-
         # reference counts in rows, query in column
         ii = range(args.homopolymer_max)
         margins = ii + [gtceil]
-        args.matrix.writerow([''] + ['q{}'.format(i) for i in ii] + [gtceil])
-        for i_ref in margins:
-            cols = [homopolymers[i_ref, i_query] for i_query in margins]
-            args.matrix.writerow(['r{}'.format(i_ref)] + cols)
+        for base in sorted(homopolymers):
+            args.matrix.writerow([base] + ['q{}'.format(i) for i in ii] + [gtceil])
+            for i_ref in margins:
+                cols = [homopolymers[base][i_ref, i_query] for i_query in margins]
+                args.matrix.writerow(['r{}'.format(i_ref)] + cols)
+            args.matrix.writerow([''] * 10)
+
