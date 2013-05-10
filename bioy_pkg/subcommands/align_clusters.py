@@ -73,6 +73,6 @@ def action(args):
                                '-in', f, '-out', outfile]
                     log.debug(' '.join(command))
                     subprocess.check_call(command)
-                else:
-                    with open(outfile, 'w') as f:
-                        f.write('\n'.join('>{}\n{}'.format(s.id, s.seq) for s in seqs))
+            else:
+                with open(outfile, 'w') as f:
+                    f.write('\n'.join('>{}\n{}'.format(s.id, s.seq) for s in seqs))
