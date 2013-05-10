@@ -1,16 +1,15 @@
 import csv
 import contextlib
 import tempfile
-import os
 import logging
 import re
 import subprocess
 
 from cStringIO import StringIO
 from itertools import tee, izip_longest, groupby, takewhile
-from collections import Counter, defaultdict, namedtuple, OrderedDict
+from collections import Counter, defaultdict, namedtuple
 from subprocess import Popen, PIPE
-from utils import cast, opener
+from utils import cast
 
 log = logging.getLogger(__name__)
 
@@ -281,8 +280,8 @@ def fasta_tempfile(seqs, dir = None):
     file and, then deletes it at the end of the with block.
     """
 
-    handle = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta',
-                                         dir=dir)
+    handle = tempfile.NamedTemporaryFile(
+            mode='w', suffix = '.fasta', dir = dir)
 
     handle.write(''.join('>{s.id}\n{s.seq}\n'.format(s=s) for s in seqs))
     handle.flush()
@@ -347,7 +346,7 @@ def run_ssearch(query, target, outfile = None, cleanup = True,
     log.info(command)
 
     try:
-        p = subprocess.check_call(command, shell=True)
+        subprocess.check_call(command, shell=True)
         if outfile:
             handle = open(filename, 'rU')
         else:
@@ -695,7 +694,6 @@ def _iterfasta(handle):
     with fields (id, description, seq) given file-like object `handle`.
     """
 
-    seqlite = namedtuple('SeqLite', 'id, description, seq')
     name, seq = '', ''
     for line in handle:
         if line.startswith('>'):
