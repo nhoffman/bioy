@@ -5,6 +5,8 @@ Test sequtils module.
 import logging
 import pprint
 
+from bz2 import BZ2File
+from collections import Counter
 from os import path
 
 from bioy_pkg import sequtils
@@ -58,6 +60,12 @@ class TestRunSsearch(TestBase):
 
         # should not still exist
         self.assertFalse(path.exists(aligns.name))
+
+    def test04(self):
+        with BZ2File(self.data('rle_100_left.ssearch.bz2')) as f:
+            aligns = list(sequtils.parse_ssearch36(f))
+            self.assertEqual(len(set(a['q_name'] for a in aligns)), 100) # 100 total sequences
+            self.assertEqual(len(aligns), 400) # searched against 4 primers
 
 class TestAllPairwise(TestBase):
 
@@ -241,4 +249,46 @@ class TestErrorCounting(TestBase):
             8: dict(ref='C', query='-')
             }
 
+class TestAsciiEncoding(TestBase):
+
+    def test01(self):
+        v = range(79)
+        self.assertEqual(v, sequtils.from_ascii(sequtils.to_ascii(v)))
+
+    def test02(self):
+        v = range(80)
+        self.assertRaises(ValueError, sequtils.to_ascii, v)
+
+class TestFastaLite(TestBase):
+
+    def test01(self):
+        with open(self.data('five.fasta')) as f, open(self.data('five.fasta')) as r:
+            seqs = sequtils.fastalite(f)
+            raw = r.read()
+            fasta = ''
+            for seq in seqs:
+                fasta += '>{}\n{}\n'.format(seq.description, seq.seq)
+                log.debug('{}'.format(seq))
+
+        self.assertEquals(''.join(raw).replace('\n', ''), fasta.replace('\n', ''))
+
+    def test02(self):
+        with open(self.data('five.fasta')) as f:
+            seqs = sequtils.fastalite(f)
+            for seq in seqs:
+                pass
+
+class TestParseClusters(TestBase):
+
+    def test01(self):
+        infile = self.data('clusters.uc')
+        with open(infile) as f:
+            cluster_ids, cluster_sizes = sequtils.parse_uc(f)
+
+        counter = Counter()
+        for cluster, count in cluster_sizes.items():
+            counter[count] += 1
+
+        # most of the clusters are singletons
+        self.assertEquals(counter.most_common(1)[0][0], 1)
 
