@@ -81,6 +81,9 @@ def build_parser(parser):
             help = """If --map is not provided, the default behavior is to treat
                     all reads as one group; use this option to treat
                     each read as a separate group [%(default)s]""")
+    parser.add_argument('--group-label',
+            default = 'all',
+            help = 'Single group label for reads')
     parser.add_argument('--min-cluster-size',
             default = 0,
             type = int,
@@ -170,7 +173,7 @@ def action(args):
     if args.map:
         specimen_grouper = lambda s: args.map[s['qseqid']]
     elif args.all_one_group:
-        specimen_grouper = lambda s: 'all'
+        specimen_grouper = lambda s: args.group_label
     else:
         specimen_grouper = lambda s: s['qseqid']
 
