@@ -12,7 +12,21 @@ dependencies
 
 * Python 2.7.x
 * Tested on Ubuntu and OS X.
+* biopython
 
+Some functions require
+
+* scipy
+
+installation
+============
+
+Using setup.py or pip from the project directory
+
+    % cd bioy
+    % python setup.py install
+    # or
+    % pip install -U .
 
 execution
 =========
@@ -41,7 +55,7 @@ We use abbrevited git sha hashes to identify the software version::
 
 The version information is saved in ``bioy_pkg/data`` when ``setup.py``
 is run (on installation, or even by executing ``python setup.py
--h``). 
+-h``).
 
 unit tests
 ==========
