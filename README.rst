@@ -21,12 +21,12 @@ Some functions require
 installation
 ============
 
-Using setup.py or pip from the project directory
+Using setup.py or pip from the project directory::
 
-    % cd bioy
-    % python setup.py install
-    # or
-    % pip install -U .
+  % cd bioy
+  % python setup.py install
+  # or
+  % pip install -U .
 
 execution
 =========
@@ -36,7 +36,7 @@ UNIX command line syntax. Note that for development, it is convenient
 to run ``bioy`` from within the project directory by specifying the
 relative path to the script::
 
-    % ./bioy
+  % ./bioy
 
 Commands are constructed as follows. Every command starts with the
 name of the script, followed by an "action" followed by a series of
@@ -50,8 +50,8 @@ versions
 
 We use abbrevited git sha hashes to identify the software version::
 
-    % ./bioy --version
-    0128.9790c13
+  % ./bioy --version
+  0128.9790c13
 
 The version information is saved in ``bioy_pkg/data`` when ``setup.py``
 is run (on installation, or even by executing ``python setup.py
