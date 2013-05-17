@@ -85,8 +85,9 @@ def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
 
 def action(args):
     seqs = islice(args.fastafile, args.limit)
-    seqs = sorted(seqs, key = lambda s: args.clusters[s.description])
-    seqs = groupby(seqs, lambda s: args.clusters[s.description])
+    clusters = lambda s: args.clusters.get(s.description, s.description)
+    seqs = sorted(seqs, key = clusters)
+    seqs = groupby(seqs, clusters)
     seqs = (list(s) for _,s in seqs)
     seqs = (s for s in seqs if len(s) >= args.min_clust_size)
     seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
