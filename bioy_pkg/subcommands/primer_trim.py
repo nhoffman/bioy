@@ -164,12 +164,15 @@ def action(args):
 
     for s in seqs:
         start, stop = left.get(s.id), right.get(s.id)
-        fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
-        args.fasta_out.write(fasta)
+        seq = s.seq[start:stop]
 
-        if args.rle_out:
-            args.rle_out.writerow({
-                'name': s.id,
-                'rle': args.rle[s.id][start:stop]
-            })
+        if seq:
+            fasta = '>{}\n{}\n'.format(s.description, s.seq[start:stop])
+            args.fasta_out.write(fasta)
+
+            if args.rle_out:
+                args.rle_out.writerow({
+                    'name': s.id,
+                    'rle': args.rle[s.id][start:stop]
+                })
 
