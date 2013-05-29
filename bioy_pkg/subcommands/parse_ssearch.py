@@ -6,7 +6,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import islice, ifilter
+from itertools import islice
 
 from bioy_pkg.sequtils import parse_ssearch36, count_ambiguous
 from bioy_pkg.utils import Opener, Csv2Dict
@@ -40,7 +40,7 @@ def build_parser(parser):
         help = 'output file for fasta reads')
 
 def action(args):
-    aligns = ifilter(lambda a: float(a['sw_zscore']) >= args.min_zscore, args.aligns)
+    aligns = (a for a in args.aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = islice(aligns, args.limit)
 
     if args.out_info:
