@@ -44,7 +44,7 @@ def build_parser(parser):
         nargs = '+',
         help = 'Decode alignment')
     parser.add_argument('--min-zscore',
-        default = 0,
+        default = None,
         type = float,
         metavar = 'X',
         help = 'Exclude alignments with z-score < X')
@@ -54,15 +54,17 @@ def build_parser(parser):
                   provide this option to include
                   only the top entry per query.""")
 
+
 def action(args):
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
-    aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
+    if args.min_zscore:
+        aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
 
     if args.top_alignment:
-        aligns = (next(a) for _,a in aligns)
+        aligns = (next(a) for _, a in aligns)
     else:
-        aligns = (a for _,i in aligns for a in i) # flatten groupby iters
+        aligns = (a for _, i in aligns for a in i)  # flatten groupby iters
 
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}
@@ -93,4 +95,3 @@ def action(args):
         writer.writeheader()
 
     writer.writerows(aligns)
-

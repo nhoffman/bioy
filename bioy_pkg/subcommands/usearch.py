@@ -46,9 +46,12 @@ def build_parser(parser):
             help = 'minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
             help = 'maximum number of alignments to keep default = 1')
+    parser.add_argument('--usearch', default = 'usearch6_64',
+            help = 'name of usearch executable')
+
 
 def action(args):
-    command = ['usearch6_64']
+    command = [args.usearch]
     command += ['-usearch_global', args.fasta]
     command += ['-threads', args.threads]
     command += ['-id', str(args.id)]
@@ -80,4 +83,3 @@ def action(args):
         out.writeheader()
 
     out.writerows(lines)
-
