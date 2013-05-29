@@ -20,7 +20,7 @@ def build_parser(parser):
             help = 'sample id to pull reads for')
     parser.add_argument('--map-file',
             type = Csv2Dict(value = 'sample_id', fieldnames=['sequence_id','sample_id']),
-            help = 'csv(.bz2) file containing sample_id,barcode in the rows.')
+            help = 'csv(.bz2) file containing sequence_id,sample_id in the rows.')
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
