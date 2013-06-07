@@ -11,7 +11,7 @@ from itertools import islice, chain, groupby, imap
 from operator import itemgetter
 
 from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
-from bioy_pkg.utils import Opener, Csv2Dict
+from bioy_pkg.utils import Opener, Csv2Dict, parse_extras
 
 log = logging.getLogger(__name__)
 
@@ -53,9 +53,15 @@ def build_parser(parser):
         help = """By default, return all alignments;
                   provide this option to include
                   only the top entry per query.""")
+    parser.add_argument('-e', '--extra-fields',
+            help="extra fields for csv file in form 'name1:val1,name2:val2'")
+
 
 
 def action(args):
+
+    extras = parse_extras(args.extra_fields) if args.extra_fields else {}
+
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
     if args.min_zscore:
         aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
@@ -86,6 +92,10 @@ def action(args):
         top = next(aligns, {})
         fieldnames = top.keys()
         aligns = chain([top], aligns)
+
+    if extras:
+        fieldnames += extras.keys()
+        aligns = (dict(d, **extras) for d in aligns)
 
     writer = csv.DictWriter(args.out,
             extrasaction = 'ignore',
