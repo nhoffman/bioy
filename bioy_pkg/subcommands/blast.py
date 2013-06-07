@@ -38,9 +38,9 @@ def build_parser(parser):
             help = """query strand(s) to search against database/subject.
                       default = %(default)s""")
     parser.add_argument('--threads',
-            default = '1',
+            default = os.environ.get('THREADS_ALLOC') or '1',
             help = """Number of threads (CPUs) to use in the BLAST search.
-                   Can also specify with environment variable BLAST_THREADS
+                   Can also specify with environment variable THREADS_ALLOC
                    default = %(default)s""")
     parser.add_argument('--id',
             default = '90',
@@ -53,7 +53,7 @@ def build_parser(parser):
 def action(args):
     command = ['blastn']
     command += ['-query', args.fasta]
-    command += ['-num_threads', os.environ.get('BLAST_THREADS') or args.threads]
+    command += ['-num_threads', args.threads]
     command += ['-perc_identity', args.id]
     command += ['-outfmt', BLAST_FORMAT]
     command += ['-db', args.database]

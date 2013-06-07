@@ -10,9 +10,12 @@ sequences.
 import logging
 import sys
 import csv
+import os
+
 from itertools import groupby, islice
 from random import shuffle
 from collections import defaultdict
+from multiprocessing import Pool
 
 from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, fastalite, from_ascii
 from bioy_pkg.utils import chunker, Opener, Csv2Dict
@@ -62,7 +65,11 @@ def build_parser(parser):
     parser.add_argument('--name-delimiter', default = CLUSTER_NAME_DELIMITER,
                         metavar = 'CHAR',
                         help = 'A character used to delimit elements in cluster names [default "%(default)s"]')
-
+    parser.add_argument('--threads',
+            default = int(os.environ.get('THREADS_ALLOC') or 1),
+            help = """Number of threads (CPUs) to use.
+                   Can also specify with environment variable THREADS_ALLOC
+                   default = %(default)s""")
 
 def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
     """
@@ -83,6 +90,11 @@ def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
             rlelist = [from_ascii(rledict[s.id]) for s in cluster] if rledict else None
             yield (cluster, rlelist)
 
+def align_and_consensus(seq):
+    i, (cluster, rlelist) = seq
+    log.info('aligning cluster {} len {}'.format(i, len(cluster)))
+    return cluster, consensus(run_muscle(cluster), rlelist)
+
 def action(args):
     seqs = islice(args.fastafile, args.limit)
     clusters = lambda s: args.clusters.get(s.description, s.description)
@@ -94,10 +106,11 @@ def action(args):
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
+
     exemplars = defaultdict(list)
-    for i, (cluster, rlelist) in enumerate(seqs):
-        log.info('aligning cluster {} len {}'.format(i, len(cluster)))
-        cons = consensus(run_muscle(cluster), rlelist)
+
+    pool = Pool(processes = args.threads)
+    for cluster, cons in pool.map(align_and_consensus, enumerate(seqs)):
         exemplars[cons].extend([s.id for s in cluster])
 
     # write each consensus sequence
