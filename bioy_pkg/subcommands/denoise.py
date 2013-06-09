@@ -51,7 +51,7 @@ def build_parser(parser):
             help = 'Output file with columns (clustername,weight)')
     parser.add_argument('--max-clust-size',
             type = int,
-            default = 100, help = 'default %(default)s')
+            default = sys.maxint, help = 'default %(default)s')
     parser.add_argument('--min-clust-size',
             type = int,
             default = 1, help = 'default %(default)s')
@@ -111,8 +111,8 @@ def action(args):
     exemplars = defaultdict(list)
 
     pool = Pool(processes = args.threads)
-    for cluster, cons in pool.map(align_and_consensus, enumerate(seqs)):
-        exemplars[cons].extend([s.id for s in cluster])
+    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(seqs)):
+        exemplars[cons].extend([c.id for c in cluster])
 
     # write each consensus sequence
     items = sorted(exemplars.items(), key = lambda x: -1 * len(x[1]))
