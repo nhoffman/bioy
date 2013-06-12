@@ -684,9 +684,12 @@ def _readfasta(handle):
     with fields (id, description, seq) given file-like object `handle`.
     """
 
-    for h in handle.read().lstrip('> ').split('\n>'):
-        part = h.find('\n')
-        yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
+    handle = handle.read()
+
+    if handle:
+        for h in handle.read().lstrip('> ').split('\n>'):
+            part = h.find('\n')
+            yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
 
 def _iterfasta(handle):
     """
@@ -703,7 +706,8 @@ def _iterfasta(handle):
         else:
             seq += line.strip()
 
-    yield SeqLite(name.split()[0], name, seq)
+    if name and seq:
+        yield SeqLite(name.split()[0], name, seq)
 
 def fastalite(handle, readfile = True):
     return _readfasta(handle) if readfile else _iterfasta(handle)

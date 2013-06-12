@@ -26,7 +26,7 @@ CLUSTER_NAME_DELIMITER = '_'
 
 def build_parser(parser):
     parser.add_argument('fastafile',
-            type = lambda f: fastalite(Opener()(f)),
+            type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file containing original clustered reads (default stdin).')
     parser.add_argument('clusters',
             type = lambda c: parse_uc(Opener()(c))[0],
