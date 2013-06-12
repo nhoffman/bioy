@@ -687,7 +687,7 @@ def _readfasta(handle):
     handle = handle.read()
 
     if handle:
-        for h in handle.read().lstrip('> ').split('\n>'):
+        for h in handle.lstrip('> ').split('\n>'):
             part = h.find('\n')
             yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
 
