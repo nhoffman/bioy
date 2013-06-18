@@ -6,7 +6,7 @@ import re
 import subprocess
 
 from cStringIO import StringIO
-from itertools import tee, izip_longest, groupby, takewhile
+from itertools import tee, izip_longest, groupby, takewhile, izip
 from collections import Counter, defaultdict, namedtuple
 from subprocess import Popen, PIPE
 from utils import cast
@@ -106,7 +106,11 @@ def homoencode(seq):
 
     assert gap not in seq
 
-    chars, counts = zip(*[(c, len(list(g))) for c, g in groupby(seq.upper())])
+    seq = seq.upper()
+    seq = groupby(seq)
+    seq = ((c, len(list(g))) for c,g in seq)
+    chars, counts = izip(*seq)
+
     return ''.join(chars), list(counts)
 
 def homodecodealignment(seq1, counts1, seq2, counts2, insertion=homogap):
