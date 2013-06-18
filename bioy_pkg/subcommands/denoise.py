@@ -111,7 +111,7 @@ def action(args):
     exemplars = defaultdict(list)
 
     pool = Pool(processes = args.threads)
-    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(seqs)):
+    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(seqs, start = 1)):
         exemplars[cons].extend([c.id for c in cluster])
 
     # write each consensus sequence
