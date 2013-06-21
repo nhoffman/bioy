@@ -109,6 +109,7 @@ def homoencode(seq):
     seq = seq.upper()
     seq = groupby(seq)
     seq = ((c, len(list(g))) for c,g in seq)
+
     chars, counts = izip(*seq)
 
     return ''.join(chars), list(counts)
