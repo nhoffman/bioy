@@ -11,6 +11,19 @@ from bioy_pkg.utils import Opener, Csv2Dict
 log = logging.getLogger(__name__)
 
 rle_fieldnames = ['name', 'rle']
+rev_comp = {'A':'T',
+            'T':'A',
+            'C':'G',
+            'G':'C',
+            'M':'K',
+            'K':'M',
+            'R':'Y',
+            'Y':'R',
+            'W':'W',
+            'S':'S',
+            'V':'B',
+            'H':'D',
+            'N':'N'}
 
 def build_parser(parser):
     parser.add_argument('infile',
@@ -33,7 +46,9 @@ def action(args):
     seqs = fastalite(args.infile)
 
     for s in seqs:
-        seq = ''.join(reversed(s.seq))
+        seq = reversed(s.seq)
+        seq = [rev_comp[se] for se in seq]
+        seq = ''.join(seq)
         args.out_fasta.write('>{}\n{}\n'.format(s.description, seq))
 
     if args.rlefile and args.out_rle:
