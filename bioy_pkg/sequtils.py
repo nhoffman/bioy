@@ -26,20 +26,20 @@ UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
 IUPAC = {('A',): 'A',
+        ('C',): 'C',
+        ('G',): 'G',
+        ('T',): 'T',
         ('A', 'C'): 'M',
+        ('A', 'G'): 'R',
+        ('A', 'T'): 'W',
+        ('C', 'T'): 'Y',
+        ('C', 'G'): 'S',
+        ('G', 'T'): 'K',
         ('A', 'C', 'G'): 'V',
         ('A', 'C', 'T'): 'H',
-        ('A', 'G'): 'R',
         ('A', 'G', 'T'): 'D',
-        ('A', 'T'): 'W',
-        ('C',): 'C',
-        ('C', 'G'): 'S',
         ('C', 'G', 'T'): 'B',
-        ('C', 'T'): 'Y',
-        ('G',): 'G',
-        ('A', 'C', 'G', 'T'): 'N',
-        ('G', 'T'): 'K',
-        ('T',): 'T'}
+        ('A', 'C', 'G', 'T'): 'N'}
 
 gap = '-'
 
