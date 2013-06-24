@@ -135,7 +135,7 @@ def action(args):
 
         right = primer_dict(
             parse_ssearch36(args.right_aligns, numeric = bool(args.right_expr)),
-            side='right',
+            side = 'right',
             keep = keep,
             include = args.include_primer)
 
@@ -151,7 +151,7 @@ def action(args):
 
         left = primer_dict(
             parse_ssearch36(args.left_aligns, numeric = bool(args.left_expr)),
-            side='left',
+            side = 'left',
             keep = keep,
             include = args.include_primer)
 
@@ -171,8 +171,7 @@ def action(args):
             args.fasta_out.write(fasta)
 
             if args.rle_out:
-                args.rle_out.writerow({
-                    'name': s.id,
-                    'rle': args.rle[s.id][start:stop]
-                })
+                name = s.id
+                rle = args.rle[s.id][start:stop]
+                args.rle_out.writerow(dict(name = name, rle = rle))
 
