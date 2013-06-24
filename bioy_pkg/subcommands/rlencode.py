@@ -46,7 +46,9 @@ def action(args):
 
     for seq, (seqstr, count) in seqs:
         assert len(seqstr) == len(count)
+
         args.outfile.write('>{}\n{}\n'.format(seq.description, seqstr))
+
         if args.rlefile:
-            args.rlefile.writerow(dict({'name':seq.description, 'rle':to_ascii(count)}))
+            args.rlefile.writerow(dict(name = seq.id, rle =  to_ascii(count)))
 
