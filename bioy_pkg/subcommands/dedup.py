@@ -9,7 +9,7 @@ import logging
 import sys
 
 from csv import DictWriter
-from itertools import groupby, imap, chain, tee
+from itertools import groupby, chain
 
 from bioy_pkg.deduplicate import dedup
 from bioy_pkg.sequtils import fastalite
@@ -58,15 +58,17 @@ def action(args):
 
     seqs = sorted(args.sequences, key = seq_group)
     seqs = groupby(seqs, seq_group)
-    seqs = imap(lambda (_,s): dedups(list(s)), seqs)
+    seqs = (dedups(list(s)) for _,s in seqs)
     seqs = chain(*seqs)
-    seqs, info = tee(seqs)
+
+    if args.out_info and args.seq_info:
+        fieldnames = next(iter(args.seq_info.values())).keys()
+        info_out = DictWriter(args.out_info, fieldnames = fieldnames)
+        info_out.writeheader()
 
     for s in seqs:
         args.out.write('>{}\n{}\n'.format(s.description, s.seq))
 
-    if args.out_info:
-        fieldnames = next(iter(args.seq_info.values())).keys()
-        info_out = DictWriter(args.out_info, fieldnames = fieldnames)
-        info_out.writeheader()
-        info_out.writerows([args.seq_info[s.id] for s in info])
+        if args.out_info and args.seq_info:
+            info_out.writerow([args.seq_info[s.id]])
+
