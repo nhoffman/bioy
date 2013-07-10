@@ -157,7 +157,7 @@ def action(args):
     blast_results = imap(lambda b:
             update_blast_results(b, args.seq_info, args.taxonomy, args.target_rank), blast_results)
 
-    # remove hits with no rank ids
+    # remove hits with no rank ids (will affect read and cluster counts for species vs genus)
     blast_results = (b for b in blast_results if b['target_rank_id'])
 
     blast_results = (b for b in blast_results if b['target_rank_id'] not in args.exclude_by_taxid)
