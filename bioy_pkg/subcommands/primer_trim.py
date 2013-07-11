@@ -84,10 +84,7 @@ def primer_dict(parsed, side, keep = None, include = False):
 
     msg = '{} sequences passed {} primer criteria'.format(side, len(d))
 
-    if d:
-        log.debug(msg)
-    else:
-        sys.exit(msg)
+    log.debug(msg)
 
     return d
 
