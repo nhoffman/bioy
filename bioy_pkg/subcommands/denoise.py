@@ -17,7 +17,7 @@ from random import shuffle
 from collections import defaultdict
 from multiprocessing import Pool
 
-from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, fastalite, from_ascii
+from bioy_pkg.sequtils import consensus, run_muscle, parse_uc, fastalite, from_ascii, homodecode
 from bioy_pkg.utils import chunker, Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def build_parser(parser):
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file containing original clustered reads (default stdin).')
     parser.add_argument('clusters',
-            type = lambda c: parse_uc(Opener()(c))[0],
+            type = Opener(),
             help = 'Clusters file (output of "usearch -uc")')
     parser.add_argument('--specimen',
             help = 'sample name for mapfile')
@@ -55,7 +55,8 @@ def build_parser(parser):
     parser.add_argument('--min-clust-size',
             type = int,
             default = 1, help = 'default %(default)s')
-    parser.add_argument('--limit', metavar = 'N',
+    parser.add_argument('--limit',
+            metavar = 'N',
             type = int,
             help = 'use no more than N seqs')
     parser.add_argument('--name-prefix',
@@ -98,12 +99,22 @@ def align_and_consensus(seq):
 
 def action(args):
     seqs = islice(args.fastafile, args.limit)
-    clusters = lambda s: args.clusters.get(s.description, s.description)
-    seqs = sorted(seqs, key = clusters)
-    seqs = groupby(seqs, clusters)
+    _, fileExt, = args.clusters.name.split('.')
+
+    if fileExt == 'uc':
+        clusters = parse_uc(args.clusters)[0]
+    else:
+        clusters = csv.reader(args.clusters)
+        clusters = {seq:tag for seq,tag in clusters}
+
+    by_clusters = lambda s: clusters.get(s.description, s.description)
+
+    seqs = sorted(seqs, key = by_clusters)
+    seqs = groupby(seqs, key = by_clusters)
     seqs = (list(s) for _,s in seqs)
     seqs = (s for s in seqs if len(s) >= args.min_clust_size)
     seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
+    seqs = list(seqs)
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
@@ -111,7 +122,20 @@ def action(args):
     exemplars = defaultdict(list)
 
     pool = Pool(processes = args.threads)
-    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(seqs, start = 1)):
+
+    # no need to muscle clusters of size one
+    no_muscle = ((c,r) for c,r in seqs if len(c) == 1)
+
+    for (cluster,), rlelist in no_muscle:
+        if rlelist:
+            cluster = homodecode(cluster, rlelist[0])
+
+        exemplars[cluster.seq].append(cluster.id)
+
+    # muscle align clusters larger than one
+    to_muscle = ((c,r) for c,r in seqs if len(c) > 1)
+
+    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(to_muscle, start = 1)):
         exemplars[cons].extend([c.id for c in cluster])
 
     # write each consensus sequence
