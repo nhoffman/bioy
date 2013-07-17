@@ -25,10 +25,16 @@ ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
+gap = '-'
+
+homogap = '='
+
 IUPAC = {('A',): 'A',
         ('C',): 'C',
         ('G',): 'G',
         ('T',): 'T',
+        (gap,): gap,
+        (homogap,): homogap,
         ('A', 'C'): 'M',
         ('A', 'G'): 'R',
         ('A', 'T'): 'W',
@@ -39,11 +45,9 @@ IUPAC = {('A',): 'A',
         ('A', 'C', 'T'): 'H',
         ('A', 'G', 'T'): 'D',
         ('C', 'G', 'T'): 'B',
-        ('A', 'C', 'G', 'T'): 'N'}
+        ('A', 'C', 'G', 'T'): 'N',}
 
-gap = '-'
-
-homogap = '='
+CAPUI = {v:k for k,v in IUPAC.items()}
 
 # provides criteria for defining matching tax_ids as "unclassified"
 UNCLASSIFIED_REGEX = re.compile(
@@ -231,7 +235,8 @@ def get_char_counts(seqs):
     counter = defaultdict(Counter)
     for seq in seqs:
         for i, c in enumerate(seq.seq):
-            counter[i][c] += 1
+            for b in CAPUI[c]:
+                counter[i][b] += 1
 
     # counters, sorted by position
     return [count for position, count in sorted(counter.items())]
@@ -257,7 +262,8 @@ def get_rle_counts(seqs, rlelist):
         # for each non-gap character in seq, tally the run length; if
         # c is a gap, save a tally of 1
         for i, c in enumerate(seq.seq):
-            char_counter[i][c] += 1
+            for b in CAPUI[c]:
+                char_counter[i][b] += 1
             rle_counter[i][rle_counts.next() if c != gap else 1] += 1
 
     # tuples of counters, sorted by position
