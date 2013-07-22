@@ -12,14 +12,16 @@ import os
 from itertools import groupby
 from operator import itemgetter
 
-from bioy_pkg.sequtils import UCLUST_HEADERS
+from bioy_pkg.sequtils import UCLUST_HEADERS, fastalite
 from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
+    parser.add_argument('fastafile',
+            type = lambda f: fastalite(Opener()(f), readfile = False),
+            help = 'input fasta file containing original clustered reads')
     parser.add_argument('clusters',
-            nargs = '?',
             type = Opener(),
             help = 'Clusters file (output of "usearch -uc")')
     parser.add_argument('--specimen',
@@ -28,6 +30,9 @@ def build_parser(parser):
             type = Opener('w'),
             default = sys.stdout,
             help = 'Output fasta mapping reads to centroid (readname,centroidname)')
+    parser.add_argument('--readmap',
+            type = lambda f: csv.writer(Opener('w')(f)),
+            help = 'Output file with columns (readname,samplename)')
     parser.add_argument('--clustermap',
             type = lambda f: csv.writer(Opener('w')(f)),
             help = 'Output file with columns (clustername,samplename)')
@@ -50,14 +55,19 @@ def action(args):
     clusters = groupby(clusters, key = itemgetter('target_label'))
     clusters = ((c,list(r)) for c,r in clusters)
     clusters = ((c,r) for c,r in clusters if len(r) >= args.min_clust_size)
-    clusters = ((c,r) for c,r in clusters if c != '*')
+    clusters = dict(clusters)
+    clusters.pop('*')
 
-    out = csv.writer(args.out)
+    centroids = (c for c in args.fastafile if c.id in clusters)
+
+    for c in centroids:
+        args.out.write('>{}\n{}\n'.format(c.description, c.seq))
 
     for centroid, cluster in clusters:
         log.info('writing {}'.format(centroid))
 
-        out.writerows((data['query_label'], centroid) for data in cluster)
+        if args.readmap:
+           args.readmap.writerows((data['query_label'], centroid) for data in cluster)
 
         if args.clustermap and args.specimen:
             args.clustermap.writerow((centroid, args.specimen))
@@ -65,3 +75,4 @@ def action(args):
         if args.weights:
             weight = str(len(cluster))
             args.weights.writerow((centroid, weight))
+
