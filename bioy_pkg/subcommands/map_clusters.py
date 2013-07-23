@@ -1,7 +1,7 @@
 """
 Create a readmap and clustermap and/or weights file from a 'usearch -uc' cluster file
 
-Input is a usearch 6 .uc file
+Input is a usearch6 .uc file
 """
 
 import logging
@@ -56,14 +56,15 @@ def action(args):
     clusters = ((c,list(r)) for c,r in clusters)
     clusters = ((c,r) for c,r in clusters if len(r) >= args.min_clust_size)
     clusters = dict(clusters)
-    clusters.pop('*')
+    clusters.pop('*') # remove star seqs (centroids are the rest of keys)
 
+    # filter non centroid seqs
     centroids = (c for c in args.fastafile if c.id in clusters)
 
     for c in centroids:
         args.out.write('>{}\n{}\n'.format(c.description, c.seq))
 
-    for centroid, cluster in clusters:
+    for centroid, cluster in clusters.items():
         log.info('writing {}'.format(centroid))
 
         if args.readmap:
