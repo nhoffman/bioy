@@ -38,11 +38,11 @@ def build_parser(parser):
     parser.add_argument('--no-header',
         dest='header',
         action = 'store_false')
-    parser.add_argument('-d', '--decode',
+    parser.add_argument('-r', '--rlefile',
         type = Csv2Dict(index = 'name', value = 'rle',
             fieldnames = ['name', 'rle']),
         nargs = '+',
-        help = 'Decode alignment')
+        help = 'CSV file containing run-length encoding')
     parser.add_argument('--min-zscore',
         default = None,
         type = float,
@@ -72,8 +72,8 @@ def action(args):
     else:
         aligns = (a for _, i in aligns for a in i)  # flatten groupby iters
 
-    if args.decode:
-        decoding = {k:v for d in args.decode for k,v in d.items()}
+    if args.rlefile:
+        decoding = {k:v for d in args.rlefile for k,v in d.items()}
         def decode(aligns):
             aligns['t_seq'], aligns['q_seq'] = homodecodealignment(
                     aligns['t_seq'], from_ascii(decoding[aligns['t_name']]),
