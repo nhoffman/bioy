@@ -97,6 +97,7 @@ def build_parser(parser):
             default = 90)
     parser.add_argument('--copy-numbers',
             type = Csv2Dict('tax_id', 'median'),
+            default = {},
             help = '16S copy-number csv for correcting read numbers')
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
@@ -106,12 +107,12 @@ def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
         tax_id = t['tax_id']
 
         if tax_id in copy_numbers:
-            copy_counts[tax_id] = float(copy_numbers[tax_id])
+            copy_counts[tax_id] = float(copy_numbers.get(tax_id, 1))
         else:
             # return the copy_number for the lowest rank tax id available
             for r in ranks:
                if t[r] in copy_numbers:
-                    copy_counts[tax_id] = float(copy_numbers[t[r]])
+                    copy_counts[tax_id] = float(copy_numbers.get(t[r], 1))
                     break
 
     return copy_counts
@@ -269,7 +270,7 @@ def action(args):
 
         # corrected counts based on read_counts / mean(copy_counts)
         corrected_counts = ((c, set(map(itemgetter('tax_id'), h))) for c,h in categories.items())
-        corrected_counts = ((c, mean(copy_counts[t] for t in ts)) for c,ts in corrected_counts)
+        corrected_counts = ((c, mean(copy_counts.get(t, 1) for t in ts)) for c,ts in corrected_counts)
         corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
         corrected_counts = dict(corrected_counts)
 
