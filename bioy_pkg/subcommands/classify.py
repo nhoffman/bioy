@@ -11,7 +11,7 @@ from collections import defaultdict
 from itertools import groupby, imap
 from operator import itemgetter
 
-from bioy_pkg.sequtils import UNCLASSIFIED_REGEX, format_taxonomy, BLAST_HEADER
+from bioy_pkg import sequtils
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ def action(args):
     taxonomy = dict((t['tax_id'], t) for t in taxonomy)
 
     ### filter and format format blast data
-    blast_results = DictReader(args.blast_file, fieldnames = BLAST_HEADER)
+    blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
 
     # add some preliminary values to blast results
     blast_results = imap(lambda b: dict({
@@ -248,7 +248,7 @@ def action(args):
                 for queries in cats.values():
                     names = map(itemgetter('target_rank_name'), queries)
                     selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
-                    tax = format_taxonomy(names, selectors, '*')
+                    tax = sequtils.format_taxonomy(names, selectors, '*')
                     categories[tax].extend(queries)
 
             # add query ids that were matched to a filter
@@ -259,9 +259,6 @@ def action(args):
 
         # remaining hits go in the etc ('no match') category
         categories[etc] = hits
-
-         # include the remaining hits in the clusters set
-        clusters |= set(map(itemgetter('query'), hits))
 
         # calculate read counts
         read_counts = ((c, set(map(itemgetter('query'), h))) for c,h in categories.items())
