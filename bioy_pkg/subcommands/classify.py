@@ -308,7 +308,7 @@ def action(args):
                     'min_percent':'{0:.2f}'.format(min(percents)),
                     'max_coverage':'{0:.2f}'.format(max(coverages)),
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
-                    'tax_ids':', '.join(taxids)
+                    'tax_ids':' '.join(taxids)
                     })
 
                 if args.out_detail:
