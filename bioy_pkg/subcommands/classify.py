@@ -214,7 +214,7 @@ def action(args):
     out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
         'max_percent', 'min_percent', 'max_coverage', 'min_coverage', 'assignment_id',
         'assignment', 'specimen', 'clusters', 'reads', 'pct_reads',
-        'corrected', 'pct_corrected', 'target_rank', 'hi', 'low'
+        'corrected', 'pct_corrected', 'target_rank', 'hi', 'low', 'tax_ids'
         ])
     out.writeheader()
 
@@ -308,6 +308,7 @@ def action(args):
                     'min_percent':'{0:.2f}'.format(min(percents)),
                     'max_coverage':'{0:.2f}'.format(max(coverages)),
                     'min_coverage':'{0:.2f}'.format(min(coverages)),
+                    'tax_ids':', '.join(taxids)
                     })
 
                 if args.out_detail:
