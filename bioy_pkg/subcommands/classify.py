@@ -99,6 +99,10 @@ def build_parser(parser):
             type = Csv2Dict('tax_id', 'median'),
             default = {},
             help = '16S copy-number csv for correcting read numbers')
+    parser.add_argument('--group-rank',
+            default = 'genus:3',
+            help = """group assignments that excede a threshold
+                      to another rank [%(default)s]""")
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -133,9 +137,6 @@ def update_blast_results(b, seq_info, taxonomy, target_rank):
 
     b['target_rank_id'] = tax[target_rank]
 
-    if b['target_rank_id']:
-        b['target_rank_name'] = taxonomy[b['target_rank_id']]['tax_name']
-
     return b
 
 def coverage(start, end, length):
@@ -161,6 +162,14 @@ def action(args):
     ranks = list(reversed(taxonomy.fieldnames[4:]))
     taxonomy = dict((t['tax_id'], t) for t in taxonomy)
 
+    # parse assignment grouping and do some sanity checks
+    if args.group_rank:
+        group_assignment, group_thresh = args.group_rank.split(':')
+        group_assignment = group_assignment if group_assignment in ranks else None
+        group_thresh = int(group_thresh) if group_thresh else 0
+    else:
+        group_assignment, group_thresh = None, 0
+
     ### filter and format format blast data
     blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
 
@@ -176,8 +185,8 @@ def action(args):
     blast_results = (b for b in blast_results if float(b['coverage']) >= args.coverage)
 
     # add required values for classification
-    blast_results = imap(lambda b:
-            update_blast_results(b, args.seq_info, taxonomy, args.target_rank), blast_results)
+    blast_results = (update_blast_results(b, args.seq_info, taxonomy, args.target_rank)
+            for b in blast_results)
 
     # remove hits with no rank ids (will affect read and cluster counts for species vs genus)
     blast_results = (b for b in blast_results if b['target_rank_id'])
@@ -187,8 +196,6 @@ def action(args):
     # (Optional) In some cases you want to filter some target hits
     blast_results = (b for b in blast_results if b['ambig_count'] <= args.max_ambiguous)
 #    blast_results = (b for b in blast_results if b['qseqid'] != b['sseqid'])
-#    blast_results = (b for b in blast_results
-#            if not UNCLASSIFIED_REGEX.search(b['target_rank_name']))
     ###
 
     # first, group by specimen
@@ -234,22 +241,33 @@ def action(args):
             if cat:
                 categories[cat] = matches
             else:
-                cats = defaultdict(list)
-
                 # create sets of tax_rank_id
                 query_group = groupby(matches, itemgetter('query'))
                 query_group = (list(m) for _,m in query_group)
 
                 for queries in query_group:
-                    target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
-                    cats[target_ids].extend(queries)
+                    if group_assignment and group_thresh:
+                        group_rank = defaultdict(set)
+                        for q in map(itemgetter('target_rank_id'), queries):
+                            group_id = taxonomy[q][group_assignment]
+                            if group_id:
+                                group_rank[group_id].add(q)
+                            else: # default back to target_rank_id
+                                group_rank[q].add(q)
 
-                # and finally, text out category assignments
-                for queries in cats.values():
-                    names = map(itemgetter('target_rank_name'), queries)
-                    selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
-                    tax = sequtils.format_taxonomy(names, selectors, '*')
-                    categories[tax].extend(queries)
+                        # do group_thresh check
+                        target_ids = []
+                        for g,i in group_rank.items():
+                            if group_thresh < len(i):
+                                target_ids.append(g)
+                            else: # default back to target_rank_id
+                                target_ids.extend(i)
+                        target_ids = frozenset(target_ids)
+                    else:
+                        target_ids = map(itemgetter('target_rank_id'), queries)
+                        target_ids = frozenset(target_ids)
+
+                    categories[target_ids].extend(queries)
 
             # add query ids that were matched to a filter
             clusters |= set(map(itemgetter('query'), matches))
@@ -261,12 +279,12 @@ def action(args):
         categories[etc] = hits
 
         # calculate read counts
-        read_counts = ((c, set(map(itemgetter('query'), h))) for c,h in categories.items())
-        read_counts = ((c, sum(float(args.weights.get(q, 1)) for q in list(qs))) for c,qs in read_counts)
+        read_counts = ((t, set(map(itemgetter('query'), h))) for t,h in categories.items())
+        read_counts = ((t, sum(float(args.weights.get(q, 1)) for q in qs)) for t,qs in read_counts)
         read_counts = dict(read_counts)
 
         # corrected counts based on read_counts / mean(copy_counts)
-        corrected_counts = ((c, set(map(itemgetter('tax_id'), h))) for c,h in categories.items())
+        corrected_counts = ((t, set(map(itemgetter('tax_id'), h))) for t,h in categories.items())
         corrected_counts = ((c, mean(copy_counts.get(t, 1) for t in ts)) for c,ts in corrected_counts)
         corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
         corrected_counts = dict(corrected_counts)
@@ -276,21 +294,26 @@ def action(args):
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
         sort_by_reads = lambda (c,h): read_counts[c]
-        for cat, hits in sorted(categories.items(), key = sort_by_reads, reverse = True):
+        for target_ids, hits in sorted(categories.items(), key = sort_by_reads, reverse = True):
             # only output categories with hits
             if hits:
-                if cat not in assignments:
-                    assignments.append(cat)
+                if target_ids not in assignments:
+                    assignments.append(target_ids)
 
-                assignment_id = assignments.index(cat)
+                assignment_id = assignments.index(target_ids)
 
                 # assignment indexing
                 taxids = set(map(itemgetter('tax_id'), hits))
                 clusters = set(map(itemgetter('query'), hits))
                 coverages = set(map(itemgetter('coverage'), hits))
                 percents = set(map(itemgetter('pident'), hits))
-                reads = read_counts[cat]
-                reads_corrected = corrected_counts[cat]
+                reads = read_counts[target_ids]
+                reads_corrected = corrected_counts[target_ids]
+
+                # build tax name
+                names = map(lambda i: taxonomy[i]['tax_name'], target_ids)
+                selectors = map(lambda h: h['pident'] >= args.asterisk, hits)
+                assignment = sequtils.format_taxonomy(names, selectors, '*')
 
                 out.writerow({
                     'hi':args.max_identity,
@@ -298,7 +321,7 @@ def action(args):
                     'target_rank':args.target_rank,
                     'specimen':specimen,
                     'assignment_id':assignment_id,
-                    'assignment':cat,
+                    'assignment':assignment,
                     'reads':int(reads),
                     'pct_reads':'{0:.2f}'.format(reads / total_reads * 100),
                     'corrected': int(reads_corrected),
@@ -314,7 +337,7 @@ def action(args):
                 if args.out_detail:
                     args.out_detail.writerows([dict({
                             'specimen':specimen,
-                            'assignment':cat,
+                            'assignment':assignment,
                             'assignment_id':assignment_id,
                             'hi':args.max_identity,
                             'low':args.min_identity,
