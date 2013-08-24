@@ -156,6 +156,7 @@ def action(args):
         (None, lambda h: args.max_identity >= h['pident'] > args.min_identity),
         ('<= {}%'.format(args.min_identity), lambda h: h['pident'] <= args.min_identity),
     ]
+    group_cats = map(itemgetter(0), groups)
 
     taxonomy = DictReader(args.taxonomy)
     # need ranks for copy number corrections
@@ -311,9 +312,12 @@ def action(args):
                 reads_corrected = corrected_counts[target_ids]
 
                 # build tax name
-                names = map(lambda i: taxonomy[i]['tax_name'], target_ids)
-                selectors = map(lambda h: h['pident'] >= args.asterisk, hits)
-                assignment = sequtils.format_taxonomy(names, selectors, '*')
+                if target_ids in group_cats:
+                    assignment = target_ids
+                else:
+                    names = map(lambda i: taxonomy[i]['tax_name'], target_ids)
+                    selectors = map(lambda h: h['pident'] >= args.asterisk, hits)
+                    assignment = sequtils.format_taxonomy(names, selectors, '*')
 
                 out.writerow({
                     'hi':args.max_identity,
