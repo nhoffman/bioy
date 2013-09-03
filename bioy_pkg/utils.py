@@ -5,7 +5,7 @@ import logging
 import shutil
 import sys
 
-from itertools import takewhile, izip_longest
+from itertools import takewhile, izip_longest, groupby
 from csv import DictReader
 from collections import Iterable, OrderedDict
 from os import path
@@ -163,4 +163,10 @@ class Csv2Dict(object):
 
 def csv2dict(pth, index = None, value = None, *args, **kwds):
     return Csv2Dict(index, value, args, kwds)(pth)
+
+def groupbyl(li, key = None):
+    groups = sorted(li, key = key)
+    groups = groupby(groups, key = key)
+    groups = ((g,list(l)) for g,l in groups)
+    return groups
 
