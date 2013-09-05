@@ -8,6 +8,7 @@ import subprocess
 from cStringIO import StringIO
 from itertools import tee, izip_longest, groupby, takewhile, izip
 from collections import Counter, defaultdict, namedtuple
+from operator import itemgetter
 from subprocess import Popen, PIPE
 from utils import cast
 
@@ -665,27 +666,30 @@ def format_taxonomy(names, selectors, asterisk = '*'):
     element in the selectors evaluates to True.
     """
 
-    taxons = defaultdict(lambda: defaultdict(bool))
+    names = izip_longest(names, selectors)
+    names = ((n, asterisk if s else '') for n,s in names) # add asterisk to selected names
+    names = set(names)
+    names = sorted(names) # sort by the name plus asterisk
+    names = groupby(names, key = itemgetter(0)) # group by just the names
+    names = (list(g)[-1] for _,g in names) # perfer asterisk names which will be at the bottom
+    names = (n+a for n,a in names) # combine names with asterisks
+    species = lambda n: len(n.split()) == 2 # assume species names have exactly two words
+    names = sorted(names, key = species)
+    names = groupby(names, key = species)
 
-    for i,name in enumerate(names):
-        name = name.split(None, 1)
-        subject = name[0]
-        predicate = name[1] if name[1:] else None
-        selector = selectors[i] if selectors[i:] else False
-        taxons[subject][predicate] |= selector
+    tax = []
 
-    taxonomy = []
-    for tax, preds in sorted(taxons.items()):
-        onomy = []
-        for pred, has_asterisk in sorted(preds.items()):
-            mark = asterisk if has_asterisk else ''
-            if pred:
-                onomy.append(pred + mark)
-            else:
-                tax += mark
-        taxonomy.append('{} {}'.format(tax, '/'.join(onomy)).strip())
+    for species,assigns in names:
+        if species:
+            # take the species word and combine them with a '/'
+            assigns = (a.split() for a in assigns)
+            assigns = groupby(assigns, key = itemgetter(0))
+            assigns = ((k, map(itemgetter(1), g)) for k,g in assigns)
+            assigns = ('{} {}'.format(k, '/'.join(g)) for k,g in assigns)
 
-    return ';'.join(taxonomy)
+        tax.extend(assigns)
+
+    return ';'.join(sorted(tax))
 
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 

@@ -8,11 +8,10 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
-from itertools import groupby, imap
 from operator import itemgetter
 
 from bioy_pkg import sequtils
-from bioy_pkg.utils import Opener, Csv2Dict
+from bioy_pkg.utils import Opener, Csv2Dict, groupbyl
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +98,11 @@ def build_parser(parser):
             type = Csv2Dict('tax_id', 'median'),
             default = {},
             help = '16S copy-number csv for correcting read numbers')
+    parser.add_argument('--target-max-group-size',
+            default = 3,
+            type = int,
+            help = """recursively group multiple target-rank assignments that
+                      excede a threshold to a higher rank [%(default)s]""")
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -107,12 +111,12 @@ def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
         tax_id = t['tax_id']
 
         if tax_id in copy_numbers:
-            copy_counts[tax_id] = float(copy_numbers.get(tax_id, 1))
+            copy_counts[tax_id] = float(copy_numbers[tax_id])
         else:
             # return the copy_number for the lowest rank tax id available
             for r in ranks:
                if t[r] in copy_numbers:
-                    copy_counts[tax_id] = float(copy_numbers.get(t[r], 1))
+                    copy_counts[tax_id] = float(copy_numbers[t[r]])
                     break
 
     return copy_counts
@@ -133,9 +137,6 @@ def update_blast_results(b, seq_info, taxonomy, target_rank):
 
     b['target_rank_id'] = tax[target_rank]
 
-    if b['target_rank_id']:
-        b['target_rank_name'] = taxonomy[b['target_rank_id']]['tax_name']
-
     return b
 
 def coverage(start, end, length):
@@ -144,6 +145,42 @@ def coverage(start, end, length):
 def mean(l):
     l = list(l)
     return float(sum(l)) / len(l) if len(l) > 0 else 0
+
+def unflatten_tax_ids(queries, target_rank, max_size, ranks, flatten_rank = None):
+    # null case
+    if not queries:
+        return []
+
+    for q in queries:
+        q['target_rank_id'] = q[target_rank]
+
+    # if flatten_rank is defined then ignore the max_size and
+    # return all queries at target_rank
+    if flatten_rank:
+        flatten_ids = map(itemgetter(flatten_rank), queries)
+        if len(set(flatten_ids)) == 1:
+            max_size = sys.maxint
+
+    groups = groupbyl(queries, key = itemgetter(target_rank))
+    groups = dict(groups)
+
+    num_groups = len(groups)
+
+    target_rank = ranks[ranks.index(target_rank) + 1]
+
+    unflatten = groups.pop('') if '' in groups else []
+
+    # continue unflattening ungrouped queries
+    if unflatten and num_groups <= max_size:
+        flat = [q for v in groups.values() for q in v]
+        max_size -= num_groups - 1
+        return flat + unflatten_tax_ids(unflatten, target_rank, max_size, ranks)
+    # return groups of queries
+    elif num_groups <= max_size:
+        return queries
+    # continue unflattening everything
+    else:
+        return unflatten_tax_ids(queries, target_rank, max_size, ranks)
 
 def action(args):
     ### Rows
@@ -155,41 +192,41 @@ def action(args):
         (None, lambda h: args.max_identity >= h['pident'] > args.min_identity),
         ('<= {}%'.format(args.min_identity), lambda h: h['pident'] <= args.min_identity),
     ]
+    group_cats = map(itemgetter(0), groups)
 
     taxonomy = DictReader(args.taxonomy)
-    # need ranks for copy number corrections
+    # need ranks for copy number corrections and assignment groupings
     ranks = list(reversed(taxonomy.fieldnames[4:]))
     taxonomy = dict((t['tax_id'], t) for t in taxonomy)
 
     ### filter and format format blast data
     blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
 
-    # add some preliminary values to blast results
-    blast_results = imap(lambda b: dict({
-        'coverage':coverage(b['qstart'], b['qend'], b['qlen'])
-        }, **b), blast_results)
-
     # some raw filtering
+    blast_results = (dict(b, pident = float(b['pident'])) for b in blast_results)
+    blast_results = (b for b in blast_results if b['pident'] >= args.details_identity)
     blast_results = (b for b in blast_results
             if float(args.weights.get(b['qseqid'], 1)) >= args.min_cluster_size)
-    blast_results = (b for b in blast_results if float(b['pident']) >= args.details_identity)
-    blast_results = (b for b in blast_results if float(b['coverage']) >= args.coverage)
 
-    # add required values for classification
-    blast_results = imap(lambda b:
-            update_blast_results(b, args.seq_info, taxonomy, args.target_rank), blast_results)
+    blast_results = (dict(b, coverage = coverage(b['qstart'], b['qend'], b['qlen'])) for b in blast_results)
+    blast_results = (b for b in blast_results if b['coverage'] >= args.coverage)
 
-    # remove hits with no rank ids (will affect read and cluster counts for species vs genus)
-    blast_results = (b for b in blast_results if b['target_rank_id'])
+    # add seq info
+    blast_results = (dict(args.seq_info[b['sseqid']], **b) for b in blast_results)
 
-    blast_results = (b for b in blast_results if b['target_rank_id'] not in args.exclude_by_taxid)
+    # add tax info
+    blast_results = (dict(taxonomy[b['tax_id']], **b) for b in blast_results)
+
+    # custom exclusion of tax records
+    blast_results = (b for b in blast_results if b[args.target_rank] not in args.exclude_by_taxid)
 
     # (Optional) In some cases you want to filter some target hits
-    blast_results = (b for b in blast_results if b['ambig_count'] <= args.max_ambiguous)
+    blast_results = (b for b in blast_results if int(b['ambig_count']) <= args.max_ambiguous)
 #    blast_results = (b for b in blast_results if b['qseqid'] != b['sseqid'])
-#    blast_results = (b for b in blast_results
-#            if not UNCLASSIFIED_REGEX.search(b['target_rank_name']))
     ###
+
+    # add initial target rank id information
+    blast_results = (dict(b, target_rank_id = b[args.target_rank]) for b in blast_results)
 
     # first, group by specimen
     if args.map:
@@ -199,14 +236,7 @@ def action(args):
     else:
         specimen_grouper = lambda s: s['qseqid']
 
-    blast_results = sorted(blast_results, key = specimen_grouper)
-
-    # needs taxids for 16S copy number corrections later
-    taxids = set(b['tax_id'] for b in blast_results)
-    copy_counts = get_copy_counts(taxids, args.copy_numbers, taxonomy, ranks)
-
-    blast_results = groupby(blast_results, key = specimen_grouper)
-    blast_results = ((s,list(h)) for s,h in blast_results)
+    blast_results = groupbyl(blast_results, key = specimen_grouper)
 
     assignments = [] # assignment list for assignment ids
 
@@ -234,39 +264,45 @@ def action(args):
             if cat:
                 categories[cat] = matches
             else:
-                cats = defaultdict(list)
-
                 # create sets of tax_rank_id
-                query_group = groupby(matches, itemgetter('query'))
-                query_group = (list(m) for _,m in query_group)
+                query_group = groupbyl(matches, key = itemgetter('qseqid'))
 
-                for queries in query_group:
-                    target_ids = frozenset(map(itemgetter('target_rank_id'), queries))
-                    cats[target_ids].extend(queries)
+                target_cats = defaultdict(list)
+                for _,queries in query_group:
+                    queries = unflatten_tax_ids(
+                            queries,
+                            args.target_rank,
+                            args.target_max_group_size,
+                            ranks,
+                            flatten_rank = 'genus')
+                    target_ids = map(itemgetter('target_rank_id'), queries)
+                    target_ids = frozenset(target_ids)
 
-                # and finally, text out category assignments
-                for queries in cats.values():
-                    names = map(itemgetter('target_rank_name'), queries)
-                    selectors = map(lambda h: h['pident'] >= args.asterisk, queries)
-                    tax = sequtils.format_taxonomy(names, selectors, '*')
-                    categories[tax].extend(queries)
+                    target_cats[target_ids].extend(queries)
+
+                categories = dict(categories, **target_cats)
 
             # add query ids that were matched to a filter
-            clusters |= set(map(itemgetter('query'), matches))
+            clusters |= set(map(itemgetter('qseqid'), matches))
 
             # remove all hits corresponding to a matched query id (cluster)
-            hits = filter(lambda h: h['query'] not in clusters, hits)
+            hits = filter(lambda h: h['qseqid'] not in clusters, hits)
 
         # remaining hits go in the etc ('no match') category
         categories[etc] = hits
 
+        # FIXME: will need to do this after grouping
+        # needs taxids for 16S copy number corrections
+        taxids = set(h['target_rank_id'] for v in categories.values() for h in v)
+        copy_counts = get_copy_counts(taxids, args.copy_numbers, taxonomy, ranks)
+
         # calculate read counts
-        read_counts = ((c, set(map(itemgetter('query'), h))) for c,h in categories.items())
-        read_counts = ((c, sum(float(args.weights.get(q, 1)) for q in list(qs))) for c,qs in read_counts)
+        read_counts = ((t, set(map(itemgetter('qseqid'), h))) for t,h in categories.items())
+        read_counts = ((t, sum(float(args.weights.get(q, 1)) for q in qs)) for t,qs in read_counts)
         read_counts = dict(read_counts)
 
         # corrected counts based on read_counts / mean(copy_counts)
-        corrected_counts = ((c, set(map(itemgetter('tax_id'), h))) for c,h in categories.items())
+        corrected_counts = ((t, set(map(itemgetter('tax_id'), h))) for t,h in categories.items())
         corrected_counts = ((c, mean(copy_counts.get(t, 1) for t in ts)) for c,ts in corrected_counts)
         corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
         corrected_counts = dict(corrected_counts)
@@ -275,49 +311,59 @@ def action(args):
         total_corrected = sum(v for v in corrected_counts.values())
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
-        sort_by_reads = lambda (c,h): read_counts[c]
-        for cat, hits in sorted(categories.items(), key = sort_by_reads, reverse = True):
+        sort_by_reads = lambda (c,_): read_counts[c]
+        for target_ids, hits in sorted(categories.items(), key = sort_by_reads, reverse = True):
             # only output categories with hits
             if hits:
-                if cat not in assignments:
-                    assignments.append(cat)
+                if target_ids not in assignments:
+                    assignments.append(target_ids)
 
-                assignment_id = assignments.index(cat)
+                assignment_id = assignments.index(target_ids)
 
                 # assignment indexing
                 taxids = set(map(itemgetter('tax_id'), hits))
-                clusters = set(map(itemgetter('query'), hits))
+                clusters = set(map(itemgetter('qseqid'), hits))
                 coverages = set(map(itemgetter('coverage'), hits))
                 percents = set(map(itemgetter('pident'), hits))
-                reads = read_counts[cat]
-                reads_corrected = corrected_counts[cat]
 
-                out.writerow({
-                    'hi':args.max_identity,
-                    'low':args.min_identity,
-                    'target_rank':args.target_rank,
-                    'specimen':specimen,
-                    'assignment_id':assignment_id,
-                    'assignment':cat,
-                    'reads':int(reads),
-                    'pct_reads':'{0:.2f}'.format(reads / total_reads * 100),
-                    'corrected': int(reads_corrected),
-                    'pct_corrected': '{0:.2f}'.format(reads_corrected / total_corrected * 100),
-                    'clusters':len(clusters),
-                    'max_percent':'{0:.2f}'.format(max(percents)),
-                    'min_percent':'{0:.2f}'.format(min(percents)),
-                    'max_coverage':'{0:.2f}'.format(max(coverages)),
-                    'min_coverage':'{0:.2f}'.format(min(coverages)),
-                    'tax_ids':' '.join(taxids)
-                    })
+                reads = read_counts[target_ids]
+                reads_corrected = corrected_counts[target_ids]
+
+                # build tax name
+                if target_ids in group_cats:
+                    assignment = target_ids
+                else:
+                    names = [taxonomy[h['target_rank_id']]['tax_name'] for h in  hits]
+                    selectors = [h['pident'] >= args.asterisk for h in hits]
+                    assignment = sequtils.format_taxonomy(names, selectors, '*')
+
+                out.writerow(dict(
+                    hi = args.max_identity,
+                    low = args.min_identity,
+                    target_rank = args.target_rank,
+                    specimen = specimen,
+                    assignment_id = assignment_id,
+                    assignment = assignment,
+                    reads = int(reads),
+                    pct_reads = '{0:.2f}'.format(reads / total_reads * 100),
+                    corrected = int(reads_corrected),
+                    pct_corrected = '{0:.2f}'.format(reads_corrected / total_corrected * 100),
+                    clusters = len(clusters),
+                    max_percent = '{0:.2f}'.format(max(percents)),
+                    min_percent = '{0:.2f}'.format(min(percents)),
+                    max_coverage = '{0:.2f}'.format(max(coverages)),
+                    min_coverage = '{0:.2f}'.format(min(coverages)),
+                    tax_ids = ' '.join(taxids)
+                    ))
 
                 if args.out_detail:
-                    args.out_detail.writerows([dict({
-                            'specimen':specimen,
-                            'assignment':cat,
-                            'assignment_id':assignment_id,
-                            'hi':args.max_identity,
-                            'low':args.min_identity,
-                            'target_rank':args.target_rank,
-                            }, **h) for h in hits])
+                    for h in hits:
+                        args.out_detail.writerow(dict(
+                        specimen = specimen,
+                        assignment = assignment,
+                        assignment_id = assignment_id,
+                        hi = args.max_identity,
+                        low = args.min_identity,
+                        target_rank = args.target_rank,
+                        **h))
 
