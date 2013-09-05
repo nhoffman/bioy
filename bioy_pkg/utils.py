@@ -2,6 +2,7 @@ import os
 import bz2
 import gzip
 import logging
+import re
 import shutil
 import sys
 
@@ -90,7 +91,16 @@ def parse_extras(s, numeric = True):
     "key1:val1,key2:val2"
     """
 
-    return OrderedDict((k, cast(v) if numeric else v) for k,v in [e.split(':') for e in s.split(',')])
+    # allow for escaped quoted text
+    commas = re.compile(r"""((?:[^,"']|"[^"]*"|'[^']*')+)""")
+    colons = re.compile(r"""((?:[^:"']|"[^"]*"|'[^']*')+)""")
+
+    extras = commas.split(s)[1::2]
+    extras = (colons.split(e)[1::2] for e in extras)
+    extras = ((k, cast(v) if numeric else v) for k,v in extras)
+    extras = OrderedDict(extras)
+
+    return extras
 
 class Opener(object):
     """Factory for creating file objects

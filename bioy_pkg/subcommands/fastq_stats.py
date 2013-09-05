@@ -15,25 +15,26 @@ from bioy_pkg.utils import Opener, parse_extras
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
-    parser.add_argument(
-        'fastq', nargs = '?',
-        default = sys.stdin,
-        type = Opener('r'),
-        help = 'fastq-sanger file with phred scores')
-    parser.add_argument(
-        '-o', '--out',
-        default = sys.stdout,
-        type = Opener('w'),
-        help = 'csv-format file containing stats for each read.')
+    parser.add_argument('fastq',
+            nargs = '?',
+            default = sys.stdin,
+            type = Opener('r'),
+            help = 'fastq-sanger file with phred scores')
+    parser.add_argument('-o', '--out',
+            default = sys.stdout,
+            type = Opener('w'),
+            help = 'csv-format file containing stats for each read.')
     parser.add_argument('-l', '--limit',
             type = int,
             metavar = 'N',
             help = 'Limit number of sequences read from input to N')
     parser.add_argument('-e', '--extra-fields',
+            type = str,
             help="extra fields for csv file in form 'name1:val1,name2:val2'")
     parser.add_argument('-n', '--no-header',
             action = 'store_false',
-            default = True, dest = 'show_header')
+            default = True,
+            dest = 'show_header')
 
 BASES = set(['A', 'C', 'G', 'T'])
 
