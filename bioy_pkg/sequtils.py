@@ -683,9 +683,9 @@ def format_taxonomy(names, selectors, asterisk = '*'):
         if species:
             # take the species word and combine them with a '/'
             assigns = (a.split() for a in assigns)
-            assigns = groupby(assigns, key = itemgetter(0))
-            assigns = ((k, map(itemgetter(1), g)) for k,g in assigns)
-            assigns = ('{} {}'.format(k, '/'.join(g)) for k,g in assigns)
+            assigns = groupby(assigns, key = itemgetter(0)) # group by genus name
+            assigns = ((k, map(itemgetter(1), g)) for k,g in assigns) # get a list of the species names
+            assigns = ('{} {}'.format(k, '/'.join(g)) for k,g in assigns) # combine species names with '/'
 
         tax.extend(assigns)
 

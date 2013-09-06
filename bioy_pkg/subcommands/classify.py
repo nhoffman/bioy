@@ -103,6 +103,9 @@ def build_parser(parser):
             type = int,
             help = """recursively group multiple target-rank assignments that
                       excede a threshold to a higher rank [%(default)s]""")
+    parser.add_argument('--target-rank-secondary',
+            default = 'genus',
+            help = 'Return full target-rank signature if common secondary rank "%(default)s"')
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -274,7 +277,7 @@ def action(args):
                             args.target_rank,
                             args.target_max_group_size,
                             ranks,
-                            flatten_rank = 'genus')
+                            flatten_rank = args.target_rank_secondary)
                     target_ids = map(itemgetter('target_rank_id'), queries)
                     target_ids = frozenset(target_ids)
 
