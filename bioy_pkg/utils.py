@@ -174,9 +174,11 @@ class Csv2Dict(object):
 def csv2dict(pth, index = None, value = None, *args, **kwds):
     return Csv2Dict(index, value, args, kwds)(pth)
 
-def groupbyl(li, key = None):
+def groupbyl(li, key = None, as_dict=False):
     groups = sorted(li, key = key)
     groups = groupby(groups, key = key)
     groups = ((g,list(l)) for g,l in groups)
-    return groups
-
+    if as_dict:
+        return(dict(groups))
+    else:
+        return groups
