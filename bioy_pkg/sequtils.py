@@ -26,6 +26,9 @@ ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
+RANKS = ['species', 'genus', 'family', 'order', 'class',
+         'pylum', 'kingom', 'superkingdom', 'root']
+
 gap = '-'
 
 homogap = '='
