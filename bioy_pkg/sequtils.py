@@ -27,7 +27,7 @@ UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
 RANKS = ['species', 'genus', 'family', 'order', 'class',
-         'phylum', 'kingom', 'superkingdom', 'root']
+         'phylum', 'kingdom', 'superkingdom', 'root']
 
 gap = '-'
 
