@@ -146,7 +146,8 @@ def mean(l):
     l = list(l)
     return float(sum(l)) / len(l) if len(l) > 0 else 0
 
-def unflatten_tax_ids(queries, target_rank, max_size, ranks):
+def condense(queries, target_rank, max_size, ranks):
+    # part 1: check immediate grouping
     for q in queries:
         q['target_rank_id'] = q[target_rank]
 
@@ -157,29 +158,30 @@ def unflatten_tax_ids(queries, target_rank, max_size, ranks):
 
     target_rank = ranks[ranks.index(target_rank) + 1]
 
-    unflatten = groups.pop('') if '' in groups else []
+    uncondensed = groups.pop('') if '' in groups else []
 
     # continue unflattening ungrouped queries
-    if unflatten and num_groups <= max_size:
-        flat = [q for v in groups.values() for q in v]
+    if uncondensed and num_groups <= max_size:
+        condensed = [q for v in groups.values() for q in v]
         max_size -= num_groups - 1
-        flat.extend(unflatten_tax_ids(unflatten, target_rank, max_size, ranks))
-        return flat
+        condensed.extend(condense(uncondensed, target_rank, max_size, ranks))
+        return condensed
 
     # return groups of queries
     if num_groups <= max_size:
         return queries
 
-    # FIXME: make below more elegant
-    # go up one level to check groupings
+    # part 2: go up one level to check groupings
     groups = groupbyl(queries, key = itemgetter(target_rank))
     groups = dict(groups)
 
-    unflatten = groups.pop('') if '' in groups else []
+    uncondensed = groups.pop('') if '' in groups else []
 
+    # sort by group sizes looking for smaller size groups
     groups = sorted(groups.values(), key = lambda v: len(v))
 
     # find how many groups we can return without up ranking
+    # TODO: reimplement with a do-while loop
     split_index = 0
     for i in range(len(groups)):
         if sum(len(v) for v in groups[:i]) < max_size:
@@ -187,16 +189,16 @@ def unflatten_tax_ids(queries, target_rank, max_size, ranks):
         else:
             break
 
-    max_size -= sum(len(g) for g in groups[:split_index])
+    condensed = [i for g in groups[:split_index] for i in g]
 
-    flat = [i for g in groups[:split_index] for i in g]
-    unflatten = [i for g in groups[split_index:] + [unflatten] for i in g]
-    flat.extend(unflatten_tax_ids(unflatten, target_rank, max_size, ranks))
+    max_size -= len(condensed)
+
+    uncondensed.extend(i for g in groups[split_index:] for i in g)
+
+    condensed.extend(condense(uncondensed, target_rank, max_size, ranks))
 
     # continue unflattening everything
-    return flat
-
-#    return unflatten_tax_ids(queries, target_rank, max_size, ranks)
+    return condensed
 
 def action(args):
     ### Rows
@@ -285,7 +287,7 @@ def action(args):
 
                 target_cats = defaultdict(list)
                 for _,queries in query_group:
-                    queries = unflatten_tax_ids(
+                    queries = condense(
                             queries,
                             args.target_rank,
                             args.target_max_group_size,
