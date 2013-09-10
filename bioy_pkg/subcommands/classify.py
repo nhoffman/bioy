@@ -160,7 +160,7 @@ def condense(queries, target_rank, max_size, ranks):
 
     uncondensed = groups.pop('') if '' in groups else []
 
-    # continue unflattening ungrouped queries
+    # condense ungrouped queries
     if uncondensed and num_groups <= max_size:
         condensed = [q for v in groups.values() for q in v]
         max_size -= num_groups - 1
@@ -197,7 +197,6 @@ def condense(queries, target_rank, max_size, ranks):
 
     condensed.extend(condense(uncondensed, target_rank, max_size, ranks))
 
-    # continue unflattening everything
     return condensed
 
 def action(args):
