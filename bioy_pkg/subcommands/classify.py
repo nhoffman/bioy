@@ -163,13 +163,40 @@ def unflatten_tax_ids(queries, target_rank, max_size, ranks):
     if unflatten and num_groups <= max_size:
         flat = [q for v in groups.values() for q in v]
         max_size -= num_groups - 1
-        return flat + unflatten_tax_ids(unflatten, target_rank, max_size, ranks)
+        flat.extend(unflatten_tax_ids(unflatten, target_rank, max_size, ranks))
+        return flat
+
     # return groups of queries
-    elif num_groups <= max_size:
+    if num_groups <= max_size:
         return queries
+
+    # FIXME: make below more elegant
+    # go up one level to check groupings
+    groups = groupbyl(queries, key = itemgetter(target_rank))
+    groups = dict(groups)
+
+    unflatten = groups.pop('') if '' in groups else []
+
+    groups = sorted(groups.values(), key = lambda v: len(v))
+
+    # find how many groups we can return without up ranking
+    split_index = 0
+    for i in range(len(groups)):
+        if sum(len(v) for v in groups[:i]) < max_size:
+            split_index = i
+        else:
+            break
+
+    max_size -= sum(len(g) for g in groups[:split_index])
+
+    flat = [i for g in groups[:split_index] for i in g]
+    unflatten = [i for g in groups[split_index:] + [unflatten] for i in g]
+    flat.extend(unflatten_tax_ids(unflatten, target_rank, max_size, ranks))
+
     # continue unflattening everything
-    else:
-        return unflatten_tax_ids(queries, target_rank, max_size, ranks)
+    return flat
+
+#    return unflatten_tax_ids(queries, target_rank, max_size, ranks)
 
 def action(args):
     ### Rows
@@ -262,7 +289,7 @@ def action(args):
                             queries,
                             args.target_rank,
                             args.target_max_group_size,
-                            ranks)
+                            sequtils.RANKS)
                     target_ids = map(itemgetter('target_rank_id'), queries)
                     target_ids = frozenset(target_ids)
 
