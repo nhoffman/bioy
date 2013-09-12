@@ -8,6 +8,7 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
+from math import floor
 from operator import itemgetter
 
 from bioy_pkg import sequtils
@@ -146,56 +147,35 @@ def mean(l):
     l = list(l)
     return float(sum(l)) / len(l) if len(l) > 0 else 0
 
-def condense(queries, target_rank, max_size, ranks):
-    # part 1: check immediate grouping
-    for q in queries:
-        q['target_rank_id'] = q[target_rank]
+def condense(queries, floor_rank, max_size, ranks, target_rank = None):
+    target_rank = target_rank or ranks[0]
 
-    groups = groupbyl(queries, key = itemgetter(target_rank))
-    groups = dict(groups)
+    groups = list(groupbyl(queries, key = itemgetter(target_rank)))
 
     num_groups = len(groups)
 
-    target_rank = ranks[ranks.index(target_rank) + 1]
+    max_size /= num_groups
+    max_size = floor(max_size)
 
-    uncondensed = groups.pop('') if '' in groups else []
-
-    # condense ungrouped queries
-    if uncondensed and num_groups <= max_size:
-        condensed = [q for v in groups.values() for q in v]
-        max_size -= num_groups - 1
-        condensed.extend(condense(uncondensed, target_rank, max_size, ranks))
-        return condensed
-
-    # return groups of queries
-    if num_groups <= max_size:
+    if max_size == 0:
         return queries
 
-    # part 2: go up one level to check groupings
-    groups = groupbyl(queries, key = itemgetter(target_rank))
-    groups = dict(groups)
+    # assign where available target_rank_ids
+    for g in (g for i,g in groups if i):
+        for q in g:
+            q['target_rank_id'] = q[target_rank]
 
-    uncondensed = groups.pop('') if '' in groups else []
+    # return if we hit the floor
+    if target_rank == floor_rank:
+        return queries
 
-    # sort by group sizes looking for smaller size groups
-    groups = sorted(groups.values(), key = lambda v: len(v))
+    # else move down a rank and recurse
+    target_rank = ranks[ranks.index(target_rank) + 1]
 
-    # find how many groups we can return without up ranking
-    # TODO: reimplement with a do-while loop
-    split_index = 0
-    for i in range(len(groups)):
-        if sum(len(v) for v in groups[:i]) < max_size:
-            split_index = i
-        else:
-            break
+    condensed = (condense(g, floor_rank, max_size, ranks, target_rank) for _,g in groups)
 
-    condensed = [i for g in groups[:split_index] for i in g]
-
-    max_size -= len(condensed)
-
-    uncondensed.extend(i for g in groups[split_index:] for i in g)
-
-    condensed.extend(condense(uncondensed, target_rank, max_size, ranks))
+    # flatten condensed
+    condensed = [c for g in condensed for c in g]
 
     return condensed
 
