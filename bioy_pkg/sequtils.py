@@ -26,8 +26,8 @@ ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
         'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
-RANKS = ['species', 'genus', 'family', 'order', 'class',
-         'phylum', 'kingdom', 'superkingdom', 'root']
+RANKS = ['root', 'superkingdom', 'kingdom', 'phylum',
+         'class', 'order', 'family', 'genus', 'species']
 
 gap = '-'
 
