@@ -8,7 +8,6 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
-from math import floor
 from operator import itemgetter
 
 from bioy_pkg import sequtils
@@ -100,10 +99,15 @@ def build_parser(parser):
             default = {},
             help = '16S copy-number csv for correcting read numbers')
     parser.add_argument('--target-max-group-size',
-            default = 3,
+            default = 4,
             type = int,
-            help = """recursively group multiple target-rank assignments that
+            help = """group multiple target-rank assignments that
                       excede a threshold to a higher rank [%(default)s]""")
+    parser.add_argument('--group-def',
+            action = 'append',
+            default = [],
+            help = """define a group threshold for a particular rank overriding --target-max-group-size.
+                      example: genus:2""")
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -147,20 +151,18 @@ def mean(l):
     l = list(l)
     return float(sum(l)) / len(l) if len(l) > 0 else 0
 
-def condense(queries, floor_rank, max_size, ranks, target_rank = None):
+def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank = None):
     target_rank = target_rank or ranks[0]
 
     groups = list(groupbyl(queries, key = itemgetter(target_rank)))
 
     num_groups = len(groups)
 
-    max_size /= num_groups
-    max_size = floor(max_size)
-
-    if max_size == 0:
+    if rank_thresholds.get(target_rank, max_size) < num_groups:
         return queries
 
     # assign where available target_rank_ids
+    # groups without 'i' values remain assigned at previous (higher) rank
     for g in (g for i,g in groups if i):
         for q in g:
             q['target_rank_id'] = q[target_rank]
@@ -169,10 +171,11 @@ def condense(queries, floor_rank, max_size, ranks, target_rank = None):
     if target_rank == floor_rank:
         return queries
 
-    # else move down a rank and recurse
+    # else move down a rank
     target_rank = ranks[ranks.index(target_rank) + 1]
 
-    condensed = (condense(g, floor_rank, max_size, ranks, target_rank) for _,g in groups)
+    # recurse down the tax tree
+    condensed = (condense(g, floor_rank, max_size, ranks, rank_thresholds, target_rank) for _,g in groups)
 
     # flatten condensed
     condensed = [c for g in condensed for c in g]
@@ -195,6 +198,10 @@ def action(args):
     # need ranks for copy number corrections and assignment groupings
     ranks = list(reversed(taxonomy.fieldnames[4:]))
     taxonomy = dict((t['tax_id'], t) for t in taxonomy)
+
+    # assignment rank thresholds
+    rank_thresholds = (d.split(':') for d in args.group_def)
+    rank_thresholds = dict((k, int(v)) for k,v in rank_thresholds)
 
     ### filter and format format blast data
     blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
@@ -270,7 +277,8 @@ def action(args):
                             queries,
                             args.target_rank,
                             args.target_max_group_size,
-                            sequtils.RANKS)
+                            sequtils.RANKS,
+                            rank_thresholds)
                     target_ids = map(itemgetter('target_rank_id'), queries)
                     target_ids = frozenset(target_ids)
 
