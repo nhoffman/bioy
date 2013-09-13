@@ -38,7 +38,7 @@ def build_parser(parser):
             help = 'seq info file(s) to match sequence ids to taxids [%(default)s]')
     parser.add_argument('-t', '--taxonomy',
             required = True,
-            type = Opener(),
+            type = Csv2Dict('tax_id'),
             help = 'tax table of taxids and species names [%(default)s]')
     parser.add_argument('--min-identity',
             default = 99,
@@ -99,7 +99,7 @@ def build_parser(parser):
             default = {},
             help = '16S copy-number csv for correcting read numbers')
     parser.add_argument('--target-max-group-size',
-            default = 4,
+            default = 3,
             type = int,
             help = """group multiple target-rank assignments that
                       excede a threshold to a higher rank [%(default)s]""")
@@ -125,24 +125,6 @@ def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
                     break
 
     return copy_counts
-
-def update_blast_results(b, seq_info, taxonomy, target_rank):
-    info = seq_info[b['sseqid']]
-    tax = taxonomy[info['tax_id']]
-
-    b['query'] = b['qseqid']
-    b['subject'] = b['sseqid']
-    b['pident'] = float(b['pident'])
-
-    b['tax_id'] = info['tax_id']
-    b['accession'] = info['accession']
-    b['ambig_count'] = int(info['ambig_count'])
-    b['tax_name'] = tax['tax_name']
-    b['rank'] = tax['rank']
-
-    b['target_rank_id'] = tax[target_rank]
-
-    return b
 
 def coverage(start, end, length):
     return (float(end) - float(start) + 1) / float(length) * 100
@@ -182,6 +164,15 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
     return condensed
 
+def up_rank(tax, rank, ranks):
+    index = ranks.index(rank)
+
+    for r in ranks[:index]:
+        if tax[r]:
+            return tax[r]
+
+    return '1' # root
+
 def action(args):
     ### Rows
     etc = 'no match' # This row will hold all unmatched
@@ -194,14 +185,11 @@ def action(args):
     ]
     group_cats = map(itemgetter(0), groups)
 
-    taxonomy = DictReader(args.taxonomy)
-    # need ranks for copy number corrections and assignment groupings
-    ranks = list(reversed(taxonomy.fieldnames[4:]))
-    taxonomy = dict((t['tax_id'], t) for t in taxonomy)
-
     # assignment rank thresholds
     rank_thresholds = (d.split(':') for d in args.group_def)
     rank_thresholds = dict((k, int(v)) for k,v in rank_thresholds)
+
+    ranks_rev = list(reversed(sequtils.RANKS))
 
     ### filter and format format blast data
     blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
@@ -219,7 +207,7 @@ def action(args):
     blast_results = (dict(args.seq_info[b['sseqid']], **b) for b in blast_results)
 
     # add tax info
-    blast_results = (dict(taxonomy[b['tax_id']], **b) for b in blast_results)
+    blast_results = (dict(args.taxonomy[b['tax_id']], **b) for b in blast_results)
 
     # custom exclusion of tax records
     blast_results = (b for b in blast_results if b[args.target_rank] not in args.exclude_by_taxid)
@@ -230,7 +218,7 @@ def action(args):
     ###
 
     # add initial target rank id information
-    blast_results = (dict(b, target_rank_id = b[args.target_rank]) for b in blast_results)
+    blast_results = (dict(b, target_rank_id = up_rank(b, args.target_rank, ranks_rev)) for b in blast_results)
 
     # first, group by specimen
     if args.map:
@@ -298,7 +286,11 @@ def action(args):
         # FIXME: will need to do this after grouping
         # needs taxids for 16S copy number corrections
         taxids = set(h['target_rank_id'] for v in categories.values() for h in v)
-        copy_counts = get_copy_counts(taxids, args.copy_numbers, taxonomy, ranks)
+
+        copy_counts = get_copy_counts(taxids,
+                                      args.copy_numbers,
+                                      args.taxonomy,
+                                      ranks_rev)
 
         # calculate read counts
         read_counts = ((t, set(map(itemgetter('qseqid'), h))) for t,h in categories.items())
@@ -337,7 +329,7 @@ def action(args):
                 if target_ids in group_cats:
                     assignment = target_ids
                 else:
-                    names = [taxonomy[h['target_rank_id']]['tax_name'] for h in  hits]
+                    names = [args.taxonomy[h['target_rank_id']]['tax_name'] for h in  hits]
                     selectors = [h['pident'] >= args.asterisk for h in hits]
                     assignment = sequtils.format_taxonomy(names, selectors, '*')
 
