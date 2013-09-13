@@ -164,19 +164,6 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
     return condensed
 
-def up_rank(tax, rank, ranks):
-    """
-    return the lowest possible defined rank id
-    """
-
-    index = ranks.index(rank)
-
-    for r in ranks[:index]:
-        if tax[r]:
-            return tax[r]
-
-    return '1' # root
-
 def action(args):
     ### Rows
     etc = 'no match' # This row will hold all unmatched
@@ -214,6 +201,9 @@ def action(args):
     # add tax info
     blast_results = (dict(args.taxonomy[b['tax_id']], **b) for b in blast_results)
 
+    # only use hits with target_rank ids
+    blast_results = (b for b in blast_results if b[args.target_rank])
+
     # custom exclusion of tax records
     blast_results = (b for b in blast_results if b[args.target_rank] not in args.exclude_by_taxid)
 
@@ -223,7 +213,7 @@ def action(args):
     ###
 
     # add initial target rank id information
-    blast_results = (dict(b, target_rank_id = up_rank(b, args.target_rank, ranks_rev)) for b in blast_results)
+    blast_results = (dict(b, target_rank_id = b[args.target_rank]) for b in blast_results)
 
     # first, group by specimen
     if args.map:
