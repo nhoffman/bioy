@@ -193,6 +193,7 @@ def action(args):
     rank_thresholds = (d.split(':') for d in args.group_def)
     rank_thresholds = dict((k, int(v)) for k,v in rank_thresholds)
 
+    # get reverse order ranks for copy number corrections
     ranks_rev = list(reversed(sequtils.RANKS))
 
     ### filter and format format blast data
