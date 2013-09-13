@@ -165,6 +165,10 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
     return condensed
 
 def up_rank(tax, rank, ranks):
+    """
+    return the lowest possible defined rank id
+    """
+
     index = ranks.index(rank)
 
     for r in ranks[:index]:
