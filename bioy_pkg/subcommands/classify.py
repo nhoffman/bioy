@@ -293,8 +293,9 @@ def action(args):
         read_counts = dict(read_counts)
 
         # corrected counts based on read_counts / mean(copy_counts)
-        corrected_counts = ((t, set(map(itemgetter('tax_id'), h))) for t,h in categories.items())
-        corrected_counts = ((c, mean(copy_counts.get(t, 1) for t in ts)) for c,ts in corrected_counts)
+        corrected_counts = ((t, set(map(itemgetter('target_rank_id'), h))) for t,h in categories.items())
+        corrected_counts = ((c, mean(copy_counts[t] for t in ts)) for c,ts in corrected_counts)
+        # report 0 for any categories with no read counts
         corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
         corrected_counts = dict(corrected_counts)
 
