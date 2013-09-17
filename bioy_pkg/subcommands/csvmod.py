@@ -1,7 +1,7 @@
 """
-Add, rename, or remove columns in a csv file.
+Add or rename columns in a csv file.
 
-(rename, remove not yet implemented)
+(rename not yet implemented)
 """
 
 import logging
@@ -26,11 +26,9 @@ def build_parser(parser):
                         nargs = '?',
                         help = 'input csv file')
     parser.add_argument('-o', '--outfile', default='-', help = 'output csv file',)
-    parser.add_argument('-n', '--new',
+    parser.add_argument('-a', '--add', metavar='FIELD_SPEC',
                         help="new fields for csv file in form 'name1:val1,name2:val2,...'")
-    parser.add_argument('-d', '--delete',
-                        help="comma-delimited list of fields to remove")
-    parser.add_argument('-r', '--rename',
+    parser.add_argument('-r', '--rename', metavar='FIELD_SPEC',
                         help="fields to rename in the format 'from1:to1,from2:to2,...'")
     parser.add_argument('-i', '--inplace', action='store_true', default=False,
                         help='modify input file in place')
@@ -47,13 +45,13 @@ def action(args):
     if args.inplace and args.infile is sys.stdin:
         sys.exit('Error: cannot use the --inplace option with stdin')
 
-    if args.rename or args.delete:
+    if args.rename:
         raise NotImplementedError
 
     reader = csv.DictReader(args.infile)
     fieldnames = reader.fieldnames
 
-    new_fields = parse_extras(args.new) if args.new else {}
+    new_fields = parse_extras(args.add) if args.add else {}
 
     if new_fields:
         fieldnames.extend(new_fields.keys())
