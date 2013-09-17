@@ -280,12 +280,9 @@ def action(args):
 
         # FIXME: will need to do this after grouping
         # needs taxids for 16S copy number corrections
-        taxids = set(h['target_rank_id'] for v in categories.values() for h in v)
+        taxids = set(h['tax_id'] for v in categories.values() for h in v)
 
-        copy_counts = get_copy_counts(taxids,
-                                      args.copy_numbers,
-                                      args.taxonomy,
-                                      ranks_rev)
+        copy_counts = get_copy_counts(taxids, args.copy_numbers, args.taxonomy, ranks_rev)
 
         # calculate read counts
         read_counts = ((t, set(map(itemgetter('qseqid'), h))) for t,h in categories.items())
@@ -293,7 +290,7 @@ def action(args):
         read_counts = dict(read_counts)
 
         # corrected counts based on read_counts / mean(copy_counts)
-        corrected_counts = ((t, set(map(itemgetter('target_rank_id'), h))) for t,h in categories.items())
+        corrected_counts = ((t, set(map(itemgetter('tax_id'), h))) for t,h in categories.items())
         corrected_counts = ((c, mean(copy_counts[t] for t in ts)) for c,ts in corrected_counts)
         # report 0 for any categories with no read counts
         corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
