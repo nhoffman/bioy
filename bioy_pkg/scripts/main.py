@@ -88,7 +88,7 @@ def parse_arguments(argv):
                     subcommands.__name__, name))
             log.error(e)
             continue
-            
+
         subparser = subparsers.add_parser(
             name, help = mod.__doc__.lstrip().split('\n', 1)[0],
             description = mod.__doc__,
