@@ -1,7 +1,5 @@
 """
-Package description (in bioy_pkg/__init__.py)
-
-Update me!
+Tools for microbial sequence analysis and classification.
 """
 
 from os.path import join, dirname
