@@ -300,12 +300,22 @@ def action(args):
         taxids = set(h['tax_id'] for k,v in categories.items() for h in v if k is not etc)
         copy_counts = get_copy_counts(taxids, args.copy_numbers, args.taxonomy, ranks_rev)
 
-        # corrected counts based on read_counts / mean(copy_counts)
-        corrected_counts = ((t, set(map(itemgetter('tax_id'), h)))
-                for t,h in categories.items() if t is not etc)
-        corrected_counts = ((c, mean(copy_counts[t] for t in ts)) for c,ts in corrected_counts)
-        # report 0 for any categories with no read counts
-        corrected_counts = ((c, read_counts[c] / m if m else 0) for c,m in corrected_counts)
+        ### corrected read counts
+        assigned_ids = dict()
+        for k,v in categories.items():
+            if k not in group_cats and v:
+                assigned_ids[k] = set(map(itemgetter('tax_id'), v))
+
+        # loop through categories again defaulting to 'root' for reads not assigned in main range
+        corrected_counts = dict()
+        for k,v in categories.items():
+            if k in assigned_ids:
+                corrected_counts[k] = mean(copy_counts[t] for t in assigned_ids[k])
+            else:
+                corrected_counts[k] = float(args.copy_numbers['1']) # root
+
+        # read_counts / mean(copy_counts)
+        corrected_counts = ((c, read_counts[c] / m) for c,m in corrected_counts.items())
         corrected_counts = dict(corrected_counts)
 
         total_reads = sum(v for v in read_counts.values())
