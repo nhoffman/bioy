@@ -66,6 +66,7 @@ def action(args):
         print ' '.join(map(str, command))
         sys.exit(0)
 
+    log.info(command)
     pipe = Popen(command, stdout = PIPE, stderr = PIPE)
     results, errors = pipe.communicate()
 
