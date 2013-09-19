@@ -727,7 +727,7 @@ def _iterfasta(handle):
     if name and seq:
         yield SeqLite(name.split()[0], name, seq)
 
-def fastalite(handle, readfile = True):
+def fastalite(handle, readfile = False):
     """
     Return a sequence of namedtupe objects given fasta format open
     file-like object `handle`. Sequence is a list if `readfile` is

@@ -6,13 +6,14 @@ import logging
 import sys
 import os
 
-from itertools import imap, izip
-from subprocess import Popen, PIPE
 from csv import DictWriter
 from cStringIO import StringIO
+from itertools import chain, groupby
+from operator import itemgetter
+from subprocess import Popen, PIPE
 
-from bioy_pkg.sequtils import BLAST_FORMAT
-from bioy_pkg.utils import Opener
+from bioy_pkg.sequtils import BLAST_FORMAT, fastalite
+from bioy_pkg.utils import opener, Opener
 
 log = logging.getLogger(__name__)
 
@@ -47,8 +48,12 @@ def build_parser(parser):
             help = 'minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
             help = 'maximum number of alignments to keep default = (all)')
-    parser.add_argument('-n', '--dry-run', action = 'store_true',
-                        default = False, help = 'print blast command and exit')
+    parser.add_argument('-n', '--dry-run',
+            action = 'store_true',
+            help = 'print blast command and exit')
+    parser.add_argument('--nohits',
+            action = 'store_true',
+            help = '')
 
 def action(args):
     command = ['blastn']
@@ -66,17 +71,42 @@ def action(args):
         print ' '.join(map(str, command))
         sys.exit(0)
 
-    log.info(command)
+    log.info(' '.join(command))
+
     pipe = Popen(command, stdout = PIPE, stderr = PIPE)
+
     results, errors = pipe.communicate()
 
-    log.error(errors)
+    if errors:
+       log.error(errors)
 
     fieldnames = BLAST_FORMAT.split()[1:]
 
-    lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
-    lines = imap(lambda l: izip(fieldnames, l), lines)
-    lines = imap(lambda l: dict(l), lines)
+    # split tab lines
+    lines = (r.strip().split('\t') for r in StringIO(results))
+
+    # match with fieldnames
+    lines = (zip(fieldnames, l) for l in lines)
+
+    # make into dict
+    lines = [dict(l) for l in lines]
+
+    if args.nohits:
+        # to get nohits first we need to know about the hits
+        qids = groupby(lines, key = itemgetter('qseqid'))
+        qids = set(q for q,_ in qids)
+
+        # now we can build a list of nohits
+        nohits = []
+        for q in fastalite(opener(args.fasta)):
+            if q.description not in qids:
+                nohits.append(q)
+
+        # convert nohits into DictWriter format
+        nohits = (dict(qseqid = q.description) for q in nohits)
+
+        # append to lines
+        lines = chain(lines, nohits)
 
     out = DictWriter(args.out, fieldnames = fieldnames)
 
