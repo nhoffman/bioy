@@ -53,9 +53,9 @@ def build_parser(parser):
             type = float,
             help = 'percent of alignment coverage of blast result [%(default)s]')
     parser.add_argument('-a', '--asterisk',
-            default = 100,
+            default = 100, metavar='PERCENT',
             type = float,
-            help = 'Next to any species above a certain threshold [[%(default)s]')
+            help = 'Next to any species above a certain threshold [%(default)s]')
     parser.add_argument('--exclude-by-taxid',
             type = Csv2Dict('tax_id'),
             default = {},
@@ -73,10 +73,10 @@ def build_parser(parser):
             type = Csv2Dict('name', 'specimen', fieldnames = ['name', 'specimen']),
             default = {},
             help = 'map file with sequence ids to specimen names')
-    parser.add_argument('--not-all-one-group',
+    parser.add_argument('--all-one-group',
             dest = 'all_one_group',
-            action = 'store_false',
-            default = True,
+            action = 'store_true',
+            default = False,
             help = """If --map is not provided, the default behavior is to treat
                     all reads as one group; use this option to treat
                     each read as a separate group [%(default)s]""")
@@ -87,16 +87,17 @@ def build_parser(parser):
             default = 0,
             type = int,
             help = 'minimum cluster size to include in classification output')
-    parser.add_argument('--target-rank',
+    parser.add_argument('--target-rank', metavar='RANK',
             help = 'Rank at which to classify. Default: "%(default)s"',
             default = 'species')
     parser.add_argument('--details-identity',
-            help = 'Minimum identity threshold for classification details file',
+            help = 'Minimum identity to include blast hits in details file',
             type = float,
             default = 90)
     parser.add_argument('--copy-numbers',
             type = Csv2Dict('tax_id', 'median'),
             default = {},
+                        # TODO: required column names?
             help = '16S copy-number csv for correcting read numbers')
     parser.add_argument('--target-max-group-size',
             default = 3,
@@ -195,6 +196,8 @@ def action(args):
     rank_thresholds = (d.split(':') for d in args.group_def)
     rank_thresholds = dict((k, int(v)) for k,v in rank_thresholds)
 
+    # rt = {k: int(v) for k, v in (d.split(':') for d in args.group_def)}
+
     # get reverse order ranks for copy number corrections
     ranks_rev = list(reversed(sequtils.RANKS))
 
@@ -229,15 +232,17 @@ def action(args):
 
     blast_results = (tax_info(b) for b in blast_results)
 
-    fieldnames = ['max_percent', 'min_percent', 'max_coverage', 'min_coverage',
-                  'assignment_id', 'assignment', 'specimen', 'clusters']
+    fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
+                  'assignment_id', 'assignment']
 
     if args.weights:
-        fieldnames += ['reads', 'pct_reads']
+        fieldnames += ['clusters', 'reads', 'pct_reads']
 
     if args.copy_numbers:
         fieldnames += ['corrected', 'pct_corrected']
 
+    # TODO: take out target_rank, hi, low and provide in pipeline using csvmod
+    # TODO: option to include tax_ids (default no)
     fieldnames += ['target_rank', 'hi', 'low', 'tax_ids']
 
     ### Columns
@@ -305,6 +310,18 @@ def action(args):
         read_counts = ((t, set(map(itemgetter('qseqid'), h))) for t,h in categories.items())
         read_counts = ((t, sum(float(args.weights.get(q, 1)) for q in qs)) for t,qs in read_counts)
         read_counts = dict(read_counts)
+
+        # tqmap = ((taxids, {h['qseqid'] for h in hits}) for taxids, hits in categories.items())
+        # read_counts2 = {taxids: sum(float(args.weights.get(q, 1)) for q in qseqids) for taxids, qseqids in tqmap}
+
+        # read_counts3 = {}
+        # for taxids, hits in categories.items():
+        #     qseqids = set(h['qseqid'] for h in hits)
+        #     read_counts3[taxids] = sum(float(args.weights.get(q, 1)) for q in qseqids)
+
+        # for k, v in read_counts.items():
+        #     assert v == read_counts2[k]
+        #     assert v == read_counts3[k]
 
         taxids = set(h['tax_id'] for k,v in categories.items() for h in v if k is not etc)
         copy_counts = get_copy_counts(taxids, args.copy_numbers, args.taxonomy, ranks_rev)
@@ -392,4 +409,3 @@ def action(args):
                         low = args.min_identity,
                         target_rank = args.target_rank,
                         **h))
-
