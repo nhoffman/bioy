@@ -229,6 +229,26 @@ def action(args):
 
     blast_results = (tax_info(b) for b in blast_results)
 
+    fieldnames = ['max_percent', 'min_percent', 'max_coverage', 'min_coverage',
+                  'assignment_id', 'assignment', 'specimen', 'clusters']
+
+    if args.weights:
+        fieldnames += ['reads', 'pct_reads']
+
+    if args.copy_numbers:
+        fieldnames += ['corrected', 'pct_corrected']
+
+    fieldnames += ['target_rank', 'hi', 'low', 'tax_ids']
+
+    ### Columns
+    out = DictWriter(args.out,
+            extrasaction = 'ignore',
+            fieldnames = fieldnames)
+    out.writeheader()
+
+    if args.out_detail:
+        args.out_detail.writeheader()
+
     # group by specimen
     if args.map:
         specimen_grouper = lambda s: args.map[s['qseqid']]
@@ -240,17 +260,6 @@ def action(args):
     blast_results = groupbyl(blast_results, key = specimen_grouper)
 
     assignments = [] # assignment list for assignment ids
-
-    ### Columns
-    out = DictWriter(args.out, extrasaction = 'ignore', fieldnames = [
-        'max_percent', 'min_percent', 'max_coverage', 'min_coverage', 'assignment_id',
-        'assignment', 'specimen', 'clusters', 'reads', 'pct_reads',
-        'corrected', 'pct_corrected', 'target_rank', 'hi', 'low', 'tax_ids'
-        ])
-    out.writeheader()
-
-    if args.out_detail:
-        args.out_detail.writeheader()
 
     for specimen, hits in blast_results:
         categories = defaultdict(list)
@@ -303,16 +312,16 @@ def action(args):
         ### corrected read counts
         assigned_ids = dict()
         for k,v in categories.items():
-            if k not in group_cats and v:
+            if k is not etc and v:
                 assigned_ids[k] = set(map(itemgetter('tax_id'), v))
 
-        # loop through categories again defaulting to 'root' for reads not assigned in main range
+        # loop through categories again defaulting to 'root' for etc category
         corrected_counts = dict()
         for k,v in categories.items():
             if k in assigned_ids:
-                corrected_counts[k] = mean(copy_counts[t] for t in assigned_ids[k])
-            else:
-                corrected_counts[k] = float(args.copy_numbers['1']) # root
+                corrected_counts[k] = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
+
+        corrected_counts[etc] = float(args.copy_numbers.get('1', 1)) # root
 
         # read_counts / mean(copy_counts)
         corrected_counts = ((c, read_counts[c] / m) for c,m in corrected_counts.items())
@@ -332,6 +341,7 @@ def action(args):
                 assignment_id = assignments.index(cat)
 
                 reads = read_counts[cat]
+                reads_corrected = corrected_counts[cat]
 
                 clusters = set(map(itemgetter('qseqid'), hits))
 
@@ -343,27 +353,31 @@ def action(args):
                         assignment_id = assignment_id,
                         reads = int(reads),
                         pct_reads = '{0:.2f}'.format(reads / total_reads * 100),
+                        corrected = int(reads_corrected),
+                        pct_corrected = '{0:.2f}'.format(reads_corrected / total_corrected * 100),
                         clusters = len(clusters))
 
-                if cat in group_cats:
-                    assignment = cat
+                if cat is etc:
+                    assignment = etc
                     results = dict(results, assignment = assignment)
                 else:
                     taxids = set(map(itemgetter('tax_id'), hits))
                     coverages = set(map(itemgetter('coverage'), hits))
-                    reads_corrected = corrected_counts[cat]
                     percents = set(map(itemgetter('pident'), hits))
-                    names = [args.taxonomy[h['target_rank_id']]['tax_name'] for h in  hits]
-                    selectors = [h['pident'] >= args.asterisk for h in hits]
-                    assignment = sequtils.format_taxonomy(names, selectors, '*')
+
+                    if cat in group_cats:
+                        assignment = cat
+                    else:
+                        names = [args.taxonomy[h['target_rank_id']]['tax_name'] for h in  hits]
+                        selectors = [h['pident'] >= args.asterisk for h in hits]
+                        assignment = sequtils.format_taxonomy(names, selectors, '*')
+
                     results = dict(results,
                         assignment = assignment,
                         max_percent = '{0:.2f}'.format(max(percents)),
                         min_percent = '{0:.2f}'.format(min(percents)),
                         max_coverage = '{0:.2f}'.format(max(coverages)),
                         min_coverage = '{0:.2f}'.format(min(coverages)),
-                        corrected = int(reads_corrected),
-                        pct_corrected = '{0:.2f}'.format(reads_corrected / total_corrected * 100),
                         tax_ids = ' '.join(taxids))
 
                 out.writerow(results)
