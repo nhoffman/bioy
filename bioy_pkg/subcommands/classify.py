@@ -8,6 +8,7 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
+from math import ceil
 from operator import itemgetter
 
 from bioy_pkg import sequtils
@@ -341,7 +342,7 @@ def action(args):
         corrected_counts[etc] = float(args.copy_numbers.get('1', 1)) # root
 
         # read_counts / mean(copy_counts)
-        corrected_counts = ((c, read_counts[c] / m) for c,m in corrected_counts.items())
+        corrected_counts = ((c, ceil(read_counts[c] / m)) for c,m in corrected_counts.items())
         corrected_counts = dict(corrected_counts)
 
         total_reads = sum(v for v in read_counts.values())
