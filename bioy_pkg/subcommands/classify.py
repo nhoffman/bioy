@@ -30,7 +30,7 @@ def build_parser(parser):
     parser.add_argument('-O', '--out-detail',
             type  = lambda f: DictWriter(Opener('w')(f), extrasaction = 'ignore', fieldnames = [
                 'specimen', 'assignment', 'assignment_id', 'qseqid', 'sseqid', 'pident', 'coverage', 'ambig_count',
-                'accession', 'tax_id', 'tax_name', 'target_rank', 'hi', 'low'
+                'accession', 'tax_id', 'tax_name', 'target_rank', 'rank', 'hi', 'low'
                 ]),
              help = 'Add detailed csv file')
     parser.add_argument('-s', '--seq-info',
@@ -233,8 +233,8 @@ def action(args):
 
     blast_results = (tax_info(b) for b in blast_results)
 
-    fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage', 'min_coverage',
-                  'assignment_id', 'assignment']
+    fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage',
+                  'min_coverage', 'assignment_id', 'assignment']
 
     if args.weights:
         fieldnames += ['clusters', 'reads', 'pct_reads']
