@@ -18,6 +18,7 @@ params = {'author': 'Noah Hoffman',
           'description': 'A collection of bioinformatics tools',
           'name': 'bioy',
           'packages': find_packages(),
+          'scripts': ['bioy'],
           'version': __version__,
           }
 
