@@ -16,7 +16,7 @@ from bioy_pkg import __version__
 params = {'author': 'Noah Hoffman',
           'author_email': 'ngh2@uw.edu',
           'description': 'A collection of bioinformatics tools',
-          'name': 'bioy-pkg',
+          'name': 'bioy',
           'packages': find_packages(),
           'version': __version__,
           }
