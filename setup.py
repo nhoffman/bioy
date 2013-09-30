@@ -16,12 +16,10 @@ from bioy_pkg import __version__
 params = {'author': 'Noah Hoffman',
           'author_email': 'ngh2@uw.edu',
           'description': 'A collection of bioinformatics tools',
-          'name': 'bioy_pkg',
+          'name': 'bioy',
           'packages': find_packages(),
-          'package_dir': {'bioy_pkg': 'bioy_pkg'},
-          'scripts': ['bioy'],
           'version': __version__,
-          'package_data': {'bioy_pkg': [join('data',f) for f in ['sha','ver']]}
+          'package_data': {'bioy': [join('data',f) for f in ['sha','ver']]}
           }
 
 setup(**params)
