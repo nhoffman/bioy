@@ -7,6 +7,12 @@ Bio-y
 
 .. contents:: Table of Contents
 
+authors
+=======
+
+* Noah Hoffman
+* Chris Rosenthal
+
 dependencies
 ============
 
