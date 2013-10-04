@@ -1,9 +1,3 @@
-"""
-Setup.py template. Try this:
-
-    sed 's/bioy_pkg/newpackagename/g;s/bioy/newscriptname/g' setup.py
-"""
-
 import subprocess
 from setuptools import setup, find_packages
 from os.path import join
@@ -19,7 +13,7 @@ params = {'author': 'Noah Hoffman',
           'name': 'bioy',
           'packages': find_packages(),
           'version': __version__,
+          'scripts': ['bioy']
           }
 
 setup(**params)
-
