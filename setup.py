@@ -1,9 +1,3 @@
-"""
-Setup.py template. Try this:
-
-    sed 's/bioy_pkg/newpackagename/g;s/bioy/newscriptname/g' setup.py
-"""
-
 import subprocess
 
 from setuptools import setup, find_packages
@@ -21,4 +15,3 @@ setup(author = 'Noah Hoffman',
       scripts = ['bioy'],
       version = version,
       url = 'https://bitbucket.org/uwlabmed/bioy/')
-

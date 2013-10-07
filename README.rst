@@ -7,16 +7,25 @@ Bio-y
 
 .. contents:: Table of Contents
 
+authors
+=======
+
+* Noah Hoffman
+* Chris Rosenthal
+
+
 dependencies
 ============
 
+* Tested primarily on Ubuntu 12.04
 * Python 2.7.x
-* Tested on Ubuntu and OS X.
-* biopython
+* setuptools
 
 Some functions require
 
+* biopython
 * scipy
+* numpy
 
 installation
 ============
