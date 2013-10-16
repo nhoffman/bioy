@@ -7,7 +7,7 @@ import sys
 import logging
 
 from csv import DictReader, DictWriter
-from collections import defaultdict
+from collections import defaultdict, Counter
 from math import ceil
 from operator import itemgetter
 
@@ -22,94 +22,117 @@ def build_parser(parser):
             default = sys.stdin,
             type = Opener('r'),
             help = 'CSV tabular blast file of query and subject hits')
+    parser.add_argument('--all-one-group',
+            dest = 'all_one_group',
+            action = 'store_true',
+            help = """If --map is not provided, the default behavior is to treat
+                    all reads as one group; use this option to treat
+                    each read as a separate group [%(default)s]""")
+    parser.add_argument('-a', '--asterisk',
+            default = 100,
+            metavar='PERCENT',
+            type = float,
+            help = 'Next to any species above a certain threshold [%(default)s]')
+    parser.add_argument('--copy-numbers',
+            metavar = 'CSV',
+            type = Csv2Dict('tax_id', 'median'),
+            default = {},
+                        # TODO: required column names?
+            help = '16S copy-number for correcting read numbers')
+    parser.add_argument('-c', '--coverage',
+            default = 95,
+            metavar = 'PERCENT',
+            type = float,
+            help = 'percent of alignment coverage of blast result [%(default)s]')
+    parser.add_argument('--details-identity',
+            metavar = 'PERCENT',
+            help = 'Minimum identity to include blast hits in details file',
+            type = float,
+            default = 90)
+    parser.add_argument('--details-full',
+            action = 'store_true',
+            help = 'limit out_details to only larget cluster per assignment')
+    parser.add_argument('--exclude-by-taxid',
+            metavar = 'CSV',
+            type = Csv2Dict('tax_id'),
+            default = {},
+            help = 'column: tax_id')
+    parser.add_argument('--group-def',
+            metavar = 'INT',
+            action = 'append',
+            default = [],
+            help = """define a group threshold for a particular rank overriding
+                      --target-max-group-size. example: genus:2""")
+    parser.add_argument('--group-label',
+            metavar = 'LABEL',
+            default = 'all',
+            help = 'Single group label for reads')
     parser.add_argument('-o', '--out',
             default = sys.stdout,
             type = Opener('w'),
-            help = """Tab delimited list of classifications by species
-                   [specimen, species, reads, clusters, max_percent, min_percent[]""")
+            metavar = 'CSV',
+            help = """columns: specimen, max_percent, min_percent, max_coverage,
+                      min_coverage, assignment_id, assignment, clusters, reads,
+                      pct_reads, corrected, pct_corrected, target_rank, hi, low, tax_ids""")
+    parser.add_argument('-m', '--map',
+            metavar = 'CSV',
+            type = Csv2Dict('name', 'specimen', fieldnames = ['name', 'specimen']),
+            default = {},
+            help = 'columns: name, specimen')
+    parser.add_argument('--max-ambiguous',
+            metavar = 'INT',
+            default = 3,
+            type = int,
+            help = 'Maximum ambiguous count in reference sequences [%(default)s]')
+    parser.add_argument('--max-identity',
+            default = 100,
+            metavar = 'PERCENT',
+            type = float,
+            help = 'maximum identity threshold for accepting matches [<= %(default)s]')
+    parser.add_argument('--min-cluster-size',
+            default = 0,
+            metavar = 'INT',
+            type = int,
+            help = 'minimum cluster size to include in classification output')
+    parser.add_argument('--min-identity',
+            default = 99,
+            metavar = 'PERCENT',
+            type = float,
+            help = 'minimum identity threshold for accepting matches [> %(default)s]')
+    parser.add_argument('-s', '--seq-info',
+            required = True,
+            metavar = 'CSV',
+            type = Csv2Dict('seqname'),
+            help = 'seq info file(s) to match sequence ids to taxids [%(default)s]')
+    parser.add_argument('-t', '--taxonomy',
+            required = True,
+            metavar = 'CSV',
+            type = Csv2Dict('tax_id'),
+            help = 'tax table of taxids and species names [%(default)s]')
     parser.add_argument('-O', '--out-detail',
             type  = lambda f: DictWriter(Opener('w')(f), extrasaction = 'ignore', fieldnames = [
                 'specimen', 'assignment', 'assignment_id', 'qseqid', 'sseqid', 'pident', 'coverage', 'ambig_count',
                 'accession', 'tax_id', 'tax_name', 'target_rank', 'rank', 'hi', 'low'
                 ]),
-             help = 'Add detailed csv file')
-    parser.add_argument('-s', '--seq-info',
-            required = True,
-            type = Csv2Dict('seqname'),
-            help = 'seq info file(s) to match sequence ids to taxids [%(default)s]')
-    parser.add_argument('-t', '--taxonomy',
-            required = True,
-            type = Csv2Dict('tax_id'),
-            help = 'tax table of taxids and species names [%(default)s]')
-    parser.add_argument('--min-identity',
-            default = 99,
-            type = float,
-            help = 'minimum identity threshold for accepting matches [> %(default)s]')
-    parser.add_argument('--max-identity',
-            default = 100,
-            type = float,
-            help = 'maximum identity threshold for accepting matches [<= %(default)s]')
-    parser.add_argument('-c', '--coverage',
-            default = 95,
-            type = float,
-            help = 'percent of alignment coverage of blast result [%(default)s]')
-    parser.add_argument('-a', '--asterisk',
-            default = 100, metavar='PERCENT',
-            type = float,
-            help = 'Next to any species above a certain threshold [%(default)s]')
-    parser.add_argument('--exclude-by-taxid',
-            type = Csv2Dict('tax_id'),
-            default = {},
-            help = """csv file with column "tax_id" providing a set of tax_ids
-                      to exclude from the results""")
-    parser.add_argument('--max-ambiguous',
-            default = 3,
-            type = int,
-            help = 'Maximum ambiguous count in reference sequences [%(default)s]')
-    parser.add_argument('-w', '--weights',
-            type = Csv2Dict('name', 'weight', fieldnames = ['name', 'weight']),
-            default = {},
-            help = 'Provides a weight (number of reads) associated with each id')
-    parser.add_argument('-m', '--map',
-            type = Csv2Dict('name', 'specimen', fieldnames = ['name', 'specimen']),
-            default = {},
-            help = 'map file with sequence ids to specimen names')
-    parser.add_argument('--all-one-group',
-            dest = 'all_one_group',
-            action = 'store_true',
-            default = False,
-            help = """If --map is not provided, the default behavior is to treat
-                    all reads as one group; use this option to treat
-                    each read as a separate group [%(default)s]""")
-    parser.add_argument('--group-label',
-            default = 'all',
-            help = 'Single group label for reads')
-    parser.add_argument('--min-cluster-size',
-            default = 0,
-            type = int,
-            help = 'minimum cluster size to include in classification output')
-    parser.add_argument('--target-rank', metavar='RANK',
-            help = 'Rank at which to classify. Default: "%(default)s"',
-            default = 'species')
-    parser.add_argument('--details-identity',
-            help = 'Minimum identity to include blast hits in details file',
-            type = float,
-            default = 90)
-    parser.add_argument('--copy-numbers',
-            type = Csv2Dict('tax_id', 'median'),
-            default = {},
-                        # TODO: required column names?
-            help = '16S copy-number csv for correcting read numbers')
+            metavar = 'CSV',
+            help = """columns: specimen, assignment, assignment_id,
+                      qseqid, sseqid, pident, coverage, ambig_count,
+                      accession, tax_id, tax_name, target_rank, rank, hi, low""")
     parser.add_argument('--target-max-group-size',
+            metavar = 'INTEGER',
             default = 3,
             type = int,
             help = """group multiple target-rank assignments that
                       excede a threshold to a higher rank [%(default)s]""")
-    parser.add_argument('--group-def',
-            action = 'append',
-            default = [],
-            help = """define a group threshold for a particular rank overriding --target-max-group-size.
-                      example: genus:2""")
+    parser.add_argument('--target-rank',
+            metavar='RANK',
+            help = 'Rank at which to classify. Default: "%(default)s"',
+            default = 'species')
+    parser.add_argument('-w', '--weights',
+            metavar = 'CSV',
+            type = Csv2Dict('name', 'weight', fieldnames = ['name', 'weight']),
+            default = {},
+            help = 'columns: name, weight')
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -308,43 +331,38 @@ def action(args):
         categories[etc] = hits
 
         # calculate read counts
-        read_counts = ((t, set(map(itemgetter('qseqid'), h))) for t,h in categories.items())
-        read_counts = ((t, sum(float(args.weights.get(q, 1)) for q in qs)) for t,qs in read_counts)
-        read_counts = dict(read_counts)
+        read_counts = dict()
+        for k,v in categories.items():
+            qseqids = set(map(itemgetter('qseqid'), v))
+            weight = sum(float(args.weights.get(q, 1)) for q in qseqids)
+            read_counts[k] = weight
 
-        # tqmap = ((taxids, {h['qseqid'] for h in hits}) for taxids, hits in categories.items())
-        # read_counts2 = {taxids: sum(float(args.weights.get(q, 1)) for q in qseqids) for taxids, qseqids in tqmap}
+        taxids = set()
+        for k,v in categories.items():
+            if k is not etc:
+                for h in v:
+                    taxids.add(h['tax_id'])
 
-        # read_counts3 = {}
-        # for taxids, hits in categories.items():
-        #     qseqids = set(h['qseqid'] for h in hits)
-        #     read_counts3[taxids] = sum(float(args.weights.get(q, 1)) for q in qseqids)
-
-        # for k, v in read_counts.items():
-        #     assert v == read_counts2[k]
-        #     assert v == read_counts3[k]
-
-        taxids = set(h['tax_id'] for k,v in categories.items() for h in v if k is not etc)
         copy_counts = get_copy_counts(taxids, args.copy_numbers, args.taxonomy, ranks_rev)
 
-        ### corrected read counts
+        ### list of assigned ids for count corrections
         assigned_ids = dict()
         for k,v in categories.items():
             if k is not etc and v:
                 assigned_ids[k] = set(map(itemgetter('tax_id'), v))
 
-        # loop through categories again defaulting to 'root' for etc category
+        # correction counts
         corrected_counts = dict()
         for k,v in categories.items():
-            if k in assigned_ids:
-                corrected_counts[k] = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
+            if k is not etc:
+                if k in assigned_ids:
+                    av = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
+                    corrected_counts[k] = ceil(read_counts[k] / av)
 
+        # finally take the root value for the etc category
         corrected_counts[etc] = float(args.copy_numbers.get('1', 1)) # root
 
-        # read_counts / mean(copy_counts)
-        corrected_counts = ((c, ceil(read_counts[c] / m)) for c,m in corrected_counts.items())
-        corrected_counts = dict(corrected_counts)
-
+        # totals for percent calculations later
         total_reads = sum(v for v in read_counts.values())
         total_corrected = sum(v for v in corrected_counts.values())
 
@@ -401,6 +419,16 @@ def action(args):
                 out.writerow(results)
 
                 if args.out_detail:
+                    if not args.details_full:
+                        cluster_sizes = Counter()
+
+                        for c in clusters:
+                            cluster_sizes[c] = int(args.weights.get(c, 1))
+
+                        most_common = cluster_sizes.most_common(1)[0][0]
+
+                        hits = (h for h in hits if h['qseqid'] == most_common)
+
                     for h in hits:
                         args.out_detail.writerow(dict(
                         specimen = specimen,
@@ -410,3 +438,4 @@ def action(args):
                         low = args.min_identity,
                         target_rank = args.target_rank,
                         **h))
+
