@@ -182,10 +182,10 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
     target_rank = ranks[ranks.index(target_rank) + 1]
 
     # recurse down the tax tree
-    condensed = (condense(g, floor_rank, max_size, ranks, rank_thresholds, target_rank) for _,g in groups)
-
-    # flatten condensed
-    condensed = [c for g in condensed for c in g]
+    condensed = []
+    for _,g in groups:
+        c = condense(g, floor_rank, max_size, ranks, rank_thresholds, target_rank)
+        condensed.extend(c)
 
     return condensed
 
@@ -354,10 +354,9 @@ def action(args):
         # correction counts
         corrected_counts = dict()
         for k,v in categories.items():
-            if k is not etc:
-                if k in assigned_ids:
-                    av = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
-                    corrected_counts[k] = ceil(read_counts[k] / av)
+            if k is not etc and k in assigned_ids:
+                av = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
+                corrected_counts[k] = ceil(read_counts[k] / av)
 
         # finally take the root value for the etc category
         corrected_counts[etc] = float(args.copy_numbers.get('1', 1)) # root
