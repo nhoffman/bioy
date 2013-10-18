@@ -99,7 +99,7 @@ def align_and_consensus(seq):
 
 def action(args):
     seqs = islice(args.fastafile, args.limit)
-    _, fileExt, = args.clusters.name.split('.')
+    _, fileExt, = os.path.basename(args.clusters.name).split('.')
 
     if fileExt == 'uc':
         clusters = parse_uc(args.clusters)[0]
