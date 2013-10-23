@@ -35,10 +35,8 @@ def build_parser(parser):
             help = 'Next to any species above a certain threshold [%(default)s]')
     parser.add_argument('--copy-numbers',
             metavar = 'CSV',
-            type = Csv2Dict('tax_id', 'median'),
-            default = {},
-                        # TODO: required column names?
-            help = '16S copy-number for correcting read numbers')
+            type = Opener(),
+            help = 'columns: tax_id, median')
     parser.add_argument('-c', '--coverage',
             default = 95,
             metavar = 'PERCENT',
@@ -130,8 +128,7 @@ def build_parser(parser):
             default = 'species')
     parser.add_argument('-w', '--weights',
             metavar = 'CSV',
-            type = Csv2Dict('name', 'weight', fieldnames = ['name', 'weight']),
-            default = {},
+            type = Opener(),
             help = 'columns: name, weight')
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
@@ -199,6 +196,37 @@ def blast_hit(hit, args):
            int(hit['ambig_count']) <= args.max_ambiguous
 
 def action(args):
+    ### output file headers
+    fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage',
+                  'min_coverage', 'assignment_id', 'assignment']
+
+    if args.weights:
+        args.weights = DictReader(args.weights, fieldnames = ['name', 'weight'])
+        args.weights = {d['name']:d['weight'] for d in args.weights}
+        fieldnames += ['clusters', 'reads', 'pct_reads']
+    else:
+        args.weights = {}
+
+    if args.copy_numbers:
+        args.copy_numbers = DictReader(args.copy_numbers)
+        args.copy_numbers = {d['tax_id']:d['median'] for d in args.copy_numbers}
+        fieldnames += ['corrected', 'pct_corrected']
+    else:
+        args.copy_numbers = {}
+
+    # TODO: take out target_rank, hi, low and provide in pipeline using csvmod
+    # TODO: option to include tax_ids (default no)
+    fieldnames += ['target_rank', 'hi', 'low', 'tax_ids']
+
+    ### Columns
+    out = DictWriter(args.out,
+            extrasaction = 'ignore',
+            fieldnames = fieldnames)
+    out.writeheader()
+
+    if args.out_detail:
+        args.out_detail.writeheader()
+
     ### Rows
     etc = '[no blast result]' # This row will hold all unmatched
 
@@ -255,28 +283,6 @@ def action(args):
         return dict(args.taxonomy[b['tax_id']], **b) if b['sseqid'] else b
 
     blast_results = (tax_info(b) for b in blast_results)
-
-    fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage',
-                  'min_coverage', 'assignment_id', 'assignment']
-
-    if args.weights:
-        fieldnames += ['clusters', 'reads', 'pct_reads']
-
-    if args.copy_numbers:
-        fieldnames += ['corrected', 'pct_corrected']
-
-    # TODO: take out target_rank, hi, low and provide in pipeline using csvmod
-    # TODO: option to include tax_ids (default no)
-    fieldnames += ['target_rank', 'hi', 'low', 'tax_ids']
-
-    ### Columns
-    out = DictWriter(args.out,
-            extrasaction = 'ignore',
-            fieldnames = fieldnames)
-    out.writeheader()
-
-    if args.out_detail:
-        args.out_detail.writeheader()
 
     # group by specimen
     if args.map:
