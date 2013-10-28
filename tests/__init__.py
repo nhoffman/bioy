@@ -68,8 +68,11 @@ class TestCaseSuppressOutput(unittest.TestCase):
             sys.stderr = sys.__stderr__
 
 class TestSubcommand(unittest.TestCase):
-    """
-    Must define class variables action and build_parser in subclass.
+    """Must define class variable subcommand with methods action and
+    build_parser. Execute the subcommand using
+
+      self.main(list_of_args)
+
     """
 
     def setUp(self):
@@ -78,9 +81,12 @@ class TestSubcommand(unittest.TestCase):
         if self.suppress_output:
             sys.stdout = sys.stderr = open(os.devnull, 'w')
 
+        self.action = self.subcommand.action
+        self.build_parser = self.subcommand.build_parser
         parser = argparse.ArgumentParser()
         self.build_parser(parser)
         self.main = lambda args: self.action(parser.parse_args(args))
+
 
     def tearDown(self):
         if self.suppress_output:

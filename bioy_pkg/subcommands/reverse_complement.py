@@ -2,11 +2,10 @@
 
 import logging
 import sys
-
-from csv import DictWriter
+import csv
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.utils import Opener, Csv2Dict
+from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
@@ -27,20 +26,15 @@ rev_comp = {'A':'T',
 
 def build_parser(parser):
     parser.add_argument('infile',
-            type = Opener(),
-            help = 'Input fasta file')
-    parser.add_argument('rlefile',
-            nargs = '?',
-            type = Csv2Dict(value = 'rle',
-                            fieldnames = rle_fieldnames),
-            help = 'csv file (may be bzip encoded) containing columns "name","rle"')
-    parser.add_argument('-O', '--out-rle',
-            type = lambda f: DictWriter(Opener('w')(f), fieldnames = rle_fieldnames),
-            help = 'reversed rlefile')
+                        type = Opener(),
+                        help = 'Input fasta file')
+    parser.add_argument('rlefile', nargs = '?', type = Opener(),
+                        help = 'csv file (may be bzip encoded) containing columns "name","rle"')
+    parser.add_argument('-O', '--out-rle', type = Opener('w'), help = 'reversed rlefile')
     parser.add_argument('-o','--out-fasta',
-            type = Opener('w'),
-            default = sys.stdout,
-            help = 'Name of output file')
+                        type = Opener('w'),
+                        default = sys.stdout,
+                        help = 'Name of output file')
 
 def action(args):
     seqs = fastalite(args.infile)
@@ -52,6 +46,12 @@ def action(args):
         args.out_fasta.write('>{}\n{}\n'.format(s.description, seq))
 
     if args.rlefile and args.out_rle:
-        for n,r in args.rlefile.items():
-            rle = ''.join(reversed(r))
-            args.out_rle.writerow(dict(name = n, rle = rle))
+        reader = csv.reader(args.rlefile)
+        writer = csv.writer(args.out_rle)
+
+        header = reader.next()
+        assert header == rle_fieldnames
+
+        writer.writerow(header)
+        for name, rle in reader:
+            writer.writerow([name, ''.join(reversed(rle))])
