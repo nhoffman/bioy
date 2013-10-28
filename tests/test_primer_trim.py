@@ -21,8 +21,7 @@ class TestMain(TestCaseSuppressOutput, TestBase):
 
 class TestPrimerTrimAction(TestSubcommand, TestBase):
 
-    action = lambda self, args: primer_trim.action(args)
-    build_parser = lambda self, args: primer_trim.build_parser(args)
+    subcommand = primer_trim
 
     def testHelp(self):
         self.assertRaises(SystemExit, self.main, ['-h'])
