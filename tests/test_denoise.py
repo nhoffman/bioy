@@ -6,9 +6,11 @@ from os import path
 import logging
 import argparse
 
+from bioy_pkg.sequtils import fastalite
 from bioy_pkg.utils import opener
 from bioy_pkg.scripts.main import parse_arguments, main
 from bioy_pkg.subcommands import denoise
+
 
 from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
 
@@ -33,6 +35,14 @@ class TestDenoise(TestBase, TestSubcommand):
                                for line in f if line.startswith('>'))
             self.assertEqual(limit, cluster_mass)
 
+        # regression test
+        reference = path.join(datadir, 'F1_3', 'test01_denoised.fasta')
+        with open(fa_out) as out, open(reference) as ref:
+            outseqs = list(fastalite(out))
+            refseqs = list(fastalite(ref))
+            self.assertEqual(len(outseqs), len(refseqs))
+            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
+
 
     def test02(self):
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
@@ -44,8 +54,9 @@ class TestDenoise(TestBase, TestSubcommand):
         self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
                    min_size])
 
-        # a regression test of sorts...
         reference = path.join(datadir, 'F1_3', 'test02_denoised.fasta')
         with open(fa_out) as out, open(reference) as ref:
-            seqnames = lambda f: [line.strip()[1:] for line in f if line.startswith('>')]
-            self.assertEqual(seqnames(out), seqnames(ref))
+            outseqs = list(fastalite(out))
+            refseqs = list(fastalite(ref))
+            self.assertEqual(len(outseqs), len(refseqs))
+            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))

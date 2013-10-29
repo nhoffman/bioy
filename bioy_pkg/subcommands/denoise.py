@@ -98,10 +98,25 @@ def ichunker(seqs, rledict=None, min_clust_size=1, max_clust_size=sys.maxint):
             yield (cluster, rlelist)
 
 
-def align_and_consensus(seq):
-    i, (cluster, rlelist) = seq
-    log.info('aligning cluster {} len {}'.format(i, len(cluster)))
-    return cluster, consensus(run_muscle(cluster), rlelist)
+def align_and_consensus(chunk):
+    """Wraps functions for alignment and consensus generation. Does not
+    perform alignment for clusters of length 1.
+
+    """
+
+    i, (cluster, rlelist) = chunk
+
+    if len(cluster) == 1:
+        # no need to align...
+        seq = cluster[0]
+        rle = rlelist[0] if rlelist else None
+        cons = homodecode(seq, rle) if rle else seq.seq
+    else:
+        log.info('aligning cluster {} len {}'.format(i, len(cluster)))
+        cons = consensus(run_muscle(cluster), rlelist)
+
+    return cluster, cons
+
 
 def action(args):
 
@@ -112,7 +127,7 @@ def action(args):
     else:
         clusters = {seq: tag for seq,tag in csv.reader(args.clusters)}
 
-    by_clusters = lambda s: clusters.get(s.description, s.description)
+    by_clusters = lambda s: clusters.get(s.id, s.id)
 
     seqs = islice(args.fastafile, args.limit)
     seqs = sorted(seqs, key = by_clusters)
@@ -123,40 +138,21 @@ def action(args):
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
-
     exemplars = defaultdict(list)
 
     pool = Pool(processes = args.threads)
 
-    # no need to muscle clusters of size one
-    no_muscle = ((c,r) for c,r in chunks if len(c) == 1)
-
-    for (cluster,), rlelist in no_muscle:
-        if rlelist:
-            cluster = homodecode(cluster, rlelist[0])
-
-        exemplars[cluster.seq].append(cluster.id)
-
-    # muscle align clusters larger than one
-    to_muscle = ((c,r) for c,r in chunks if len(c) > 1)
-
-    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(to_muscle, start = 1)):
+    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(chunks, start = 1)):
         exemplars[cons].extend([c.id for c in cluster])
 
-    # write each consensus sequence
-    items = sorted(exemplars.items(), key = lambda x: -1 * len(x[1]))
-    for i, (cons, names) in enumerate(items, start = 1):
-        weight = str(len(names))
-        name_elements = []
-        if args.name_prefix:
-            name_elements.append(args.name_prefix)
-
-        name_elements.extend(['cons{:04}'.format(i), weight])
-
-        if args.name_suffix:
-            name_elements.append(args.name_suffix)
-
-        consname = args.name_delimiter.join(name_elements)
+    # write each consensus sequence in descending order of cluster size
+    items = sorted(exemplars.items(), key=lambda x: len(x[1]), reverse=True)
+    for i, (cons, names) in enumerate(items, start=1):
+        name_elements = [args.name_prefix,
+                         'cons{:04}'.format(i),
+                         str(len(names)),
+                         args.name_suffix]
+        consname = args.name_delimiter.join([e for e in name_elements if e])
 
         log.info('writing {}'.format(consname))
 
