@@ -92,23 +92,24 @@ def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
             rlelist = [from_ascii(rledict[s.id]) for s in cluster] if rledict else None
             yield (cluster, rlelist)
 
+
 def align_and_consensus(seq):
     i, (cluster, rlelist) = seq
     log.info('aligning cluster {} len {}'.format(i, len(cluster)))
     return cluster, consensus(run_muscle(cluster), rlelist)
 
 def action(args):
-    seqs = islice(args.fastafile, args.limit)
+
     _, fileExt, = os.path.basename(args.clusters.name).split('.')
 
     if fileExt == 'uc':
         clusters = parse_uc(args.clusters)[0]
     else:
-        clusters = csv.reader(args.clusters)
-        clusters = {seq:tag for seq,tag in clusters}
+        clusters = {seq: tag for seq,tag in csv.reader(args.clusters)}
 
     by_clusters = lambda s: clusters.get(s.description, s.description)
 
+    seqs = islice(args.fastafile, args.limit)
     seqs = sorted(seqs, key = by_clusters)
     seqs = groupby(seqs, key = by_clusters)
     seqs = (list(s) for _,s in seqs)

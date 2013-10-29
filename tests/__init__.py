@@ -85,7 +85,7 @@ class TestSubcommand(unittest.TestCase):
         self.build_parser = self.subcommand.build_parser
         parser = argparse.ArgumentParser()
         self.build_parser(parser)
-        self.main = lambda args: self.action(parser.parse_args(args))
+        self.main = lambda args: self.action(parser.parse_args([str(arg) for arg in args]))
 
 
     def tearDown(self):

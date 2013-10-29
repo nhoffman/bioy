@@ -15,19 +15,6 @@ from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
 log = logging.getLogger(__name__)
 
 
-def make_caller(subcommand):
-    """Factory function to construct a test case method for calling the
-    subcommand's action.
-
-    """
-
-    def _parser(_args):
-        parser = argparse.ArgumentParser()
-        subcommand.build_parser(parser)
-        return subcommand.action(parser.parse_args(_args))
-
-    return _parser
-
 class TestMainScript(TestCaseSuppressOutput, TestBase):
 
     def testExit01(self):
