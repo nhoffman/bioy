@@ -73,14 +73,19 @@ def build_parser(parser):
                    Can also specify with environment variable THREADS_ALLOC
                    default = %(default)s""")
 
-def ichunker(seqs, rledict = None, max_clust_size = sys.maxint):
-    """
-    Return iterator of (seqlist, rlelist) tuples. Clusters are broken
-    into chunks no larger than 0.5*max_clust_size
+def ichunker(seqs, rledict=None, min_clust_size=1, max_clust_size=sys.maxint):
+    """Return iterator of (seqlist, rlelist) tuples. Clusters are broken
+    into chunks no larger than 0.5*max_clust_size. Returns an iterator
+    of (cluster_seqs, rle_info). If rle_info is not provided, rle_info
+    is None.
+
     """
 
     for cluster in seqs:
-        if len(cluster) > max_clust_size:
+        cluster = list(cluster)
+        if len(cluster) < min_clust_size:
+            continue
+        elif len(cluster) > max_clust_size:
             shuffle(cluster)
             # combine trailing chunk with next to last if less than
             # half the target chunk size
@@ -111,11 +116,10 @@ def action(args):
 
     seqs = islice(args.fastafile, args.limit)
     seqs = sorted(seqs, key = by_clusters)
-    seqs = groupby(seqs, key = by_clusters)
-    seqs = (list(s) for _,s in seqs)
-    seqs = (s for s in seqs if len(s) >= args.min_clust_size)
-    seqs = ichunker(seqs, args.rlefile, args.max_clust_size)
-    seqs = list(seqs)
+    groups = groupby(seqs, key = by_clusters)
+    chunks = ichunker((group for _, group in groups),
+                      args.rlefile, args.min_clust_size, args.max_clust_size)
+    chunks = list(chunks)
 
     # calculate consensus for each cluster, then accumulate names of
     # each set of identical consensus sequences in `exemplars`
@@ -125,7 +129,7 @@ def action(args):
     pool = Pool(processes = args.threads)
 
     # no need to muscle clusters of size one
-    no_muscle = ((c,r) for c,r in seqs if len(c) == 1)
+    no_muscle = ((c,r) for c,r in chunks if len(c) == 1)
 
     for (cluster,), rlelist in no_muscle:
         if rlelist:
@@ -134,7 +138,7 @@ def action(args):
         exemplars[cluster.seq].append(cluster.id)
 
     # muscle align clusters larger than one
-    to_muscle = ((c,r) for c,r in seqs if len(c) > 1)
+    to_muscle = ((c,r) for c,r in chunks if len(c) > 1)
 
     for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(to_muscle, start = 1)):
         exemplars[cons].extend([c.id for c in cluster])
