@@ -60,3 +60,35 @@ class TestDenoise(TestBase, TestSubcommand):
             refseqs = list(fastalite(ref))
             self.assertEqual(len(outseqs), len(refseqs))
             self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
+
+
+    def test03(self):
+        fa = path.join(datadir, 'F1_3xR1_36', 'trimmed.fasta')
+        uc = path.join(datadir, 'F1_3xR1_36', 'trimmed.uc')
+        groups = path.join(datadir, 'F1_3xR1_36', 'groups.csv.bz2')
+        outdir = self.mkoutdir()
+        limit = 500
+        min_size = 2
+
+        denoised = path.join(outdir, 'denoised.fasta')
+        self.main([fa, uc,
+                   '--outfile', denoised,
+                   '--limit', limit,
+                   '--min-clust-size', min_size,
+                   '--weights', path.join(outdir, 'weights.csv')
+               ])
+
+        denoised_grouped = path.join(outdir, 'denoised.grouped.fasta')
+        self.main([fa, uc,
+                   '--outfile', denoised_grouped,
+                   '--limit', limit,
+                   '--min-clust-size', min_size,
+                   '--groups', groups,
+                   '--weights', path.join(outdir, 'weights.grouped.csv')
+               ])
+
+        reference = path.join(datadir, 'F1_3', 'test02_denoised.fasta')
+        with open(denoised) as d, open(denoised_grouped) as g:
+            ds = list(fastalite(d))
+            gs = list(fastalite(g))
+            self.assertEqual(set(s.seq for s in ds), set(s.seq for s in gs))

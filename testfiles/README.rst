@@ -29,3 +29,14 @@ And some reverse reads - reverse complement these::
   rm $dest/temp*
   usearch6 -cluster_fast $dest/trimmed.fasta -uc $dest/trimmed.uc -id 0.985 -quiet
   usearch6 -cluster_fast $dest/trimmed_rle.fasta -uc $dest/trimmed_rle.uc -id 0.985 -quiet
+
+Concatenate these..::
+
+  cd testfiles
+  mkdir F1_3xR1_36
+  cat F1_3/trimmed.fasta R1_36/trimmed.fasta > F1_3xR1_36/trimmed.fasta
+  seqmagick mogrify --sort name-asc F1_3xR1_36/trimmed.fasta
+  usearch6 -cluster_fast F1_3xR1_36/trimmed.fasta -uc F1_3xR1_36/trimmed.uc -id 0.985 -quiet
+  seqmagick extract-ids F1_3/trimmed.fasta | sed 's/$/,f/' > F1_3xR1_36/groups.csv
+  seqmagick extract-ids R1_36/trimmed.fasta | sed 's/$/,r/' >> F1_3xR1_36/groups.csv
+  bzip2 F1_3xR1_36/groups.csv
