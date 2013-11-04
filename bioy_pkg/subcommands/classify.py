@@ -425,14 +425,20 @@ def action(args):
 
                 if args.out_detail:
                     if not args.details_full:
-                        cluster_sizes = Counter()
+                        # choose the single largest cluster
+                        clusters_and_sizes = [(float(args.weights.get(c, 1.0)), c) for c in clusters]
+                        max_size, largest = max(clusters_and_sizes)
+                        hits = (h for h in hits if h['qseqid'] == largest)
 
-                        for c in clusters:
-                            cluster_sizes[c] = int(args.weights.get(c, 1))
+                        # cluster_sizes = Counter()
 
-                        most_common = cluster_sizes.most_common(1)[0][0]
+                        # for c in clusters:
+                        #     cluster_sizes[c] = int(args.weights.get(c, 1))
 
-                        hits = (h for h in hits if h['qseqid'] == most_common)
+                        # most_common = cluster_sizes.most_common(1)[0][0]
+
+                        # hits = (h for h in hits if h['qseqid'] == most_common)
+
 
                     for h in hits:
                         args.out_detail.writerow(dict(
@@ -443,4 +449,3 @@ def action(args):
                         low = args.min_identity,
                         target_rank = args.target_rank,
                         **h))
-
