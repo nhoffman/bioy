@@ -53,3 +53,18 @@ class TestReverseComplement(TestBase, TestSubcommand):
         with opener(rle) as infile, opener(rle_out) as outfile:
             self.assertEqual(infile.next(), outfile.next())
             self.assertEqual(len(list(infile)), len(list(outfile)))
+
+    def test03(self):
+        outdir = self.mkoutdir()
+        fa = path.join(datadir, 'F1_3', 'trimmed_rle.fasta')
+        rle = path.join(datadir, 'F1_3', 'trimmed_rle_nohead.csv.bz2')
+
+        fa_out = path.join(outdir, 'rc.fasta')
+        rle_out = path.join(outdir, 'rc.csv.bz2')
+
+        self.main([fa, rle, '--out-fasta', fa_out, '--out-rle', rle_out])
+        self.assertTrue(path.exists(fa_out))
+        self.assertTrue(path.exists(rle_out))
+
+        with opener(rle) as infile, opener(rle_out) as outfile:
+            self.assertEqual(len(list(infile)), len(list(outfile)))

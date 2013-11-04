@@ -49,9 +49,13 @@ def action(args):
         reader = csv.reader(args.rlefile)
         writer = csv.writer(args.out_rle)
 
-        header = reader.next()
-        assert header == rle_fieldnames
+        # try to determine if first row is a header
+        name, rle = reader.next()
+        if rle[0].isdigit():
+            writer.writerow([name, ''.join(reversed(rle))])
+        else:
+            assert [name, rle] == rle_fieldnames
+            writer.writerow([name, rle])
 
-        writer.writerow(header)
         for name, rle in reader:
             writer.writerow([name, ''.join(reversed(rle))])
