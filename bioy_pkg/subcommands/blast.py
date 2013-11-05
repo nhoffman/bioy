@@ -99,11 +99,11 @@ def action(args):
         # now we can build a list of nohits
         nohits = []
         for q in fastalite(opener(args.fasta)):
-            if q.description not in qids:
+            if q.id not in qids:
                 nohits.append(q)
 
         # convert nohits into DictWriter format
-        nohits = (dict(qseqid = q.description) for q in nohits)
+        nohits = (dict(qseqid = q.id) for q in nohits)
 
         # append to lines
         lines = chain(lines, nohits)

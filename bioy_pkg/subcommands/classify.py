@@ -365,7 +365,7 @@ def action(args):
                 corrected_counts[k] = ceil(read_counts[k] / av)
 
         # finally take the root value for the etc category
-        corrected_counts[etc] = float(args.copy_numbers.get('1', 1)) # root
+        corrected_counts[etc] = ceil(read_counts[etc] / float(args.copy_numbers['1']))
 
         # totals for percent calculations later
         total_reads = sum(v for v in read_counts.values())
