@@ -49,9 +49,11 @@ def action(args):
         reader = csv.reader(args.rlefile)
         writer = csv.writer(args.out_rle)
 
-        # try to determine if first row is a header
+        # try to determine if first row is a header; we'll assume that
+        # the first row, second column is a run-length encoding if
+        # it's at least half digits.
         name, rle = reader.next()
-        if rle[0].isdigit():
+        if sum(c.isdigit() for c in rle)/float(len(rle)) > 0.5:
             writer.writerow([name, ''.join(reversed(rle))])
         else:
             assert [name, rle] == rle_fieldnames
