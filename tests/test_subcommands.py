@@ -15,19 +15,6 @@ from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
 log = logging.getLogger(__name__)
 
 
-def make_caller(subcommand):
-    """Factory function to construct a test case method for calling the
-    subcommand's action.
-
-    """
-
-    def _parser(_args):
-        parser = argparse.ArgumentParser()
-        subcommand.build_parser(parser)
-        return subcommand.action(parser.parse_args(_args))
-
-    return _parser
-
 class TestMainScript(TestCaseSuppressOutput, TestBase):
 
     def testExit01(self):
@@ -65,4 +52,19 @@ class TestReverseComplement(TestBase, TestSubcommand):
 
         with opener(rle) as infile, opener(rle_out) as outfile:
             self.assertEqual(infile.next(), outfile.next())
+            self.assertEqual(len(list(infile)), len(list(outfile)))
+
+    def test03(self):
+        outdir = self.mkoutdir()
+        fa = path.join(datadir, 'F1_3', 'trimmed_rle.fasta')
+        rle = path.join(datadir, 'F1_3', 'trimmed_rle_nohead.csv.bz2')
+
+        fa_out = path.join(outdir, 'rc.fasta')
+        rle_out = path.join(outdir, 'rc.csv.bz2')
+
+        self.main([fa, rle, '--out-fasta', fa_out, '--out-rle', rle_out])
+        self.assertTrue(path.exists(fa_out))
+        self.assertTrue(path.exists(rle_out))
+
+        with opener(rle) as infile, opener(rle_out) as outfile:
             self.assertEqual(len(list(infile)), len(list(outfile)))
