@@ -3,11 +3,13 @@ Assembles subcommands and provides top-level script.
 """
 
 import argparse
-from argparse import RawDescriptionHelpFormatter
+import globe
 import logging
 import pkgutil
 import sys
+
 from importlib import import_module
+
 from bioy_pkg import subcommands, __version__ as version, __doc__ as docstring
 
 log = logging
@@ -66,7 +68,7 @@ def parse_arguments(argv):
 
     # Organize submodules by argv
     modules = [name for _,name,_ in pkgutil.iter_modules(subcommands.__path__)]
-    run = filter(lambda name: name in argv, modules)
+    run = [m for m in modules if m in argv]
 
     actions = {}
 
@@ -92,7 +94,8 @@ def parse_arguments(argv):
         subparser = subparsers.add_parser(
             name, help = mod.__doc__.lstrip().split('\n', 1)[0],
             description = mod.__doc__,
-            formatter_class = RawDescriptionHelpFormatter)
+            formatter_class = argparse.RawDescriptionHelpFormatter)
+        subparser = globe.parse_args(subparser)
         mod.build_parser(subparser)
         actions[name] = mod.action
     # Determine we have called ourself (e.g. "help <action>")
