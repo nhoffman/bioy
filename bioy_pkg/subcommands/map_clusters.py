@@ -42,12 +42,6 @@ def build_parser(parser):
     parser.add_argument('--min-clust-size',
             type = int,
             default = 1, help = 'default %(default)s')
-    parser.add_argument('--threads',
-            default = int(os.environ.get('THREADS_ALLOC') or 1),
-            type = int,
-            help = """Number of threads (CPUs) to use.
-                   Can also specify with environment variable THREADS_ALLOC
-                   default = %(default)s""")
 
 def action(args):
     clusters = csv.DictReader(args.clusters, delimiter = '\t', fieldnames = UCLUST_HEADERS)

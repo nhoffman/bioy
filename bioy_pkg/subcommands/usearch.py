@@ -36,10 +36,6 @@ def build_parser(parser):
             choices = ['plus', 'minus', 'both'],
             help = """query strand(s) to search against database/subject.
                       default = %(default)s""")
-    parser.add_argument('--threads',
-            default = '1',
-            help = """Number of threads (CPUs) to use in the BLAST search.
-                      default = %(default)s""")
     parser.add_argument('--id',
             default = 0.9,
             type = float,

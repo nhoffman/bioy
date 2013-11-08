@@ -27,12 +27,6 @@ def build_parser(parser):
             type = lambda f: DictWriter(Opener('w')(f), fieldnames=['name', 'rle']),
             help = """Name of output file for run length encoding; default is to
                       append .csv.bz2 to --outfile basename.""")
-    parser.add_argument('--threads',
-            default = int(os.environ.get('THREADS_ALLOC') or 1),
-            type = int,
-            help = """Number of threads (CPUs) to use.
-                   Can also specify with environment variable THREADS_ALLOC
-                   default = %(default)s""")
 
 def seq_and_homoencode(seq):
     return seq, homoencode(seq.seq)

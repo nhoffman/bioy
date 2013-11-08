@@ -38,11 +38,6 @@ def build_parser(parser):
             choices = ['plus', 'minus', 'both'],
             help = """query strand(s) to search against database/subject.
                       default = %(default)s""")
-    parser.add_argument('--threads',
-            default = os.environ.get('THREADS_ALLOC') or '1',
-            help = """Number of threads (CPUs) to use in the BLAST search.
-                   Can also specify with environment variable THREADS_ALLOC
-                   default = %(default)s""")
     parser.add_argument('--id',
             default = '90',
             help = 'minimum identity for accepted values default [%(default)s]')

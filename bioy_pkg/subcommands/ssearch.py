@@ -75,6 +75,7 @@ def action(args):
     command += ['-n']
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
+    command += ['-T', args.threads]
 
     if args.full_sequences:
         command += ['-a']
