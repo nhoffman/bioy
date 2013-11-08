@@ -12,7 +12,7 @@ from bioy_pkg.scripts.main import parse_arguments, main
 from bioy_pkg.subcommands import denoise
 
 
-from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
+from __init__ import TestBase, TestSubcommand, datadir
 
 log = logging.getLogger(__name__)
 
