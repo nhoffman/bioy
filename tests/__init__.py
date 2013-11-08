@@ -6,6 +6,7 @@ import unittest
 import argparse
 
 from bioy_pkg.utils import mkdir
+from bioy_pkg.scripts import globe
 
 # set up logging for unit tests
 verbosity_flag = [x for x in sys.argv if x.startswith('-v')]
@@ -84,7 +85,9 @@ class TestSubcommand(unittest.TestCase):
         self.action = self.subcommand.action
         self.build_parser = self.subcommand.build_parser
         parser = argparse.ArgumentParser()
+        parser = globe.parse_args(parser)
         self.build_parser(parser)
+
         self.main = lambda args: self.action(parser.parse_args([str(arg) for arg in args]))
 
 
