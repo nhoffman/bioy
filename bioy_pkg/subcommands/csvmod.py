@@ -6,7 +6,6 @@ Add or rename columns in a csv file.
 
 import logging
 import sys
-import pprint
 import csv
 import random
 import string
@@ -18,11 +17,10 @@ from bioy_pkg.utils import Opener, opener, parse_extras
 
 log = logging.getLogger(__name__)
 
-
 def build_parser(parser):
     parser.add_argument('infile',
                         default = sys.stdin,
-                        type = Opener('rU'),
+                        type = Opener(),
                         nargs = '?',
                         help = 'input csv file')
     parser.add_argument('-o', '--outfile', default='-', help = 'output csv file',)
@@ -33,13 +31,11 @@ def build_parser(parser):
     parser.add_argument('-i', '--inplace', action='store_true', default=False,
                         help='modify input file in place')
 
-
 def tmp(filename):
     dirname, fname = path.split(filename)
     return path.join(
         dirname,
         ''.join(random.sample(string.letters + string.digits, 15) + ['_' + fname]))
-
 
 def action(args):
     if args.inplace and args.infile is sys.stdin:
@@ -64,3 +60,4 @@ def action(args):
 
     if args.inplace:
         os.rename(fout.name, args.infile.name)
+
