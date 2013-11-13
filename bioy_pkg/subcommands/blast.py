@@ -62,11 +62,10 @@ def action(args):
     if args.max:
         command += ['-max_target_seqs', args.max]
 
-    if args.dry_run:
-        print ' '.join(map(str, command))
-        sys.exit(0)
-
     log.info(' '.join(command))
+
+    if args.dry_run:
+        sys.exit(0)
 
     pipe = Popen(command, stdout = PIPE, stderr = PIPE)
 
