@@ -7,13 +7,13 @@ http://computing.bio.cam.ac.uk/local/doc/fasta_guide.pdf
 import logging
 import sys
 
-from itertools import chain, groupby, imap, islice
+from itertools import chain, groupby, imap
 from operator import itemgetter
 from cStringIO import StringIO
 from subprocess import Popen, PIPE
 from csv import DictWriter
 
-from bioy_pkg.sequtils import fastalite, parse_ssearch36, homodecodealignment, from_ascii
+from bioy_pkg.sequtils import parse_ssearch36, homodecodealignment, from_ascii
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -21,18 +21,13 @@ log = logging.getLogger(__name__)
 def build_parser(parser):
     parser.add_argument('query',
             default = sys.stdin,
-            type = Opener(),
             help = 'input fasta query file')
-    parser.add_argument('-l', '--library',
-            required = True,
+    parser.add_argument('library',
             help = 'input fasta library file to search against')
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
             help = 'tabulated ssearch results')
-    parser.add_argument('--limit',
-            type = int,
-            help = 'maximum number of query sequences to read from the alignment')
     parser.add_argument('--no-header',
             dest = 'header',
             action = 'store_false',
@@ -75,7 +70,7 @@ def action(args):
     command += ['-n']
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
-    command += ['-T', args.threads]
+    command += ['-T', str(args.threads)]
 
     if args.full_sequences:
         command += ['-a']
@@ -84,16 +79,12 @@ def action(args):
         command += ['-b', '1']
         command += ['-d', '1']
 
-    command += ['@', args.library]
+    command += [args.query, args.library]
+
+    log.debug(' '.join(command))
 
     pipe = Popen(command, stdout = PIPE, stderr = PIPE, stdin = PIPE)
-
-    fasta = fastalite(args.query, readfile = False)
-    fasta = islice(fasta, args.limit)
-    fasta = ('>{}\n{}\n'.format(f.description, f.seq) for f in fasta)
-    fasta = ''.join(fasta)
-
-    results, errors = pipe.communicate(fasta)
+    results, errors = pipe.communicate()
 
     log.error(errors)
 
@@ -110,11 +101,13 @@ def action(args):
     # decode if appropriate
     if args.decode:
         decoding = {k:v for d in args.decode for k,v in d.items()}
+
         def decode(aligns):
             aligns['t_seq'], aligns['q_seq'] = homodecodealignment(
                     aligns['t_seq'], from_ascii(decoding[aligns['t_name']]),
                     aligns['q_seq'], from_ascii(decoding[aligns['q_name']]))
             return aligns
+
         aligns = imap(decode, aligns)
 
     # write results
