@@ -25,9 +25,6 @@ def build_parser(parser):
             help = 'tabulated BLAST results with the following headers {}'.format(BLAST_FORMAT))
     parser.add_argument('-d', '--database',
             help = 'a blast database')
-    parser.add_argument('--limit',
-            type = int,
-            help = 'maximum number of query sequences to read from the alignment')
     parser.add_argument('--header',
             action = 'store_true',
             help = 'output header')
@@ -49,7 +46,7 @@ def build_parser(parser):
 def action(args):
     command = [args.usearch]
     command += ['-usearch_global', args.fasta]
-    command += ['-threads', args.threads]
+    command += ['-threads', str(args.threads)]
     command += ['-id', str(args.id)]
     command += ['-db', args.database]
     command += ['-strand', args.strand]
@@ -57,6 +54,8 @@ def action(args):
 
     if args.max:
         command += ['-maxaccepts', args.max]
+
+    log.debug(' '.join(command))
 
     pipe = Popen(command, stdout = PIPE, stderr = PIPE)
     results, errors = pipe.communicate()
@@ -79,3 +78,4 @@ def action(args):
         out.writeheader()
 
     out.writerows(lines)
+
