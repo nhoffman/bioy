@@ -9,7 +9,6 @@ import sys
 
 from itertools import chain, groupby, imap
 from operator import itemgetter
-from cStringIO import StringIO
 from subprocess import Popen, PIPE
 from csv import DictWriter
 
@@ -20,7 +19,6 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('query',
-            default = sys.stdin,
             help = 'input fasta query file')
     parser.add_argument('library',
             help = 'input fasta library file to search against')
@@ -46,9 +44,6 @@ def build_parser(parser):
             default = False,
             action = 'store_true',
             help = 'return full sequences in alignment')
-    parser.add_argument('-O', '--out-raw',
-            type = Opener('w'),
-            help = 'return raw ssearch output')
     parser.add_argument('--decode',
             type = Csv2Dict(index = 'name', value = 'rle',
                 fieldnames = ['name', 'rle']),
@@ -83,17 +78,10 @@ def action(args):
 
     log.debug(' '.join(command))
 
-    pipe = Popen(command, stdout = PIPE, stderr = PIPE, stdin = PIPE)
-    results, errors = pipe.communicate()
-
-    log.error(errors)
-
-    if args.out_raw:
-        args.out_raw.write(results)
+    ssearch = Popen(command, stdout = PIPE, stderr = PIPE)
 
     # parse alignments
-    aligns = StringIO(results)
-    aligns = parse_ssearch36(aligns)
+    aligns = parse_ssearch36(ssearch.stdout)
     aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
     aligns = (a for _,i in aligns for a in i) # flatten groupby iters
@@ -126,5 +114,10 @@ def action(args):
     if args.header:
         writer.writeheader()
 
-    writer.writerows(aligns)
+    for a in aligns:
+        writer.writerow(a)
+
+    err = ssearch.stderr.read().strip()
+    if err:
+        log.error(err)
 

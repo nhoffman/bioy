@@ -57,12 +57,9 @@ def action(args):
 
     log.debug(' '.join(command))
 
-    pipe = Popen(command, stdout = PIPE, stderr = PIPE)
-    results, errors = pipe.communicate()
+    usearch = Popen(command, stdout = PIPE, stderr = PIPE)
 
-    log.error(errors)
-
-    lines = imap(lambda l: l.strip().split('\t'), StringIO(results))
+    lines = imap(lambda l: l.strip().split('\t'), usearch.stdout)
 
     # usearch has strange commenting at the top it's alignment.
     # we just just want the lines seperated by 12 tabs
@@ -77,5 +74,9 @@ def action(args):
     if args.header:
         out.writeheader()
 
-    out.writerows(lines)
+    for l in lines:
+        out.writerow(l)
 
+    err = usearch.stderr.read().strip()
+    if err:
+        log.error(err)
