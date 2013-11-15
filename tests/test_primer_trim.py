@@ -32,8 +32,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
-            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left_ssearch.csv.bz2'),
+            '--right-aligns', self.data('rle_100_right_ssearch.csv.bz2'),
             '--fasta-out', trimmed
         ]
 
@@ -55,8 +55,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
-            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left_ssearch.csv.bz2'),
+            '--right-aligns', self.data('rle_100_right_ssearch.csv.bz2'),
             '--fasta-out', trimmed,
             '--rle-out', trimmed_rle
         ]
@@ -75,8 +75,8 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
-            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left_ssearch.csv.bz2'),
+            '--right-aligns', self.data('rle_100_right_ssearch.csv.bz2'),
             '--fasta-out', trimmed,
             '--rle', self.data('rle_100.csv.bz2'),
             '--rle-out', trimmed_rle
@@ -104,9 +104,9 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left_ssearch.csv.bz2'),
             '--right-zscore', '80',
-            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--right-aligns', self.data('rle_100_right_ssearch.csv.bz2'),
             '--fasta-out', trimmed,
             '--rle', self.data('rle_100.csv.bz2'),
             '--rle-out', trimmed_rle
@@ -131,9 +131,9 @@ class TestPrimerTrimAction(TestSubcommand, TestBase):
 
         args = [
             self.data('rle_100.fasta'),
-            '--left-aligns', self.data('rle_100_left.ssearch.bz2'),
+            '--left-aligns', self.data('rle_100_left_ssearch.csv.bz2'),
             '--right-range', '200,350',
-            '--right-aligns', self.data('rle_100_right.ssearch.bz2'),
+            '--right-aligns', self.data('rle_100_right_ssearch.csv.bz2'),
             '--fasta-out', trimmed,
             '--rle', self.data('rle_100.csv.bz2'),
             '--rle-out', trimmed_rle

@@ -5,11 +5,11 @@ Parse region between primers from fasta file
 import logging
 import sys
 
-from csv import DictWriter
+from csv import DictWriter, DictReader
 from itertools import groupby, ifilter
 from operator import itemgetter
 
-from bioy_pkg.sequtils import parse_ssearch36, fastalite
+from bioy_pkg.sequtils import fastalite
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
@@ -68,9 +68,9 @@ def primer_dict(parsed, side, keep = None, include = False):
     assert include in (True, False)
 
     positions = {
-        ('left', False): lambda hit: hit['q_al_stop'],
+        ('left', False): lambda hit: hit['q_al_stop'].isdigit() and int(hit['q_al_stop']),
         ('left', True): lambda hit: int(hit['q_al_start']) - 1,
-        ('right', True): lambda hit: hit['q_al_stop'],
+        ('right', True): lambda hit: hit['q_al_stop'].isdigit() and int(hit['q_al_stop']),
         ('right', False): lambda hit: int(hit['q_al_start']) - 1
     }
 
@@ -131,7 +131,7 @@ def action(args):
             keep = None
 
         right = primer_dict(
-            parse_ssearch36(args.right_aligns, numeric = bool(args.right_expr)),
+            DictReader(args.right_aligns),
             side = 'right',
             keep = keep,
             include = args.include_primer)
@@ -147,7 +147,7 @@ def action(args):
             keep = None
 
         left = primer_dict(
-            parse_ssearch36(args.left_aligns, numeric = bool(args.left_expr)),
+            DictReader(args.left_aligns),
             side = 'left',
             keep = keep,
             include = args.include_primer)
