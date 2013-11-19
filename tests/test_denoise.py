@@ -4,18 +4,14 @@ Test subcommands.
 
 from os import path
 import logging
-import argparse
+import sys
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.utils import opener
-from bioy_pkg.scripts.main import parse_arguments, main
 from bioy_pkg.subcommands import denoise
-
 
 from __init__ import TestBase, TestSubcommand, datadir
 
 log = logging.getLogger(__name__)
-
 
 class TestDenoise(TestBase, TestSubcommand):
 
@@ -87,8 +83,22 @@ class TestDenoise(TestBase, TestSubcommand):
                    '--weights', path.join(outdir, 'weights.grouped.csv')
                ])
 
-        reference = path.join(datadir, 'F1_3', 'test02_denoised.fasta')
         with open(denoised) as d, open(denoised_grouped) as g:
             ds = list(fastalite(d))
             gs = list(fastalite(g))
             self.assertEqual(set(s.seq for s in ds), set(s.seq for s in gs))
+
+    def test04(self):
+        fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
+        uc = path.join(datadir, 'F1_3', 'trimmed.uc')
+        outdir = self.mkoutdir()
+        fa_out = path.join(outdir, 'denoised.fasta')
+        limit = 100
+        min_size = sys.maxint
+        self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
+                   min_size])
+
+        with open(fa_out) as out:
+            outseqs = list(fastalite(out))
+            self.assertEqual(len(outseqs), 0)
+

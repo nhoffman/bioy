@@ -130,6 +130,7 @@ def action(args):
     seqs = islice(args.fastafile, args.limit)
     seqs = sorted(seqs, key = by_clusters)
     grouped_seqs = groupby(seqs, key = by_clusters)
+
     chunks = ichunker((group for _, group in grouped_seqs),
                       args.rlefile, args.min_clust_size, args.max_clust_size)
 
@@ -143,7 +144,7 @@ def action(args):
 
     # calculate ratios of reads for the smallest group to each of the
     # other groups. outseqs is a list of (weight, consensus, list_of_names)
-    if args.groups:
+    if args.groups and exemplars:
         groups = dict(csv.reader(args.groups))
         group_counts = Counter(groups[name] for name in chain.from_iterable(exemplars.values()))
         most_common = group_counts.most_common()
