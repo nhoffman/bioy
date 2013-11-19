@@ -4,6 +4,7 @@ Test subcommands.
 
 from os import path
 import logging
+import os
 import sys
 
 from bioy_pkg.sequtils import fastalite
@@ -89,14 +90,20 @@ class TestDenoise(TestBase, TestSubcommand):
             self.assertEqual(set(s.seq for s in ds), set(s.seq for s in gs))
 
     def test04(self):
+        """
+        test no clusters passing min_size
+        """
+
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
         uc = path.join(datadir, 'F1_3', 'trimmed.uc')
         outdir = self.mkoutdir()
-        fa_out = path.join(outdir, 'denoised.fasta')
+        fa_out = path.join(outdir, 'denoised_empty.fasta')
         limit = 100
         min_size = sys.maxint
         self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
                    min_size])
+
+        self.assertTrue(os.path.isfile(fa_out))
 
         with open(fa_out) as out:
             outseqs = list(fastalite(out))
