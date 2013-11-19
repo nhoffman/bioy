@@ -92,6 +92,9 @@ class TestDenoise(TestBase, TestSubcommand):
     def test04(self):
         """
         test no clusters passing min_size
+
+        1) test file is actully created
+        2) test there are no seqs in file
         """
 
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
@@ -103,9 +106,11 @@ class TestDenoise(TestBase, TestSubcommand):
         self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
                    min_size])
 
+        # 1)
         self.assertTrue(os.path.isfile(fa_out))
 
         with open(fa_out) as out:
             outseqs = list(fastalite(out))
+            # 2)
             self.assertEqual(len(outseqs), 0)
 
