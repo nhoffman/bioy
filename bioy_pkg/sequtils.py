@@ -591,7 +591,7 @@ def parse_ssearch36(lines, numeric = False):
             if 'al_cons' in hit:
                 hit['al_cons'] += line
             else:
-                hit[prefix + 'seq'] += line
+                hit[prefix + 'seq'] += line.strip()
 
     yield hit
     log.info('%s queries, %s hits' % (query_count, hit_count))
