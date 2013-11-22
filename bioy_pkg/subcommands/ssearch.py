@@ -2,6 +2,8 @@
 Run the ssearch (Smith-Waterman) pairwise aligment tool and output in csv format.
 
 http://computing.bio.cam.ac.uk/local/doc/fasta_guide.pdf
+
+Warning: the parse_ssearch36 function does not work with stdin input at this time
 """
 
 import logging
@@ -118,6 +120,7 @@ def action(args):
         writer.writerow(a)
 
     err = ssearch.stderr.read().strip()
+
     if err:
         log.error(err)
 
