@@ -56,13 +56,11 @@ def build_parser(parser):
     parser.add_argument('-e', '--extra-fields',
             help="extra fields for csv file in form 'name1:val1,name2:val2'")
 
-
-
 def action(args):
-
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
 
     aligns = islice(parse_ssearch36(args.alignments, False), args.limit)
+
     if args.min_zscore:
         aligns = (a for a in aligns if float(a['sw_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
@@ -104,4 +102,5 @@ def action(args):
     if args.header:
         writer.writeheader()
 
-    writer.writerows(aligns)
+    for a in aligns:
+        writer.writerow(a)
