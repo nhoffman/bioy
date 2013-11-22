@@ -551,7 +551,10 @@ def parse_ssearch36(lines, numeric = False):
     keeplines = False
     prefix = None
     hit = defaultdict()
+
     for line in lines:
+        line = line.rstrip('\n')
+
         if line.startswith('>>><<<'):
             # query end
             keeplines = False
@@ -566,7 +569,7 @@ def parse_ssearch36(lines, numeric = False):
                 yield hit
             hit_count += 1
             if line.startswith('>>'):
-                t_description = line[2:].rstrip('\n')
+                t_description = line[2:]
                 t_name = t_description.split()[0]
             prefix = ''
             keeplines = True
@@ -586,9 +589,9 @@ def parse_ssearch36(lines, numeric = False):
                 hit[prefix + k] = cast(v) if numeric else v.strip()
         elif prefix and keeplines:
             if 'al_cons' in hit:
-                hit['al_cons'] += line.strip()
+                hit['al_cons'] += line
             else:
-                hit[prefix + 'seq'] += line.strip()
+                hit[prefix + 'seq'] += line
 
     yield hit
     log.info('%s queries, %s hits' % (query_count, hit_count))

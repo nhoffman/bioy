@@ -24,7 +24,7 @@ class TestDenoise(TestBase, TestSubcommand):
         outdir = self.mkoutdir()
         fa_out = path.join(outdir, 'denoised.fasta')
         limit = 100
-        self.main([fa, uc, '--outfile', fa_out, '--limit', limit])
+        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit])
 
         # cluster mass equals number of input sequences
         with open(fa_out) as f:
@@ -48,7 +48,7 @@ class TestDenoise(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'denoised.fasta')
         limit = 100
         min_size = 2
-        self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
+        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
                    min_size])
 
         reference = path.join(datadir, 'F1_3', 'test02_denoised.fasta')
@@ -68,7 +68,8 @@ class TestDenoise(TestBase, TestSubcommand):
         min_size = 2
 
         denoised = path.join(outdir, 'denoised.fasta')
-        self.main([fa, uc,
+        self.main([fa,
+                   '--clusters', uc,
                    '--outfile', denoised,
                    '--limit', limit,
                    '--min-clust-size', min_size,
@@ -76,7 +77,8 @@ class TestDenoise(TestBase, TestSubcommand):
                ])
 
         denoised_grouped = path.join(outdir, 'denoised.grouped.fasta')
-        self.main([fa, uc,
+        self.main([fa,
+                   '--clusters', uc,
                    '--outfile', denoised_grouped,
                    '--limit', limit,
                    '--min-clust-size', min_size,
@@ -103,7 +105,7 @@ class TestDenoise(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'denoised_empty.fasta')
         limit = 100
         min_size = sys.maxint
-        self.main([fa, uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
+        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
                    min_size])
 
         # 1)
@@ -113,4 +115,21 @@ class TestDenoise(TestBase, TestSubcommand):
             outseqs = list(fastalite(out))
             # 2)
             self.assertEqual(len(outseqs), 0)
+
+    def test05(self):
+        """
+        test if no cluster file all one cluster
+        """
+
+        fa = path.join(datadir, '16S_random.fasta')
+        outdir = self.mkoutdir()
+        fa_out = fa_out = path.join(outdir, 'denoised.fasta')
+        self.main([fa, '--outfile', fa_out])
+
+        reference = path.join(datadir, '16S_random_cons.fasta')
+        with open(fa_out) as out, open(reference) as ref:
+            outseqs = list(fastalite(out))
+            refseqs = list(fastalite(ref))
+            self.assertEqual(len(outseqs), len(refseqs))
+            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
 

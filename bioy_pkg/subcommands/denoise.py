@@ -27,9 +27,13 @@ CLUSTER_NAME_DELIMITER = '_'
 
 def build_parser(parser):
     parser.add_argument('fastafile',
-                        type = lambda f: fastalite(Opener()(f), readfile = False),
+                        metavar = 'FILE',
+                        default = sys.stdin,
+                        nargs = '?',
+                        type = Opener(),
                         help = 'input fasta file containing original clustered reads (default stdin).')
-    parser.add_argument('clusters',
+    parser.add_argument('--clusters',
+                        metavar = 'FILE',
                         type = Opener(),
                         help = 'Clusters file (output of "usearch -uc")')
     parser.add_argument('-r','--rlefile', metavar='FILE',
@@ -118,16 +122,20 @@ def align_and_consensus(chunk):
 
 def action(args):
 
-    _, fileExt, = os.path.basename(args.clusters.name).split('.')
+    if args.clusters:
+        _, fileExt, = os.path.basename(args.clusters.name).split('.')
 
-    if fileExt == 'uc':
-        clusters = parse_uc(args.clusters)[0]
+        if fileExt == 'uc':
+            clusters = parse_uc(args.clusters)[0]
+        else:
+            clusters = {seq: tag for seq,tag in csv.reader(args.clusters)}
+
+        by_clusters = lambda s: clusters.get(s.id, s.id)
     else:
-        clusters = {seq: tag for seq,tag in csv.reader(args.clusters)}
+        by_clusters = lambda _: 'all one cluster'
 
-    by_clusters = lambda s: clusters.get(s.id, s.id)
-
-    seqs = islice(args.fastafile, args.limit)
+    seqs = fastalite(args.fastafile)
+    seqs = islice(seqs, args.limit)
     seqs = sorted(seqs, key = by_clusters)
     grouped_seqs = groupby(seqs, key = by_clusters)
 
