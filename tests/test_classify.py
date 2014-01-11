@@ -275,3 +275,45 @@ class TestClassify(TestBase, TestSubcommand):
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
         self.assertTrue(filecmp.cmp(details_ref, details_out))
 
+    def test07(self):
+        """
+        Test not copy number correction
+        """
+
+        datadir = self.datadir
+
+        blast = path.join(datadir, 'blast.csv')
+        weights = path.join(datadir, 'weights.csv.bz2')
+        mapp = path.join(datadir, 'map.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = path.join(outdir, 'classification.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = path.join(datadir, 'test07', 'classification.csv.bz2')
+        details_ref = path.join(datadir, 'test07', 'details.csv.bz2')
+
+        args = ['--map', mapp,
+                '--weights', weights,
+                '--seq-info', self.info,
+                '--tax', self.tax,
+                '--max-identity', 100,
+                '--min-identity', 90,
+                '--coverage', 90,
+                '--asterisk', 100,
+                '--target-max-group', 3,
+                '--group-def', 'species:4',
+                '--target-rank', 'species',
+                '--details-identity', 90,
+                '--out-detail', details_out,
+                '--out', classify_out,
+                blast]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+

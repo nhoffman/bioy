@@ -7,7 +7,7 @@ import sys
 import logging
 
 from csv import DictReader, DictWriter
-from collections import defaultdict, Counter
+from collections import defaultdict
 from math import ceil
 from operator import itemgetter
 
@@ -360,22 +360,27 @@ def action(args):
         # correction counts
         corrected_counts = dict()
         for k,v in categories.items():
-            if k is not etc and k in assigned_ids:
+            if k is not etc and v:
                 av = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
                 corrected_counts[k] = ceil(read_counts[k] / av)
 
         # finally take the root value for the etc category
-        corrected_counts[etc] = ceil(read_counts[etc] / float(args.copy_numbers['1']))
+        corrected_counts[etc] = ceil(read_counts[etc] / float(args.copy_numbers.get('1', 1)))
 
         # totals for percent calculations later
         total_reads = sum(v for v in read_counts.values())
         total_corrected = sum(v for v in corrected_counts.values())
 
         # Print classifications per specimen sorted by # of reads in reverse (descending) order
-        sort_by_reads = lambda (c,_): read_counts[c]
-        for cat, hits in sorted(categories.items(), key = sort_by_reads, reverse = True):
-            # only output categories with hits
+
+        sort_by_reads_assign = lambda (c,h): corrected_counts.get(c, None)
+
+        for cat, hits in sorted(categories.items(), key = sort_by_reads_assign, reverse = True):
+
+            # continue if their are hits
             if hits:
+
+                # for incrementing assignment id's
                 if cat not in assignments:
                     assignments.append(cat)
 
@@ -429,16 +434,6 @@ def action(args):
                         clusters_and_sizes = [(float(args.weights.get(c, 1.0)), c) for c in clusters]
                         max_size, largest = max(clusters_and_sizes)
                         hits = (h for h in hits if h['qseqid'] == largest)
-
-                        # cluster_sizes = Counter()
-
-                        # for c in clusters:
-                        #     cluster_sizes[c] = int(args.weights.get(c, 1))
-
-                        # most_common = cluster_sizes.most_common(1)[0][0]
-
-                        # hits = (h for h in hits if h['qseqid'] == most_common)
-
 
                     for h in hits:
                         args.out_detail.writerow(dict(
