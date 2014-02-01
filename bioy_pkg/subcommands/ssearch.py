@@ -11,7 +11,7 @@ import sys
 
 from itertools import chain, groupby, imap
 from operator import itemgetter
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, CalledProcessError
 from csv import DictWriter
 
 from bioy_pkg.sequtils import parse_ssearch36, homodecodealignment, from_ascii
@@ -53,6 +53,10 @@ def build_parser(parser):
     parser.add_argument('--fieldnames',
             type = lambda f: f.split(','),
             help = 'comma-delimited list of field names to include in output')
+    parser.add_argument('-z', '--statistical-calculation',
+            default = '1',
+            help = """built in statistical calculation
+                      of E values for sequences. [%(default)s]""")
     parser.add_argument('--min-zscore',
             default = 0,
             type = float,
@@ -65,6 +69,7 @@ def action(args):
     command += ['-m', '10']
     command += ['-3']
     command += ['-n']
+    command += ['-z', args.statistical_calculation]
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
     command += ['-T', str(args.threads)]
@@ -119,8 +124,8 @@ def action(args):
     for a in aligns:
         writer.writerow(a)
 
-    err = ssearch.stderr.read().strip()
+    error = ssearch.stderr.read().strip()
 
-    if err:
-        log.error(err)
+    if ssearch.wait() != 0:
+        raise CalledProcessError(ssearch.returncode, error)
 
