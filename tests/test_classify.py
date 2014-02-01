@@ -21,9 +21,9 @@ class TestClassify(TestBase, TestSubcommand):
 
     datadir = path.join(datadir, 'classify')
 
-    tax = '/home/molmicro/common/uwdb/20130927/output/uwdb.taxonomy.csv'
-    info = '/home/molmicro/common/uwdb/20130927/output/uwdb.seq_info.csv'
-    copy_numbers = '/home/molmicro/common/rrndb/output/rrnDB_16S_copy_num.csv'
+    tax = path.join(datadir, 'taxonomy.csv.bz2')
+    info = path.join(datadir, 'seq_info.csv.bz2')
+    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv')
 
     def test01(self):
         """
