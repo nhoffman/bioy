@@ -8,5 +8,5 @@ def parse_args(parser):
             type = int,
             help = """Number of threads (CPUs). Can also specify
                       with environment variable THREADS_ALLOC.
-                      (Default = %(default)s)""")
+                      [%(default)s]""")
     return parser
