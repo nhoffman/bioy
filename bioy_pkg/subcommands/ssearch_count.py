@@ -128,17 +128,16 @@ def action(args):
             bases[(pos, idd, rank)][base] += 1
 
     fieldnames = ['name'] if tax_info else []
-    fieldnames = ['position', 'A', 'T', 'G', 'C', 'N']
-    fieldnames += ['expected', 'alignments', 'total']
+    fieldnames += ['position', 'A', 'T', 'G', 'C', 'N',
+                   'expected', 'alignments', 'total']
     fieldnames += ['rank', 'id'] if tax_info else []
 
     out = DictWriter(args.out, fieldnames = fieldnames, extrasaction='ignore')
     out.writeheader()
 
-    by_position = OrderedDict(sorted(bases.items(), key = lambda b: b[0][0]))
-    by_tax = OrderedDict(sorted(by_position.items(), key = lambda b: b[0][1]))
+    organized_bases = OrderedDict(sorted(bases.items(), key = lambda b: (b[0][1], b[0][0])))
 
-    for (pos, idd, rank), counter in by_tax.items():
+    for (pos, idd, rank), counter in organized_bases.items():
         naligns = sum([v for v in counter.values()])
         out.writerow({
             'name':tax[idd]['tax_name'] if tax_info else '',
