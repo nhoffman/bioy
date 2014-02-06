@@ -35,13 +35,13 @@ def build_parser(parser):
             help = 'no header')
     parser.add_argument('--all-alignments',
             action = 'store_true',
-            help = 'maximum number of alignments to keep default = 1')
+            help = 'maximum number of alignments to keep [1]')
     parser.add_argument('-g', '--gap-extension-penalty',
             default = '4',
-            help = 'gap extension penalty default = %(default)s')
+            help = 'gap extension penalty [%(default)s]')
     parser.add_argument('-f', '--gap-open-penalty',
             default = '12',
-            help = 'gap open penalty default = %(default)s')
+            help = 'gap open penalty [%(default)s]')
     parser.add_argument('-a', '--full-sequences',
             default = False,
             action = 'store_true',
@@ -61,7 +61,7 @@ def build_parser(parser):
             default = 0,
             type = float,
             metavar = 'X',
-            help = 'Exclude alignments with z-score < X')
+            help = 'Exclude alignments with z-score < X [%(default)s]')
 
 def action(args):
     # setup ssearch command and communicate
@@ -83,7 +83,7 @@ def action(args):
 
     command += [args.query, args.library]
 
-    log.debug(' '.join(command))
+    log.info(' '.join(command))
 
     ssearch = Popen(command, stdout = PIPE, stderr = PIPE)
 
