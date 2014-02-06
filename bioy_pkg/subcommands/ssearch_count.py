@@ -69,10 +69,11 @@ def action(args):
         rank = idd = None
 
         if tax_info:
-            if tax_info[a['q_name']][args.rank]:
+            idd = tax_info[a['q_name']][args.rank]
+            if idd:
                 rank = args.rank
-
-            idd = tax_info[a['q_name']][rank]
+            else:
+                idd = tax_info[a['q_name']]['species']
 
         return idd, rank
 
