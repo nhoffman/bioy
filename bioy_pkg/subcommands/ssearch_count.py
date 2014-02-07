@@ -106,7 +106,7 @@ def action(args):
     total_by_idd = {idd: sum(1 for a in al) for (idd,_), al in group_by}
 
     # zscore filter
-    aligns = [a for a in aligns if a['sw_zscore'] >= args.min_zscore]
+    aligns = [a for a in aligns if float(a['sw_zscore']) >= args.min_zscore]
 
     log.info('dropping {} alignments under zscore threshold'.format(total - len(aligns)))
 
