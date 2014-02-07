@@ -593,7 +593,9 @@ def parse_ssearch36(lines, numeric = False):
             else:
                 hit[prefix + 'seq'] += line.strip()
 
-    yield hit
+    if hit:
+        yield hit
+
     log.info('%s queries, %s hits' % (query_count, hit_count))
 
 def wrap(text, width=60):
