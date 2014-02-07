@@ -112,20 +112,26 @@ def action(args):
         # peek at first row fieldnames
         top = next(aligns, {})
         fieldnames = top.keys()
-        aligns = chain([top], aligns)
+        if top:
+            aligns = chain([top], aligns)
 
-    writer = DictWriter(args.out,
-            extrasaction = 'ignore',
-            fieldnames = fieldnames)
+    if fieldnames:
+        writer = DictWriter(args.out,
+                extrasaction = 'ignore',
+                fieldnames = fieldnames)
 
-    if args.header:
-        writer.writeheader()
+        if args.header:
+            writer.writeheader()
 
-    for a in aligns:
-        writer.writerow(a)
+        for a in aligns:
+            writer.writerow(a)
 
-    error = ssearch.stderr.read().strip()
+    error = set(e.strip() for e in ssearch.stderr)
+    error = ', '.join(error)
 
     if ssearch.wait() != 0:
         raise CalledProcessError(ssearch.returncode, error)
+
+    if error:
+        log.error(error)
 
