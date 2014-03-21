@@ -12,7 +12,7 @@ from math import ceil
 from operator import itemgetter
 
 from bioy_pkg import sequtils
-from bioy_pkg.utils import Opener, Csv2Dict, groupbyl
+from bioy_pkg.utils import Opener, opener, Csv2Dict, groupbyl
 
 log = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ def build_parser(parser):
             help = 'limit out_details to only larget cluster per assignment')
     parser.add_argument('--exclude-by-taxid',
             metavar = 'CSV',
-            type = Csv2Dict('tax_id'),
+            type = lambda f: set(e for e in DictReader(opener(f), fieldnames ='tax_id')),
             default = {},
             help = 'column: tax_id')
     parser.add_argument('--group-def',
@@ -74,7 +74,7 @@ def build_parser(parser):
                       pct_reads, corrected, pct_corrected, target_rank, hi, low, tax_ids""")
     parser.add_argument('-m', '--map',
             metavar = 'CSV',
-            type = Csv2Dict('name', 'specimen', fieldnames = ['name', 'specimen']),
+            type = Opener(),
             default = {},
             help = 'columns: name, specimen')
     parser.add_argument('--max-ambiguous',
@@ -100,7 +100,7 @@ def build_parser(parser):
     parser.add_argument('-s', '--seq-info',
             required = True,
             metavar = 'CSV',
-            type = Csv2Dict('seqname'),
+            type = Opener(),
             help = 'seq info file(s) to match sequence ids to taxids [%(default)s]')
     parser.add_argument('-t', '--taxonomy',
             required = True,
@@ -108,7 +108,7 @@ def build_parser(parser):
             type = Csv2Dict('tax_id'),
             help = 'tax table of taxids and species names [%(default)s]')
     parser.add_argument('-O', '--out-detail',
-            type  = lambda f: DictWriter(Opener('w')(f), extrasaction = 'ignore', fieldnames = [
+            type  = lambda f: DictWriter(opener(f, 'w'), extrasaction = 'ignore', fieldnames = [
                 'specimen', 'assignment', 'assignment_id', 'qseqid', 'sseqid', 'pident', 'coverage', 'ambig_count',
                 'accession', 'tax_id', 'tax_name', 'target_rank', 'rank', 'hi', 'low'
                 ]),
@@ -186,26 +186,59 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
     return condensed
 
-def blast_hit(hit, args):
-    return hit['sseqid'] and \
-           hit[args.target_rank] and \
-           hit['coverage'] >= args.coverage and \
-           float(args.weights.get(hit['qseqid'], 1)) >= args.min_cluster_size and \
-           hit[args.target_rank] not in args.exclude_by_taxid and \
-           hit['qseqid'] != hit['sseqid'] and \
-           int(hit['ambig_count']) <= args.max_ambiguous
-
 def action(args):
+    ### format format blast data and add additional available information
+    blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
+    blast_results = list(blast_results)
+
+    sseqids = set(s['sseqid'] for s in blast_results)
+    qseqids = set(s['qseqid'] for s in blast_results)
+
+    # load seq_info and map file
+    mapfile = DictReader(args.map, fieldnames = ['name', 'specimen'])
+    mapfile = {m['name']:m['specimen'] for m in mapfile if m['name'] in qseqids}
+
+    seq_info = DictReader(args.seq_info)
+    seq_info = {s['seqname']:s for s in seq_info if s['seqname'] in sseqids}
+
+    # pident
+    def pident(b):
+        return dict(b, pident = float(b['pident'])) if b['sseqid'] else b
+
+    blast_results = (pident(b) for b in blast_results)
+
+    # coverage
+    def cov(b):
+        if b['sseqid']:
+            c = coverage(b['qstart'], b['qend'], b['qlen'])
+            return dict(b, coverage = c)
+        else:
+            return b
+
+    blast_results = (cov(b) for b in blast_results)
+
+    # seq info
+    def info(b):
+        return dict(seq_info[b['sseqid']], **b) if b['sseqid'] else b
+
+    blast_results = (info(b) for b in blast_results)
+
+    # tax info
+    def tax_info(b):
+        return dict(args.taxonomy[b['tax_id']], **b) if b['sseqid'] else b
+
+    blast_results = (tax_info(b) for b in blast_results)
+
     ### output file headers
     fieldnames = ['specimen', 'max_percent', 'min_percent', 'max_coverage',
                   'min_coverage', 'assignment_id', 'assignment']
 
     if args.weights:
-        args.weights = DictReader(args.weights, fieldnames = ['name', 'weight'])
-        args.weights = {d['name']:d['weight'] for d in args.weights}
+        weights = DictReader(args.weights, fieldnames = ['name', 'weight'])
+        weights = {d['name']:d['weight'] for d in weights if d['name'] in qseqids}
         fieldnames += ['clusters', 'reads', 'pct_reads']
     else:
-        args.weights = {}
+        weights = {}
 
     if args.copy_numbers:
         args.copy_numbers = DictReader(args.copy_numbers)
@@ -226,6 +259,15 @@ def action(args):
 
     if args.out_detail:
         args.out_detail.writeheader()
+
+    def blast_hit(hit, args):
+        return hit['sseqid'] and \
+               hit[args.target_rank] and \
+               hit['coverage'] >= args.coverage and \
+               float(weights.get(hit['qseqid'], 1)) >= args.min_cluster_size and \
+               hit[args.target_rank] not in args.exclude_by_taxid and \
+               hit['qseqid'] != hit['sseqid'] and \
+               int(hit['ambig_count']) <= args.max_ambiguous
 
     ### Rows
     etc = '[no blast result]' # This row will hold all unmatched
@@ -253,40 +295,9 @@ def action(args):
     # get reverse order ranks for copy number corrections
     ranks_rev = list(reversed(sequtils.RANKS))
 
-    ### format format blast data and add additional available information
-    blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
-
-    # pident
-    def pident(b):
-        return dict(b, pident = float(b['pident'])) if b['sseqid'] else b
-
-    blast_results = (pident(b) for b in blast_results)
-
-    # coverage
-    def cov(b):
-        if b['sseqid']:
-            c = coverage(b['qstart'], b['qend'], b['qlen'])
-            return dict(b, coverage = c)
-        else:
-            return b
-
-    blast_results = (cov(b) for b in blast_results)
-
-    # seq info
-    def seq_info(b):
-        return dict(args.seq_info[b['sseqid']], **b) if b['sseqid'] else b
-
-    blast_results = (seq_info(b) for b in blast_results)
-
-    # tax info
-    def tax_info(b):
-        return dict(args.taxonomy[b['tax_id']], **b) if b['sseqid'] else b
-
-    blast_results = (tax_info(b) for b in blast_results)
-
     # group by specimen
     if args.map:
-        specimen_grouper = lambda s: args.map[s['qseqid']]
+        specimen_grouper = lambda s: mapfile[s['qseqid']]
     elif args.all_one_group:
         specimen_grouper = lambda s: args.group_label
     else:
@@ -340,7 +351,7 @@ def action(args):
         read_counts = dict()
         for k,v in categories.items():
             qseqids = set(map(itemgetter('qseqid'), v))
-            weight = sum(float(args.weights.get(q, 1)) for q in qseqids)
+            weight = sum(float(weights.get(q, 1)) for q in qseqids)
             read_counts[k] = weight
 
         taxids = set()
@@ -431,7 +442,7 @@ def action(args):
                 if args.out_detail:
                     if not args.details_full:
                         # choose the single largest cluster
-                        clusters_and_sizes = [(float(args.weights.get(c, 1.0)), c) for c in clusters]
+                        clusters_and_sizes = [(float(weights.get(c, 1.0)), c) for c in clusters]
                         max_size, largest = max(clusters_and_sizes)
                         hits = (h for h in hits if h['qseqid'] == largest)
 
