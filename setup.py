@@ -14,5 +14,6 @@ setup(author = 'Noah Hoffman',
       packages = find_packages(),
       scripts = ['bioy'],
       version = version,
-      url = 'https://bitbucket.org/uwlabmed/bioy/')
-
+      url = 'https://bitbucket.org/uwlabmed/bioy/',
+      requires = ['python (>= 2.7.5)'],
+      install_requires = ['biopython', 'scipy'])
