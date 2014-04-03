@@ -7,32 +7,25 @@ http://computing.bio.cam.ac.uk/local/doc/fasta_guide.pdf
 import logging
 import sys
 
-from itertools import chain, groupby, imap, islice
+from itertools import chain, groupby, imap
 from operator import itemgetter
-from cStringIO import StringIO
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, CalledProcessError
 from csv import DictWriter
 
-from bioy_pkg.sequtils import fastalite, parse_ssearch36, homodecodealignment, from_ascii
+from bioy_pkg.sequtils import parse_ssearch36, homodecodealignment, from_ascii
 from bioy_pkg.utils import Opener, Csv2Dict
 
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('query',
-            default = sys.stdin,
-            type = Opener(),
             help = 'input fasta query file')
-    parser.add_argument('-l', '--library',
-            required = True,
+    parser.add_argument('library',
             help = 'input fasta library file to search against')
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
             help = 'tabulated ssearch results')
-    parser.add_argument('--limit',
-            type = int,
-            help = 'maximum number of query sequences to read from the alignment')
     parser.add_argument('--no-header',
             dest = 'header',
             action = 'store_false',
@@ -75,7 +68,7 @@ def action(args):
     command += ['-n']
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
-    command += ['-T', args.threads]
+    command += ['-T', str(args.threads)]
 
     if args.full_sequences:
         command += ['-a']
@@ -84,25 +77,14 @@ def action(args):
         command += ['-b', '1']
         command += ['-d', '1']
 
-    command += ['@', args.library]
+    command += [args.query, args.library]
 
-    pipe = Popen(command, stdout = PIPE, stderr = PIPE, stdin = PIPE)
+    log.info(' '.join(command))
 
-    fasta = fastalite(args.query, readfile = False)
-    fasta = islice(fasta, args.limit)
-    fasta = ('>{}\n{}\n'.format(f.description, f.seq) for f in fasta)
-    fasta = ''.join(fasta)
-
-    results, errors = pipe.communicate(fasta)
-
-    log.error(errors)
-
-    if args.out_raw:
-        args.out_raw.write(results)
+    pipe = Popen(command, stdout = PIPE, stderr = PIPE)
 
     # parse alignments
-    aligns = StringIO(results)
-    aligns = parse_ssearch36(aligns)
+    aligns = parse_ssearch36(pipe.stdout)
     aligns = (a for a in aligns if float(a['fa_zscore']) >= args.min_zscore)
     aligns = groupby(aligns, key = itemgetter('q_name'))
     aligns = (a for _,i in aligns for a in i) # flatten groupby iters
@@ -124,14 +106,25 @@ def action(args):
         # peek at first row fieldnames
         top = next(aligns, {})
         fieldnames = top.keys()
-        aligns = chain([top], aligns)
+        if top:
+            aligns = chain([top], aligns)
 
-    writer = DictWriter(args.out,
-            extrasaction = 'ignore',
-            fieldnames = fieldnames)
+    if fieldnames:
+        writer = DictWriter(args.out,
+                extrasaction = 'ignore',
+                fieldnames = fieldnames)
 
-    if args.header:
-        writer.writeheader()
+        if args.header:
+            writer.writeheader()
 
-    writer.writerows(aligns)
+        for a in aligns:
+            writer.writerow(a)
+
+    error = set(e.strip() for e in pipe.stderr)
+    error = ', '.join(error)
+
+    if pipe.wait() != 0:
+        raise CalledProcessError(pipe.returncode, error)
+    if error:
+        log.error(error)
 
