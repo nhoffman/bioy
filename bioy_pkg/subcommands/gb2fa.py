@@ -9,7 +9,7 @@ from bioy_pkg.utils import Opener
 from Bio import SeqIO
 from csv import DictWriter
 
-from itertools import ifilter, islice
+from itertools import islice
 
 from bioy_pkg.sequtils import UNCLASSIFIED_REGEX,tax_of_genbank, count_ambiguous, is_type
 
@@ -70,10 +70,11 @@ def action(args):
     records = islice(SeqIO.parse(args.infile, 'genbank'), args.limit)
 
     if args.type_strains:
-        records = ifilter(lambda r: is_type(r), records)
+        records = (r for r in records if is_type(r))
 
     if args.filter:
-        records = ifilter(lambda r: not UNCLASSIFIED_REGEX.search(r.description), records)
+        fltr = lambda r: not UNCLASSIFIED_REGEX.search(r.description)
+        records = (r for r in records if fltr(r))
 
     info = []
 
@@ -125,7 +126,8 @@ def action(args):
                 log.debug(r)
                 log.debug(f)
             else:
-                src = next(ifilter(lambda f: f.type == 'source', r.features), None)
+                type_source = lambda f: f.type == 'source'
+                src = next((f for f in r.features if type_source(f)), None)
                 if src and ((args.minus and src.location.strand == 1) or src.location.strand == -1):
                     seq = seq.reverse_complement()
 
