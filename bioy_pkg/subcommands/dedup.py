@@ -8,31 +8,36 @@ of identical sequences.
 import logging
 import sys
 import csv
-from itertools import groupby, chain, imap
-from operator import itemgetter, attrgetter
+from operator import itemgetter
 
 from bioy_pkg.deduplicate import dedup
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.utils import Csv2Dict, opener, Opener
+from bioy_pkg.utils import Opener, groupbyl
 
 log = logging.getLogger(__name__)
 
-
 def build_parser(parser):
     parser.add_argument('sequences',
-                        type = lambda f: fastalite(opener(f), readfile = True),
+                        type = Opener(),
                         help = 'input fasta file')
-    parser.add_argument('-i', '--seq-info', metavar='FILE',
+    parser.add_argument('-i', '--split-info', metavar='FILE',
                         type = Opener('rU'),
                         help = """csv file containing column "seqname" plus
-                      another column for grouping sequences prior to deduplication""")
+                                  another column for grouping sequences prior to deduplication""")
     parser.add_argument('--primary-group', metavar='COLUMN_NAME',
-                        help = 'column in seq_info to use for grouping [default %(default)s]',
+                        help = 'column in split_info to use for grouping [default %(default)s]',
                         default = 'species')
     parser.add_argument('--secondary-group', metavar='COLUMN_NAME',
-                        help = """column in seq_info to use for grouping
-                      if primary_group is undefined for a given row [default %(default)s]""",
+                        help = """column in split_info to use for grouping
+                                  if primary_group is undefined
+                                  for a given row [default %(default)s]""",
                         default = 'tax_id')
+    parser.add_argument('--out-map', metavar='FILE',
+                        type = Opener('w'),
+                        help = 'map file of sequences from (kept_seq_id,orig_seq_i)')
+    parser.add_argument('--out-weights', metavar='FILE',
+                        help = 'weight file for each kept sequence',
+                        type = Opener('w'))
     parser.add_argument('-O', '--out-info', metavar='FILE',
                         type = Opener('w'),
                         help = 'deduplicate seq info file')
@@ -41,41 +46,68 @@ def build_parser(parser):
                         default = sys.stdout,
                         help = 'deduplicated sequences in fasta format')
 
-
-def deduper(tups):
-    grouper = itemgetter(0)
-    tups = sorted(tups, key=grouper)
-    for groupname, group in groupby(tups, grouper):
-        group = list(group)
-        deduped = dedup([s.seq for _, s, _ in group]).keys()
-        yield [group[i] for i in deduped]
-
-
 def action(args):
+    seqs = fastalite(args.sequences)
 
-    if args.seq_info:
+    if args.split_info:
         primary, secondary = args.primary_group, args.secondary_group
-        info_reader = csv.DictReader(args.seq_info)
+        info_reader = csv.DictReader(args.split_info)
         info = {r['seqname']: r for r in info_reader}
 
-        def decorate(seq):
-            d = info[seq.id]
-            group = d[primary] or d[secondary] if secondary else d[primary]
-            return (group, seq, d)
+    # group tag sequences if info_file exists
+    def group_tag(seq):
+        if args.split_info:
+            i = info[seq.id]
+            group = i[primary] or i[secondary] if secondary else i[primary]
+            return dict(group=group, seq=seq)
+        else:
+            return dict(group=None, seq=seq)
 
-        packed = imap(decorate, args.sequences)
-        deduped = chain.from_iterable(deduper(packed))
+    seqs = (group_tag(s) for s in seqs)
 
-        if args.out_info:
-            info_out = csv.DictWriter(args.out_info, fieldnames=info_reader.fieldnames)
-            info_out.writeheader()
+    # group the sequences by tags
+    seqs = groupbyl(seqs, key=itemgetter('group'))
 
-        for _, seq, seq_info in deduped:
-            args.out.write('>{}\n{}\n'.format(seq.description, seq.seq))
-            if args.out_info:
-                info_out.writerow(seq_info)
-    else:
-        seqs = list(args.sequences)
-        deduped = dedup([s.seq for s in seqs]).keys()
-        args.out.writelines('>{}\n{}\n'.format(
-            seqs[i].description, seqs[i].seq) for i in deduped)
+    # and now drop the group tags
+    seqs = (map(itemgetter('seq'), g) for _,g in seqs)
+
+    # deduplicate each group
+    def deduper(seqs):
+        """
+        Return a list of tuples: (kept_seq, [orig_seqs])
+        """
+
+        deduped = dedup([s.seq for s in seqs]).items() # dedup need just the sequences
+        deduped = [(seqs[kept], [seqs[o] for o in orig]) for kept,orig in deduped]
+        return deduped
+
+    seqs = (deduper(s) for s in seqs)
+
+    # flatten deduped seqs
+    seqs = (dp for group in seqs for dp in group)
+
+    # output results
+    if args.out_info and args.split_info:
+        info_out = csv.DictWriter(args.out_info, fieldnames=info_reader.fieldnames)
+        info_out.writeheader()
+
+    if args.out_map:
+        map_out = csv.DictWriter(args.out_map, fieldnames = ['kept', 'orig'])
+
+    if args.out_weights:
+        weights_out = csv.DictWriter(args.out_weights, fieldnames = ['kept', 'kept', 'weight'])
+
+    for seq,group in seqs:
+        args.out.write('>{}\n{}\n'.format(seq.description, seq.seq))
+
+        if args.out_info and args.split_info:
+            info_out.writerow(info[seq.id])
+
+        if args.out_map:
+            for g in group:
+                map_out.writerow(dict(kept=seq.id, orig=g.id))
+
+        # add one to include the kept sequence
+        if args.out_weights:
+            weights_out.writerow(dict(kept=seq.id, weight=len(group) + 1))
+
