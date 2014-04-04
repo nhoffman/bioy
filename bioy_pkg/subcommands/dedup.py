@@ -104,6 +104,7 @@ def action(args):
             info_out.writerow(info[seq.id])
 
         if args.out_map:
+            map_out.writerow(dict(kept=seq.id, orig=seq.id))
             for g in group:
                 map_out.writerow(dict(kept=seq.id, orig=g.id))
 
