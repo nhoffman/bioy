@@ -71,6 +71,9 @@ def build_parser(parser):
                   only the top entry per query.""")
     parser.add_argument('-e', '--extra-fields',
             help="extra fields for csv file in form 'name1:val1,name2:val2'")
+    parser.add_argument('-d', '--with-diff', action='store_true', default=False,
+            help="""add fields 'q_diff' and 't_diff' containing
+            aligned substrings with mismatches in lowercase""")
 
 def action(args):
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
@@ -99,6 +102,9 @@ def action(args):
         pprint.pprint(aligns.next())
         sys.exit()
 
+    if args.with_diff:
+        aligns = imap(add_diff, aligns)
+
     if args.fieldnames:
         fieldnames = args.fieldnames
     else:
@@ -110,10 +116,6 @@ def action(args):
     if extras:
         fieldnames += extras.keys()
         aligns = (dict(d, **extras) for d in aligns)
-
-    # TODO: inefficient to create new dicts
-    # TODO: make this conditional on a command line argument
-    aligns = (add_diff(d) for d in aligns)
 
     writer = csv.DictWriter(args.out,
             extrasaction = 'ignore',
