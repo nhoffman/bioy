@@ -15,6 +15,22 @@ from bioy_pkg.utils import Opener, Csv2Dict, parse_extras
 
 log = logging.getLogger(__name__)
 
+def add_diff(align):
+    """Extract the aligned regions of q_seq and t_seq. Non-identical
+    characters are in lower case.
+
+    """
+
+    qstart, qstop, tstart, tstop = [int(align[k]) for k in [
+        'q_al_start', 'q_al_stop', 't_al_start', 't_al_stop']]
+
+    qstr = align['q_seq'].strip('-')[qstart - 1:qstop]
+    tstr = align['t_seq'].strip('-')[tstart - 1:tstop]
+    qchars, tchars = zip(*[(q, t) if q == t else (q.lower(), t.lower())
+                           for q, t in zip(qstr, tstr)])
+
+    return dict(align, q_diff=''.join(qchars), t_diff=''.join(tchars))
+
 def build_parser(parser):
     parser.add_argument('alignments',
         default = sys.stdin,
@@ -94,6 +110,10 @@ def action(args):
     if extras:
         fieldnames += extras.keys()
         aligns = (dict(d, **extras) for d in aligns)
+
+    # TODO: inefficient to create new dicts
+    # TODO: make this conditional on a command line argument
+    aligns = (add_diff(d) for d in aligns)
 
     writer = csv.DictWriter(args.out,
             extrasaction = 'ignore',
