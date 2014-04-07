@@ -7,12 +7,12 @@ import logging
 import sys
 import csv
 
-from collections import OrderedDict
-from itertools import chain
+from collections import Counter
+from itertools import groupby
 from operator import itemgetter
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.utils import Opener, groupbyl
+from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
@@ -47,27 +47,10 @@ def build_parser(parser):
                         default = sys.stdout,
                         help = 'deduplicated sequences in fasta format')
 
-# deduplicate each group
-def deduper(seqs):
-    """
-    Return a list of tuples: (kept_seq, [orig_seqs])
-    """
-
-    deduped = OrderedDict()
-
-    for s in seqs:
-        clean = s.seq.replace('\n', '').upper()
-        checksum = hashlib.sha1(clean).hexdigest()
-        if checksum in deduped:
-            deduped[checksum].append(s)
-        else:
-            deduped[checksum] = [s]
-
-    return [(s.pop(0), s) for s in deduped.values()]
-
 def action(args):
     seqs = fastalite(args.sequences)
 
+    # sort seqs by group information
     if args.split_info:
         primary, secondary = args.primary_group, args.secondary_group
         info_reader = csv.DictReader(args.split_info)
@@ -82,16 +65,15 @@ def action(args):
         seqs = (group_tag(s) for s in seqs)
 
         # group the sequences by tags
-        seqs = groupbyl(seqs, key = itemgetter('group'))
+        seqs = sorted(seqs, key = itemgetter('group'))
+        seqs = groupby(seqs, key = itemgetter('group'))
 
-        # and now drop the group tags
-        seqs = (map(itemgetter('seq'), g) for _,g in seqs)
-
-        seqs = chain.from_iterable(deduper(s) for s in seqs)
+        # just need the seqs
+        seqs = ((pair['seq'] for pair in group) for _,group in seqs)
     else:
-        seqs = deduper(seqs)
+        seqs = (seqs,)
 
-    # output results
+    # set up output files
     if args.out_info and args.split_info:
         info_out = csv.DictWriter(args.out_info, fieldnames=info_reader.fieldnames)
         info_out.writeheader()
@@ -102,18 +84,28 @@ def action(args):
     if args.out_weights:
         weights_out = csv.DictWriter(args.out_weights, fieldnames = ['kept', 'kept', 'weight'])
 
-    for kept,origs in seqs:
-        args.out.write('>{}\n{}\n'.format(kept.description, kept.seq))
+    # dedup seqs by groups
+    for group in seqs:
+        weights = Counter()
+        deduped = {}
 
-        if args.out_info and args.split_info:
-            info_out.writerow(info[kept.id])
+        for orig in group:
+            # checksums are faster to manage
+            clean = orig.seq.replace('\n', '').upper()
+            checksum = hashlib.sha1(clean).hexdigest()
 
-        if args.out_map:
-            map_out.writerow(dict(kept=kept.id, orig=kept.id))
-            for o in origs:
-                map_out.writerow(dict(kept=kept.id, orig=o.id))
+            if checksum in deduped:
+                kept = deduped[checksum]
+            else:
+                kept = deduped[checksum] = orig
+                args.out.write('>{}\n{}\n'.format(kept.description, kept.seq))
 
-        # add one to include the kept sequence
-        if args.out_weights:
-            weights_out.writerow(dict(kept=kept.id, weight=len(origs) + 1))
+            if args.out_weights:
+                weights[kept.id] += 1
+
+            if args.out_map:
+                map_out.writerow(dict(kept=kept.id, orig=orig.id))
+
+        for kept_id,count in weights.items():
+            weights_out.writerow(dict(kept=kept_id, weight=count))
 
