@@ -100,6 +100,9 @@ def action(args):
                 kept = deduped[checksum] = orig
                 args.out.write('>{}\n{}\n'.format(kept.description, kept.seq))
 
+                if args.out_info and args.split_info:
+                    info_out.writerow(info[kept.id])
+
             if args.out_weights:
                 weights[kept.id] += 1
 
@@ -108,4 +111,5 @@ def action(args):
 
         for kept_id,count in weights.items():
             weights_out.writerow(dict(kept=kept_id, weight=count))
+
 
