@@ -10,10 +10,18 @@ import csv
 from itertools import islice, chain, groupby, imap
 from operator import itemgetter
 
-from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
+from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii, CAPUI
 from bioy_pkg.utils import Opener, Csv2Dict, parse_extras
 
 log = logging.getLogger(__name__)
+
+
+def is_similar(a, b):
+    try:
+        return True if a == b else bool(CAPUI[a] & CAPUI[b])
+    except KeyError:
+        return False
+
 
 def add_diff(align):
     """Extract the aligned regions of q_seq and t_seq. Non-identical
@@ -26,10 +34,11 @@ def add_diff(align):
 
     qstr = align['q_seq'].strip('-')[qstart - 1:qstop]
     tstr = align['t_seq'].strip('-')[tstart - 1:tstop]
-    qchars, tchars = zip(*[(q, t) if q == t else (q.lower(), t.lower())
+    qchars, tchars = zip(*[('.', t) if is_similar(q, t) else (q.lower(), t.lower())
                            for q, t in zip(qstr, tstr)])
 
     return dict(align, q_diff=''.join(qchars), t_diff=''.join(tchars))
+
 
 def build_parser(parser):
     parser.add_argument('alignments',
