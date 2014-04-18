@@ -49,7 +49,7 @@ def build_parser(parser):
             default = 90)
     parser.add_argument('--details-full',
             action = 'store_true',
-            help = 'limit out_details to only larget cluster per assignment')
+            help = 'do not limit out_details to only larget cluster per assignment')
     parser.add_argument('--exclude-by-taxid',
             metavar = 'CSV',
             type = lambda f: set(e for e in DictReader(opener(f), fieldnames ='tax_id')),
