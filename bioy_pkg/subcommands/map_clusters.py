@@ -37,23 +37,29 @@ def build_parser(parser):
     parser.add_argument('--min-clust-size', type = int,
             default = 1, help = 'default %(default)s')
 
+def get_mapping(rows):
+    """
+    target_label (the centroid name) is '*' in rows with type of 'C'
+    and 'S'; set the centroid name to query_label (the centroid
+    itself) for 'S' rows and drop 'C' rows. This retains clusters of
+    size 1 and has the effect of adding the centroid name to the
+    list of reads. Returns iterator of (centroid_name, read_name).
+    """
+
+    for row in rows:
+        if row['type'] == 'C':
+            continue
+        elif row['type'] == 'S':
+            yield (row['query_label'], row['query_label'])
+        else:
+            yield (row['target_label'], row['query_label'])
+
+
 def action(args):
 
     rows = csv.DictReader(args.clusters, delimiter='\t', fieldnames=UCLUST_HEADERS)
-
-    # target_label (the centroid name) is '*' in rows with type of 'C'
-    # and 'S'; set the centroid name to query_label (the centroid
-    # itself) for 'S' rows and drop 'C' rows. This retains clusters of
-    # size 1 and has the effect of adding the centroid name to the
-    # list of reads.
-    rows = ifilterfalse(lambda row: row['type'] == 'C', rows)
-    rows = (dict(row, target_label=row['query_label'])
-            if row['type'] == 'S' else row
-            for row in rows)
-
-    grouped = groupbyl(rows, key=itemgetter('target_label'))  # group by centroid
-    clusters = {c: [r['query_label'] for r in rows]
-                for c, rows in grouped if len(rows) >= args.min_clust_size}
+    grouped = groupbyl(get_mapping(rows), key=itemgetter(0))  # group by centroid
+    clusters = {c: rows for c, rows in grouped if len(rows) >= args.min_clust_size}
 
     # filter non centroid seqs
     centroids = (c for c in args.fastafile if c.id in clusters)
