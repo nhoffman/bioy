@@ -1,7 +1,8 @@
-"""
-Create a readmap and clustermap and/or weights file from a 'usearch -uc' cluster file
+"""Create a readmap and clustermap and/or weights file from a
+'usearch -uc' cluster file
 
 Input is a usearch6 .uc file
+
 """
 
 import logging
@@ -21,26 +22,19 @@ def build_parser(parser):
     parser.add_argument('fastafile',
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file containing original clustered reads')
-    parser.add_argument('clusters',
-            type = Opener(),
+    parser.add_argument('clusters', type = Opener(),
             help = 'Clusters file (output of "usearch -uc")')
-    parser.add_argument('--specimen',
-            help = 'sample name for mapfile')
-    parser.add_argument('-o','--out',
-            type = Opener('w'),
-            default = sys.stdout,
-            help = 'Output fasta mapping reads to centroid (readname,centroidname)')
-    parser.add_argument('--readmap',
-            type = lambda f: csv.writer(Opener('w')(f)),
-            help = 'Output file with columns (readname,samplename)')
-    parser.add_argument('--clustermap',
-            type = lambda f: csv.writer(Opener('w')(f)),
+    parser.add_argument('-o','--out', type = Opener('w'), default = sys.stdout,
+            help = 'Output fasta containing centroids')
+    parser.add_argument('--readmap', type = Opener('w'),
+            help = 'Output file with columns (readname,centroidname)')
+    parser.add_argument('--clustermap', type = Opener('w'),
             help = 'Output file with columns (clustername,samplename)')
-    parser.add_argument('-w', '--weights',
-            type = lambda f: csv.writer(Opener('w')(f)),
+    parser.add_argument('--specimen', metavar='SAMPLENAME',
+            help = 'provides samplename for mapfile')
+    parser.add_argument('-w', '--weights', type = Opener('w'),
             help = 'Output file with columns (clustername,weight)')
-    parser.add_argument('--min-clust-size',
-            type = int,
+    parser.add_argument('--min-clust-size', type = int,
             default = 1, help = 'default %(default)s')
 
 def action(args):
@@ -58,16 +52,20 @@ def action(args):
     for c in centroids:
         args.out.write('>{}\n{}\n'.format(c.description, c.seq))
 
+    readmap = csv.writer(args.readmap) if args.readmap else None
+    clustermap = csv.writer(args.clustermap) \
+                 if args.clustermap and args.specimen else None
+    weights = csv.writer(args.weights) if args.weights else None
+
     for centroid, cluster in clusters.items():
         log.info('writing {}'.format(centroid))
 
-        if args.readmap:
-           args.readmap.writerows((data['query_label'], centroid) for data in cluster)
+        if readmap:
+            readmap.writerows((data['query_label'], centroid) for data in cluster)
 
-        if args.clustermap and args.specimen:
-            args.clustermap.writerow((centroid, args.specimen))
+        if clustermap:
+            writerow((centroid, args.specimen))
 
-        if args.weights:
-            weight = str(len(cluster))
-            args.weights.writerow((centroid, weight))
+        if weights:
+            weights.writerow((centroid, str(len(cluster))))
 
