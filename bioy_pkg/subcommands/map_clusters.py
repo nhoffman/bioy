@@ -10,11 +10,11 @@ import sys
 import csv
 import os
 
-from itertools import groupby
+from itertools import groupby, ifilterfalse
 from operator import itemgetter
 
 from bioy_pkg.sequtils import UCLUST_HEADERS, fastalite
-from bioy_pkg.utils import Opener
+from bioy_pkg.utils import Opener, groupbyl
 
 log = logging.getLogger(__name__)
 
@@ -38,33 +38,41 @@ def build_parser(parser):
             default = 1, help = 'default %(default)s')
 
 def action(args):
-    clusters = csv.DictReader(args.clusters, delimiter = '\t', fieldnames = UCLUST_HEADERS)
-    clusters = sorted(clusters, key = itemgetter('target_label'))
-    clusters = groupby(clusters, key = itemgetter('target_label'))
-    clusters = ((c,list(r)) for c,r in clusters)
-    clusters = ((c,r) for c,r in clusters if len(r) >= args.min_clust_size)
-    clusters = dict(clusters)
-    clusters.pop('*') # remove star seqs (centroids are the rest of keys)
+
+    rows = csv.DictReader(args.clusters, delimiter='\t', fieldnames=UCLUST_HEADERS)
+
+    # target_label (the centroid name) is '*' in rows with type of 'C'
+    # and 'S'; set the centroid name to query_label (the centroid
+    # itself) for 'S' rows and drop 'C' rows. This retains clusters of
+    # size 1 and has the effect of adding the centroid name to the
+    # list of reads.
+    rows = ifilterfalse(lambda row: row['type'] == 'C', rows)
+    rows = (dict(row, target_label=row['query_label'])
+            if row['type'] == 'S' else row
+            for row in rows)
+
+    grouped = groupbyl(rows, key=itemgetter('target_label'))  # group by centroid
+    clusters = {c: [r['query_label'] for r in rows]
+                for c, rows in grouped if len(rows) >= args.min_clust_size}
 
     # filter non centroid seqs
     centroids = (c for c in args.fastafile if c.id in clusters)
-
     for c in centroids:
         args.out.write('>{}\n{}\n'.format(c.description, c.seq))
 
     readmap = csv.writer(args.readmap) if args.readmap else None
     clustermap = csv.writer(args.clustermap) \
-                 if args.clustermap and args.specimen else None
+                 if (args.clustermap and args.specimen) else None
     weights = csv.writer(args.weights) if args.weights else None
 
-    for centroid, cluster in clusters.items():
+    for centroid, cluster in clusters.iteritems():
         log.info('writing {}'.format(centroid))
 
         if readmap:
-            readmap.writerows((data['query_label'], centroid) for data in cluster)
+            readmap.writerows((read, centroid) for read in cluster)
 
         if clustermap:
-            writerow((centroid, args.specimen))
+            clustermap.writerow((centroid, args.specimen))
 
         if weights:
             weights.writerow((centroid, str(len(cluster))))
