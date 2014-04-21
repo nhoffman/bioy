@@ -6,15 +6,15 @@ import logging
 import sys
 from csv import DictWriter
 from itertools import islice
+import sys
 
-from numpy import mean
-from scipy.stats.mstats import mquantiles
 from Bio import SeqIO
 from bioy_pkg.utils import Opener, parse_extras
 
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
+
     parser.add_argument('fastq',
             nargs = '?',
             default = sys.stdin,
@@ -39,6 +39,14 @@ def build_parser(parser):
 BASES = set(['A', 'C', 'G', 'T'])
 
 def action(args):
+
+    try:
+        from scipy.stats.mstats import mquantiles
+        from numpy import mean
+    except ImportError, e:
+        print(e)
+        sys.exit(1)
+
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
 
     quants = [0.025, 0.25, 0.5, 0.75, 0.975]
