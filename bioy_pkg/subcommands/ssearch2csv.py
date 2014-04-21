@@ -10,10 +10,35 @@ import csv
 from itertools import islice, chain, groupby, imap
 from operator import itemgetter
 
-from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii
+from bioy_pkg.sequtils import homodecodealignment, parse_ssearch36, from_ascii, CAPUI
 from bioy_pkg.utils import Opener, Csv2Dict, parse_extras
 
 log = logging.getLogger(__name__)
+
+
+def is_similar(a, b):
+    try:
+        return True if a == b else bool(CAPUI[a] & CAPUI[b])
+    except KeyError:
+        return False
+
+
+def add_diff(align):
+    """Extract the aligned regions of q_seq and t_seq. Non-identical
+    characters are in lower case.
+
+    """
+
+    qstart, qstop, tstart, tstop = [int(align[k]) for k in [
+        'q_al_start', 'q_al_stop', 't_al_start', 't_al_stop']]
+
+    qstr = align['q_seq'].strip('-')[qstart - 1:qstop]
+    tstr = align['t_seq'].strip('-')[tstart - 1:tstop]
+    qchars, tchars = zip(*[('.', t) if is_similar(q, t) else (q.lower(), t.lower())
+                           for q, t in zip(qstr, tstr)])
+
+    return dict(align, q_diff=''.join(qchars), t_diff=''.join(tchars))
+
 
 def build_parser(parser):
     parser.add_argument('alignments',
@@ -55,6 +80,9 @@ def build_parser(parser):
                   only the top entry per query.""")
     parser.add_argument('-e', '--extra-fields',
             help="extra fields for csv file in form 'name1:val1,name2:val2'")
+    parser.add_argument('-d', '--with-diff', action='store_true', default=False,
+            help="""add fields 'q_diff' and 't_diff' containing
+            aligned substrings with mismatches in lowercase""")
 
 def action(args):
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
@@ -82,6 +110,9 @@ def action(args):
     if args.print_one:
         pprint.pprint(aligns.next())
         sys.exit()
+
+    if args.with_diff:
+        aligns = imap(add_diff, aligns)
 
     if args.fieldnames:
         fieldnames = args.fieldnames

@@ -1,2 +1,2 @@
-biopython
-scipy
+biopython>=1.6
+
