@@ -10,6 +10,7 @@ import sys
 import csv
 import os
 
+from collections import Counter
 from operator import itemgetter
 
 from bioy_pkg.sequtils import UCLUST_HEADERS, fastalite
@@ -26,6 +27,12 @@ def build_parser(parser):
     parser.add_argument(
         'clusters', type=Opener(),
         help='Clusters file (output of "usearch -uc")')
+    parser.add_argument(
+        '-g', '--groups', metavar='FILE', type=Opener(),
+        help="""An optional file defining groups for partitioning
+        input reads. If provided, cluster weights will be normalized
+        to proportionally represent each group. File is a headerless
+        csv with columns "seqname","group" (.csv.bz2)""")
     parser.add_argument(
         '-o', '--out', type=Opener('w'), default=sys.stdout,
         help='Output fasta containing centroids')
@@ -80,6 +87,14 @@ def action(args):
                  if (args.clustermap and args.specimen) else None
     weights = csv.writer(args.weights) if args.weights else None
 
+    # Calculate ratios of reads for the smallest group to each of the
+    # other groups.
+    if args.groups:
+        groups = dict(csv.reader(args.groups))
+        most_common = Counter(groups.values()).most_common()
+        _, least_common = most_common[-1]
+        wdict = {k: float(least_common) / v for k, v in most_common}
+
     for centroid, cluster in clusters.iteritems():
         log.info('writing {}'.format(centroid))
 
@@ -90,5 +105,10 @@ def action(args):
             clustermap.writerow((centroid, args.specimen))
 
         if weights:
-            weights.writerow((centroid, str(len(cluster))))
+            if args.groups:
+                # normalize weight of each cluster by contribution of
+                # reads by each group defined in --groups
+                weights.writerow((centroid, sum(wdict[groups[r]] for c, r in cluster)))
+            else:
+                weights.writerow((centroid, len(cluster)))
 
