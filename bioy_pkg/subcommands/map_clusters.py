@@ -7,7 +7,6 @@ Input is a usearch6 .uc file
 import logging
 import sys
 import csv
-import os
 
 from itertools import groupby
 from operator import itemgetter
@@ -18,22 +17,22 @@ from bioy_pkg.utils import Opener
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
-    parser.add_argument('fastafile',
+    parser.add_argument('--fasta',
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'input fasta file containing original clustered reads')
     parser.add_argument('clusters',
             type = Opener(),
             help = 'Clusters file (output of "usearch -uc")')
     parser.add_argument('--specimen',
-            help = 'sample name for mapfile')
-    parser.add_argument('-o','--out',
+            help = 'sample name for specimen map')
+    parser.add_argument('--fasta-out',
             type = Opener('w'),
-            default = sys.stdout,
             help = 'Output fasta mapping reads to centroid (readname,centroidname)')
-    parser.add_argument('--readmap',
+    parser.add_argument('--out',
             type = lambda f: csv.writer(Opener('w')(f)),
+            default = sys.stdout,
             help = 'Output file with columns (readname,samplename)')
-    parser.add_argument('--clustermap',
+    parser.add_argument('--specimen-map',
             type = lambda f: csv.writer(Opener('w')(f)),
             help = 'Output file with columns (clustername,samplename)')
     parser.add_argument('-w', '--weights',
@@ -52,22 +51,21 @@ def action(args):
     clusters = dict(clusters)
     clusters.pop('*') # remove star seqs (centroids are the rest of keys)
 
-    # filter non centroid seqs
-    centroids = (c for c in args.fastafile if c.id in clusters)
-
-    for c in centroids:
-        args.out.write('>{}\n{}\n'.format(c.description, c.seq))
-
     for centroid, cluster in clusters.items():
         log.info('writing {}'.format(centroid))
 
-        if args.readmap:
-           args.readmap.writerows((data['query_label'], centroid) for data in cluster)
+        args.out.writerows((data['query_label'], centroid) for data in cluster)
 
-        if args.clustermap and args.specimen:
-            args.clustermap.writerow((centroid, args.specimen))
+        if args.specimen_map and args.specimen:
+            args.specimen_map.writerow((centroid, args.specimen))
 
         if args.weights:
             weight = str(len(cluster))
             args.weights.writerow((centroid, weight))
+
+    # filter non centroid seqs
+    if args.fasta_out:
+        for c in  (c for c in args.fasta if c.id in clusters):
+            args.fasta_out.write('>{}\n{}\n'.format(c.description, c.seq))
+
 
