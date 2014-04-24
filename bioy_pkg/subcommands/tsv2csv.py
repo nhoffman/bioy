@@ -1,5 +1,5 @@
 """
-Run blastn and produce classify friendly output
+convert a tsv file to a csv with an optional split/add columns feature
 """
 
 import csv
