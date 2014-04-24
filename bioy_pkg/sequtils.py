@@ -51,7 +51,7 @@ IUPAC = {('A',): 'A',
         ('C', 'G', 'T'): 'B',
         ('A', 'C', 'G', 'T'): 'N',}
 
-CAPUI = {v:k for k,v in IUPAC.items()}
+CAPUI = {v: set(k) for k, v in IUPAC.items()}
 
 # provides criteria for defining matching tax_ids as "unclassified"
 UNCLASSIFIED_REGEX = re.compile(

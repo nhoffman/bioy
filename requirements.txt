@@ -1,2 +1,2 @@
-biopython
-scipy
+numpy>=1.7.0
+biopython>=1.6.3
