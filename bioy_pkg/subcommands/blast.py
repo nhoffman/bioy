@@ -4,7 +4,6 @@ Run blastn and produce classify friendly output
 
 import logging
 import sys
-import os
 
 from csv import DictWriter
 from cStringIO import StringIO
@@ -12,7 +11,7 @@ from itertools import chain, groupby
 from operator import itemgetter
 from subprocess import Popen, PIPE
 
-from bioy_pkg.sequtils import BLAST_FORMAT, fastalite
+from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT, fastalite
 from bioy_pkg.utils import opener, Opener
 
 log = logging.getLogger(__name__)
@@ -24,7 +23,7 @@ def build_parser(parser):
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
-            help = 'tabulated BLAST results with the following headers {}'.format(BLAST_FORMAT))
+            help = 'tabulated BLAST results with the following headers {}'.format(BLAST_HEADER))
     parser.add_argument('-d', '--database',
             help = 'a blast database')
     parser.add_argument('--limit',
@@ -74,13 +73,11 @@ def action(args):
     if errors:
        log.error(errors)
 
-    fieldnames = BLAST_FORMAT.split()[1:]
-
     # split tab lines
     lines = (r.strip().split('\t') for r in StringIO(results))
 
     # match with fieldnames
-    lines = (zip(fieldnames, l) for l in lines)
+    lines = (zip(BLAST_HEADER, l) for l in lines)
 
     # make into dict
     lines = [dict(l) for l in lines]
@@ -102,7 +99,7 @@ def action(args):
         # append to lines
         lines = chain(lines, nohits)
 
-    out = DictWriter(args.out, fieldnames = fieldnames)
+    out = DictWriter(args.out, fieldnames = BLAST_HEADER)
 
     if args.header:
         out.writeheader()
