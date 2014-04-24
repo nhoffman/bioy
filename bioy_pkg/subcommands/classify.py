@@ -6,7 +6,7 @@ Optional grouping by specimen and query sequences
 import sys
 import logging
 
-from csv import DictReader, DictWriter
+from csv import DictReader, DictWriter, Sniffer
 from collections import defaultdict
 from math import ceil
 from operator import itemgetter
@@ -188,7 +188,10 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
 def action(args):
     ### format format blast data and add additional available information
-    blast_results = DictReader(args.blast_file, fieldnames = sequtils.BLAST_HEADER)
+    has_header = Sniffer().has_header(args.blast_file.read(1064))
+    args.blast_file.seek(0)
+    fieldnames = None if has_header else sequtils.BLAST_HEADER
+    blast_results = DictReader(args.blast_file, fieldnames = fieldnames)
     blast_results = list(blast_results)
 
     sseqids = set(s['sseqid'] for s in blast_results)
