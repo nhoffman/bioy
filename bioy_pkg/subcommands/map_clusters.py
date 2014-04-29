@@ -22,7 +22,7 @@ def build_parser(parser):
         'clusters', type=Opener(),
         help='Clusters file (output of "usearch -uc")')
     parser.add_argument(
-        '--fastafile', type=lambda f: fastalite(Opener()(f)),
+        '--fasta-in', type=lambda f: fastalite(Opener()(f)),
         help='input fasta file containing original clustered reads')
     parser.add_argument(
         '--fasta-out', type=Opener('w'),
@@ -71,13 +71,6 @@ def action(args):
     rows = csv.DictReader(args.clusters, delimiter='\t', fieldnames=UCLUST_HEADERS)
     grouped = groupbyl(get_mapping(rows), key=itemgetter(0))  # group by centroid
     clusters = {c: rows for c, rows in grouped if len(rows) >= args.min_clust_size}
-
-    # filter non centroid seqs
-    if args.fastafile and args.fasta_out:
-        centroids = (c for c in args.fastafile if c.id in clusters)
-        for c in centroids:
-            args.fasta_out.write('>{}\n{}\n'.format(c.description, c.seq))
-
     readmap = csv.writer(args.out)
     specimenmap = csv.writer(args.specimenmap) \
                  if (args.specimenmap and args.specimen) else None
@@ -108,7 +101,7 @@ def action(args):
                 weights.writerow((centroid, len(cluster)))
 
     # filter non centroid seqs
-    if args.fasta_out:
-        for c in  (c for c in args.fasta if c.id in clusters):
+    if args.fasta_in and args.fasta_out:
+        for c in  (c for c in args.fasta_in if c.id in clusters):
             args.fasta_out.write('>{}\n{}\n'.format(c.description, c.seq))
 
