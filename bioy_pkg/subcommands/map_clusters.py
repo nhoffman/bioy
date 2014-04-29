@@ -25,7 +25,7 @@ def build_parser(parser):
         '--fastafile', type=lambda f: fastalite(Opener()(f)),
         help='input fasta file containing original clustered reads')
     parser.add_argument(
-        '--fasta_out', type=Opener('w'),
+        '--fasta-out', type=Opener('w'),
         help='Output fasta containing centroids')
     parser.add_argument(
         '-g', '--groups', metavar='FILE', type=Opener(),
