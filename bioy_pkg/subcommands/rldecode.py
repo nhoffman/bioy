@@ -3,6 +3,7 @@
 import logging
 import os
 import sys
+import csv
 
 from multiprocessing import Pool
 
@@ -16,7 +17,7 @@ def build_parser(parser):
             type = lambda f: fastalite(Opener()(f), readfile = False),
             help = 'Input fasta file')
     parser.add_argument('rle',
-            type = Csv2Dict(value = 'rle'),
+            type = Opener(),
             help = 'csv file (may be bzip encoded) containing columns "name","rle"')
     parser.add_argument('-o','--outfile',
             type = Opener('w'),
@@ -31,9 +32,11 @@ def seq_and_homodecode(seq_rle):
     return seq, homodecode(seq.seq, rle)
 
 def action(args):
-    pool = Pool(processes = args.threads)
 
-    seqs = ((s, from_ascii(args.rle[s.id])) for s in args.seqs)
+    rledict = {seqname: rle for seqname, rle in csv.reader(args.rle)}
+    seqs = ((s, from_ascii(rledict[s.id])) for s in args.seqs)
+
+    pool = Pool(processes = args.threads)
     seqs = pool.imap(seq_and_homodecode, seqs, chunksize = 140)
 
     for seq,decoded in seqs:
