@@ -213,7 +213,7 @@ def action(args):
 
     # coverage
     def cov(b):
-        if b['sseqid'] and 'coverage' in b:
+        if b['sseqid'] and b['coverage']:
             b['coverage'] = float(b['coverage'])
             return b
         elif b['sseqid']:
