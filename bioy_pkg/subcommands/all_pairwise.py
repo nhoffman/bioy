@@ -12,10 +12,11 @@ TODO: This script needs a lot of work:
 """
 
 import logging
+import math
 import sys
 import csv
 
-from numpy import median
+from numpy import median, around
 from operator import itemgetter
 
 from bioy_pkg.sequtils import fastalite, all_pairwise
@@ -92,6 +93,8 @@ def action(args):
                 else:
                     col = columns[t]
                     med = median(map(itemgetter(2), col))
+                    # percent and round
+                    med = math.ceil(med * 100) / 100
 
                 row.append(med)
 
