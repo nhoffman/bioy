@@ -47,6 +47,8 @@ def build_parser(parser):
     parser.add_argument('-i', '--include-primer',
             action = 'store_true', default = False,
             help = 'Include primer in trimmed sequence')
+    parser.add_argument('--keep-all-seqs', action = 'store_true',
+            help = 'keep seqs that outside the trimming thresholds')
 
 def primer_dict(parsed, side, keep = None, include = False):
     """
@@ -136,7 +138,8 @@ def action(args):
             keep = keep,
             include = args.include_primer)
 
-        seqs = (s for s in seqs if s.id in right)
+        if not args.keep_all_seqs:
+            seqs = (s for s in seqs if s.id in right)
 
     if args.left_aligns:
         if args.left_expr:
@@ -152,7 +155,8 @@ def action(args):
             keep = keep,
             include = args.include_primer)
 
-        seqs = (s for s in seqs if s.id in left)
+        if not args.keep_all_seqs:
+            seqs = (s for s in seqs if s.id in left)
 
     if args.rle_out:
         if not args.rle:
