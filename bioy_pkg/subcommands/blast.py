@@ -39,7 +39,7 @@ def build_parser(parser):
                       default = %(default)s""")
     parser.add_argument('--id',
             default = '90',
-            help = 'minimum identity for accepted values default [%(default)s]')
+            help = 'minimum identity for accepted values [%(default)s]')
     parser.add_argument('--max',
             help = 'maximum number of alignments to keep default = (all)')
     parser.add_argument('-n', '--dry-run',
@@ -48,6 +48,8 @@ def build_parser(parser):
     parser.add_argument('--nohits',
             action = 'store_true',
             help = '')
+    parser.add_argument('--coverage', type = float,
+            help = 'minimum coverage for accepted values [%(default)s]')
 
 def action(args):
     command = ['blastn']
@@ -82,6 +84,17 @@ def action(args):
     # make into dict
     lines = [dict(l) for l in lines]
 
+    fieldnames = BLAST_HEADER
+
+    if isinstance(args.coverage, float):
+        for l in lines:
+            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                    / float(l['qlen']) * 100
+            l['coverage'] = '{0:.2f}'.format(l['coverage'])
+        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
+
+        fieldnames += ['coverage']
+
     if args.nohits:
         # to get nohits first we need to know about the hits
         qids = groupby(lines, key = itemgetter('qseqid'))
@@ -99,7 +112,9 @@ def action(args):
         # append to lines
         lines = chain(lines, nohits)
 
-    out = DictWriter(args.out, fieldnames = BLAST_HEADER)
+    out = DictWriter(args.out,
+                     fieldnames = fieldnames,
+                     extrasaction = 'ignore')
 
     if args.header:
         out.writeheader()

@@ -69,13 +69,25 @@ def action(args):
     lines = imap(lambda l: izip(BLAST_HEADER, l), lines)
     lines = imap(lambda l: dict(l), lines)
 
-    out = DictWriter(args.out, fieldnames = BLAST_HEADER)
+    fieldnames = BLAST_HEADER
+
+    if isinstance(args.coverage, float):
+        for l in lines:
+            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                    / float(l['qlen']) * 100
+            l['coverage'] = '{0:.2f}'.format(l['coverage'])
+        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
+
+        fieldnames += ['coverage']
+
+    out = DictWriter(args.out,
+                     fieldnames = BLAST_HEADER,
+                     extrasaction = 'ignore')
 
     if args.header:
         out.writeheader()
 
-    for l in lines:
-        out.writerow(l)
+    out.writerows(lines)
 
     err = usearch.stderr.read().strip()
     if err:

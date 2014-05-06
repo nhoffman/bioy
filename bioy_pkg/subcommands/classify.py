@@ -6,7 +6,7 @@ Optional grouping by specimen and query sequences
 import sys
 import logging
 
-from csv import DictReader, DictWriter, Sniffer
+from csv import DictReader, DictWriter
 from collections import defaultdict
 from math import ceil
 from operator import itemgetter
@@ -130,6 +130,9 @@ def build_parser(parser):
             metavar = 'CSV',
             type = Opener(),
             help = 'columns: name, weight')
+    ### csv.Sniffer.has_header is *not* reliable enough
+    parser.add_argument('--has-header', action = 'store_true',
+            help = 'specify this if blast data has a header')
 
 def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
     copy_counts = {}
@@ -188,9 +191,7 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
 def action(args):
     ### format format blast data and add additional available information
-    has_header = Sniffer().has_header(args.blast_file.read(1064))
-    args.blast_file.seek(0)
-    fieldnames = None if has_header else sequtils.BLAST_HEADER
+    fieldnames = None if args.has_header else sequtils.BLAST_HEADER
     blast_results = DictReader(args.blast_file, fieldnames = fieldnames)
     blast_results = list(blast_results)
 
@@ -212,7 +213,10 @@ def action(args):
 
     # coverage
     def cov(b):
-        if b['sseqid']:
+        if b['sseqid'] and 'coverage' in b:
+            b['coverage'] = float(b['coverage'])
+            return b
+        elif b['sseqid']:
             c = coverage(b['qstart'], b['qend'], b['qlen'])
             return dict(b, coverage = c)
         else:
