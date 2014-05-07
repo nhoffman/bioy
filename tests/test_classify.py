@@ -4,6 +4,7 @@ Test subcommands.
 
 import filecmp
 import logging
+import sys
 
 from os import path
 
@@ -32,6 +33,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         weights = path.join(datadir, 'weights.csv.bz2')
         mapp = path.join(datadir, 'map.csv.bz2')
@@ -41,8 +44,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test01', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test01', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--map', mapp,
                 '--weights', weights,
@@ -75,6 +78,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         weights = path.join(datadir, 'weights.csv.bz2')
 
@@ -83,8 +88,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test02', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test02', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--weights', weights,
                 '--seq-info', self.info,
@@ -116,6 +121,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         mapp = path.join(datadir, 'map.csv.bz2')
 
@@ -124,8 +131,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test03', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test03', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--map', mapp,
                 '--seq-info', self.info,
@@ -157,6 +164,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
 
         outdir = self.mkoutdir()
@@ -164,8 +173,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test04', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test04', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--seq-info', self.info,
                 '--tax', self.tax,
@@ -196,6 +205,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         weights = path.join(datadir, 'weights.csv.bz2')
         mapp = path.join(datadir, 'map.csv.bz2')
@@ -205,8 +216,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test05', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test05', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--map', mapp,
                 '--weights', weights,
@@ -239,6 +250,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         weights = path.join(datadir, 'weights.csv.bz2')
         mapp = path.join(datadir, 'map.csv.bz2')
@@ -248,8 +261,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test06', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test06', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--map', mapp,
                 '--weights', weights,
@@ -282,6 +295,8 @@ class TestClassify(TestBase, TestSubcommand):
 
         datadir = self.datadir
 
+        this_test = sys._getframe().f_code.co_name
+
         blast = path.join(datadir, 'blast.csv')
         weights = path.join(datadir, 'weights.csv.bz2')
         mapp = path.join(datadir, 'map.csv.bz2')
@@ -291,8 +306,8 @@ class TestClassify(TestBase, TestSubcommand):
         classify_out = path.join(outdir, 'classification.csv.bz2')
         details_out = path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(datadir, 'test07', 'classification.csv.bz2')
-        details_ref = path.join(datadir, 'test07', 'details.csv.bz2')
+        classify_ref = path.join(datadir, this_test, 'classification.csv.bz2')
+        details_ref = path.join(datadir, this_test, 'details.csv.bz2')
 
         args = ['--map', mapp,
                 '--weights', weights,

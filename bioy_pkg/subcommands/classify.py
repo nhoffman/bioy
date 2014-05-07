@@ -448,10 +448,8 @@ def action(args):
 
                 if args.out_detail:
                     if not args.details_full:
-                        # choose the single largest cluster
-                        clusters_and_sizes = [(float(weights.get(c, 1.0)), c) for c in clusters]
-                        max_size, largest = max(clusters_and_sizes)
-                        hits = (h for h in hits if h['qseqid'] == largest)
+                        summary = {(h['sseqid'], h['pident'], h['coverage']): h for h in hits}
+                        hits = (h for h in hits if h in summary.values())
 
                     for h in hits:
                         args.out_detail.writerow(dict(
