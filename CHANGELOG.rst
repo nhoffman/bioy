@@ -10,3 +10,4 @@
  * coverage filtering is done in bioy blast
  * bioy primer_trim has new option --keep-all-seqs which keeps sequences who's primers did not pass thresholds
  * bioy map_clusters takes a fasta file as an optional argument.  Optional arguments have been renamed and reorganized.
+ * bugfix: formatting error in bioy map_clusters
