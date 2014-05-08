@@ -87,7 +87,8 @@ def action(args):
     for centroid, cluster in clusters.iteritems():
         log.info('writing {}'.format(centroid))
 
-        readmap.writerows((read, centroid) for read in cluster)
+        for _centroid, read in cluster:
+            readmap.writerow([read, centroid])
 
         if specimenmap:
             specimenmap.writerow((centroid, args.specimen))
