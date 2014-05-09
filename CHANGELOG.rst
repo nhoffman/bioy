@@ -1,9 +1,18 @@
-======================
+==================
  Changes for bioy
-======================
+==================
+
+
+upcoming
+========
+
+(features to be included in the next release)
+
+ * remove scipy dependency
+
 
 1.7.7
-=======
+=====
 
  * bioy classify details output includes rows unique by sseqid,pident and coverage
  * new coverage column to blast output which is calculated in bioy blast
