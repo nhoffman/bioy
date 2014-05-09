@@ -8,6 +8,7 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
+from itertools import groupby
 from math import ceil
 from operator import itemgetter
 
@@ -190,8 +191,6 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
     return condensed
 
 def action(args):
-    print 'sdfsa'
-    sys.exit()
     ### format format blast data and add additional available information
     fieldnames = None if args.has_header else sequtils.BLAST_HEADER
     blast_results = DictReader(args.blast_file, fieldnames = fieldnames)
@@ -450,10 +449,13 @@ def action(args):
 
                 if args.out_detail:
                     if not args.details_full:
-                        print hits
-                        sys.exit()
-                        summary = {(h['sseqid'], h['pident'], h['coverage']): h for h in hits}
-                        hits = (h for h in hits if h in summary.values())
+                        # drop the no_hits
+                        hits = [h for h in hits if 'tax_id' in h]
+                        # take the largest pident/coverage for each hit
+                        hits = sorted(hits, key = itemgetter('tax_id'))
+                        hits = groupby(hits, key = itemgetter('tax_id'))
+                        hits = [sorted(v, key = itemgetter('pident', 'coverage'),
+                                          reverse = True)[0] for _,v in hits]
 
                     for h in hits:
                         args.out_detail.writerow(dict(

@@ -9,7 +9,7 @@ upcoming
 (features to be included in the next release)
 
  * remove scipy dependency
-
+ * further simplification of details - only the top pident hit per assignment tax_id is reported
 
 1.7.7
 =====
