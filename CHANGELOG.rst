@@ -11,6 +11,9 @@ upcoming
  * remove scipy dependency
 
 
+1.7.8-dev
+=======
+
 1.7.7
 =====
 
