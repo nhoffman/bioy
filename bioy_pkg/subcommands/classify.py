@@ -190,6 +190,8 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
     return condensed
 
 def action(args):
+    print 'sdfsa'
+    sys.exit()
     ### format format blast data and add additional available information
     fieldnames = None if args.has_header else sequtils.BLAST_HEADER
     blast_results = DictReader(args.blast_file, fieldnames = fieldnames)
@@ -448,6 +450,8 @@ def action(args):
 
                 if args.out_detail:
                     if not args.details_full:
+                        print hits
+                        sys.exit()
                         summary = {(h['sseqid'], h['pident'], h['coverage']): h for h in hits}
                         hits = (h for h in hits if h in summary.values())
 
