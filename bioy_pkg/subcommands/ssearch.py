@@ -130,6 +130,8 @@ def action(args):
     aligns = (dict(d, coverage= str(
              (float(d['q_al_stop']) - float(d['q_al_start']))/float(d['q_sq_len'])
              )) for d in aligns)
+
+    # write results
     if args.fieldnames:
         fieldnames = args.fieldnames
     else:
