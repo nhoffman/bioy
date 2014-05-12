@@ -148,9 +148,7 @@ def action(args):
             writer.writeheader()
 
         for a in aligns:
-    #        a['coverage'] = '1'
             writer.writerow(a)
-    #        print(a)
 
     error = set(e.strip() for e in ssearch.stderr)
     error = ', '.join(error)
