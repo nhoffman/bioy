@@ -86,7 +86,7 @@ get_wheels_from_cache(){
     fi
 }
 
-grep -v -E '^#|git\+' $REQFILE | while read pkg; do
+grep -v -E '^#|^-e|git\+' $REQFILE | while read pkg; do
     # --find-links avoids rebuilding existing wheels
     pip wheel $pkg \
     	--download-cache $CACHE \

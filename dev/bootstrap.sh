@@ -67,10 +67,13 @@ else
     echo "found existing virtualenv $VENV"
 fi
 
+# install hdf5 libraries from binaries
+HDF5_DIR=/home/local/AMC/ngh2/src/bioy/src/hdf5-1.8.13-linux-x86_64-shared pip install tables
+
 source $VENV/bin/activate
 
 # install python packages from pipy or wheels
-grep -v -E '^#|git+' $REQFILE | while read pkg; do
+grep -v -E '^#|git+|^-e' $REQFILE | while read pkg; do
     if [[ -z $WHEELHOUSE ]]; then
 	pip install --allow-external argparse $pkg
     else

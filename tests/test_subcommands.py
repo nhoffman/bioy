@@ -8,7 +8,7 @@ import argparse
 
 from bioy_pkg.utils import opener
 from bioy_pkg.scripts.main import parse_arguments, main
-from bioy_pkg.subcommands import reverse_complement
+from bioy_pkg.subcommands import reverse_complement, csv2hdf5
 
 from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
 
@@ -68,3 +68,32 @@ class TestReverseComplement(TestBase, TestSubcommand):
 
         with opener(rle) as infile, opener(rle_out) as outfile:
             self.assertEqual(len(list(infile)), len(list(outfile)))
+
+
+class TestCsv2Hdf5(TestBase, TestSubcommand):
+
+    subcommand = csv2hdf5
+
+    def setUp(self):
+        super(TestCsv2Hdf5, self).setUp()
+        self.outdir = self.mkoutdir()
+
+    def test01(self):
+        infile = path.join(datadir, '16S_random.csv')
+        self.main([infile, '-d', self.outdir])
+
+
+    def test02(self):
+        infile = path.join(datadir, '16S_random.csv')
+        self.main([infile, '-d', self.outdir, '--fieldnames', 'a,b,c,d'])
+
+
+    def test03(self):
+        infile = path.join(datadir, 'trim_left_rle.csv')
+        self.main([infile, '-d', self.outdir, '--headless'])
+
+
+    def test04(self):
+        infile = path.join(datadir, 'trim_left_rle.csv')
+        self.main([infile, '-d', self.outdir, '--headless', '--fieldnames', 'foo,bar'])
+
