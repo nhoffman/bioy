@@ -86,6 +86,10 @@ get_wheels_from_cache(){
     fi
 }
 
+# install required libraries
+dev/install_hdf5.sh --prefix $VENV --src $SRC
+export HDF5_DIR=$VENV
+
 grep -v -E '^#|^-e|git\+' $REQFILE | while read pkg; do
     # --find-links avoids rebuilding existing wheels
     pip wheel $pkg \

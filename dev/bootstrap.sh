@@ -67,10 +67,12 @@ else
     echo "found existing virtualenv $VENV"
 fi
 
-# install hdf5 libraries from binaries
-HDF5_DIR=/home/local/AMC/ngh2/src/bioy/src/hdf5-1.8.13-linux-x86_64-shared pip install tables
-
 source $VENV/bin/activate
+
+# install required libraries
+# hdf5: tables (PyTables)
+export HDF5_DIR=$(readlink -f $VENV)
+dev/install_hdf5.sh --prefix $HDF5_DIR --src $(readlink -f src)
 
 # install python packages from pipy or wheels
 grep -v -E '^#|git+|^-e' $REQFILE | while read pkg; do
