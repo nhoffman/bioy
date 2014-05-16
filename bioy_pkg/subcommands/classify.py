@@ -5,6 +5,7 @@ Optional grouping by specimen and query sequences
 """
 import sys
 import logging
+import pdb
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
@@ -447,15 +448,25 @@ def action(args):
 
                 out.writerow(results)
 
+                if assignment_id == 41:
+                    pdb.set_trace()
+
                 if args.out_detail:
                     if not args.details_full:
                         # drop the no_hits
                         hits = [h for h in hits if 'tax_id' in h]
-                        # take the largest pident/coverage for each hit
+                        # take the largest pident/coverage for each
+                        # hit by sorting each group of hits
+                        # corresponding to each tax_id and taking the
+                        # first element
                         hits = sorted(hits, key = itemgetter('tax_id'))
                         hits = groupby(hits, key = itemgetter('tax_id'))
                         hits = [sorted(v, key = itemgetter('pident', 'coverage'),
-                                          reverse = True)[0] for _,v in hits]
+                                       reverse = True)[0] for _, v in hits]
+
+
+                        if assignment_id == 41:
+                            pdb.set_trace()
 
                     for h in hits:
                         args.out_detail.writerow(dict(
