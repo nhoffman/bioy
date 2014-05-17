@@ -8,15 +8,16 @@ import sys
 
 from os import path
 
-from bioy_pkg.subcommands import classify
+from bioy_pkg.scripts.main import main
 
-from __init__ import TestBase, TestSubcommand, datadir as datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
 log = logging.getLogger(__name__)
 
-class TestClassify(TestBase, TestSubcommand):
+class TestClassify(TestBase, TestCaseSuppressOutput):
 
-    subcommand = classify
+    def main(self, arguments):
+        main(['classify'] + [str(a) for a in arguments])
 
     log_info = 'bioy classify {}'
 

@@ -7,15 +7,16 @@ import logging
 
 from os import path
 
-from bioy_pkg.subcommands import ssearch2csv
+from bioy_pkg.scripts.main import main
 
-from __init__ import TestBase, TestSubcommand, datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir
 
 log = logging.getLogger(__name__)
 
-class TestSsearch2csv(TestBase, TestSubcommand):
+class TestSsearch2csv(TestBase, TestCaseSuppressOutput):
 
-    subcommand = ssearch2csv
+    def main(self, arguments):
+        main(['ssearch2csv'] + arguments)
 
     def test01(self):
         """

@@ -7,15 +7,16 @@ import logging
 
 from os import path
 
-from bioy_pkg.subcommands import ssearch_count
+from bioy_pkg.scripts.main import main
 
-from __init__ import TestBase, TestSubcommand, datadir as datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
 log = logging.getLogger(__name__)
 
-class TestSsearch_count(TestBase, TestSubcommand):
+class TestSsearch_count(TestBase, TestCaseSuppressOutput):
 
-    subcommand = ssearch_count
+    def main(self, arguments):
+        main(['ssearch_count'] + [str(a) for a in arguments])
 
     log_info = 'bioy ssearch_count {}'
 

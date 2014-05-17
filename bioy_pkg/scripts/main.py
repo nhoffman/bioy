@@ -3,13 +3,13 @@ Assembles subcommands and provides top-level script.
 """
 
 import argparse
-import globe
 import logging
 import pkgutil
 import sys
 
 from importlib import import_module
 
+import globe
 from bioy_pkg import subcommands, __version__ as version, __doc__ as docstring
 
 log = logging

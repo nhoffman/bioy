@@ -8,15 +8,21 @@ import os
 import sys
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.subcommands import denoise
+from bioy_pkg.scripts.main import main
 
-from __init__ import TestBase, TestSubcommand, datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir
 
 log = logging.getLogger(__name__)
 
-class TestDenoise(TestBase, TestSubcommand):
+class TestDenoise(TestBase, TestCaseSuppressOutput):
 
-    subcommand = denoise
+    def main(self, arguments):
+        """Pass list 'arguments' to scripts.main, ensuring that all are
+        strings.
+
+        """
+        main(['denoise'] + [str(a) for a in arguments])
+
 
     def test01(self):
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')

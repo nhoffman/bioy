@@ -7,13 +7,11 @@ import logging
 import argparse
 
 from bioy_pkg.utils import opener
-from bioy_pkg.scripts.main import parse_arguments, main
-from bioy_pkg.subcommands import reverse_complement, csv2hdf5
+from bioy_pkg.scripts.main import main
 
-from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
+from __init__ import TestCaseSuppressOutput, TestBase, datadir
 
 log = logging.getLogger(__name__)
-
 
 class TestMainScript(TestCaseSuppressOutput, TestBase):
 
@@ -23,9 +21,10 @@ class TestMainScript(TestCaseSuppressOutput, TestBase):
     def testExit02(self):
         self.assertRaises(SystemExit, main, ['-h'])
 
-class TestReverseComplement(TestBase, TestSubcommand):
+class TestReverseComplement(TestBase, TestCaseSuppressOutput):
 
-    subcommand = reverse_complement
+    def main(self, arguments):
+        main(['reverse_complement'] + arguments)
 
     def test01(self):
         outdir = self.mkoutdir()
@@ -70,9 +69,10 @@ class TestReverseComplement(TestBase, TestSubcommand):
             self.assertEqual(len(list(infile)), len(list(outfile)))
 
 
-class TestCsv2Hdf5(TestBase, TestSubcommand):
+class TestCsv2Hdf5(TestBase, TestCaseSuppressOutput):
 
-    subcommand = csv2hdf5
+    def main(self, arguments):
+        main(['csv2hdf5'] + arguments)
 
     def setUp(self):
         super(TestCsv2Hdf5, self).setUp()
@@ -90,10 +90,11 @@ class TestCsv2Hdf5(TestBase, TestSubcommand):
 
     def test03(self):
         infile = path.join(datadir, 'trim_left_rle.csv')
-        self.main([infile, '-d', self.outdir, '--headless'])
+        self.main([infile, '-d', self.outdir, '--no-head'])
 
 
     def test04(self):
         infile = path.join(datadir, 'trim_left_rle.csv')
-        self.main([infile, '-d', self.outdir, '--headless', '--fieldnames', 'foo,bar'])
+        self.main([infile, '-d', self.outdir, '--no-head',
+                   '--fieldnames', 'foo,bar'])
 

@@ -5,14 +5,16 @@ import filecmp
 import logging
 from os import path
 
-from bioy_pkg.subcommands import fastq_stats
-from __init__ import TestBase, TestSubcommand, datadir
+from bioy_pkg.scripts.main import main
+from __init__ import TestBase, TestCaseSuppressOutput, datadir
 
 log = logging.getLogger(__name__)
 
-class TestFastq_stats(TestBase, TestSubcommand):
+class TestFastq_stats(TestBase, TestCaseSuppressOutput):
 
-    subcommand = fastq_stats
+    def main(self, arguments):
+        main(['fastq_stats'] + arguments)
+
     fq_in = path.join(datadir, '16S_random.fastq')
 
     def test01(self):

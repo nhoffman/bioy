@@ -9,30 +9,33 @@ import re
 import sys
 
 import pandas as pd
-import numpy as np
 
 from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
+
 def build_parser(parser):
     parser.add_argument('infile',
-            default = sys.stdin,
-            nargs = '?',
-            type = Opener(),
-            help = 'input csv file')
+                        default=sys.stdin,
+                        nargs='?',
+                        type=Opener(),
+                        help='input csv file')
     parser.add_argument('-o', '--outfile',
-                        help = 'HDF5 file [use basename of input file by default]')
+                        help='HDF5 file [use basename of input file by default]')
     parser.add_argument('-d', '--outdir',
-                        help = 'Optional output directory. Ignored if -o/--outfile is specified.')
-    parser.add_argument('--fieldnames', help='comma-delimited list of field names.')
+                        help="""Optional output directory. Ignored
+                        if -o/--outfile is specified.""")
+    parser.add_argument('--fieldnames',
+                        help='comma-delimited list of field names.')
     parser.add_argument('-H', '--no-header', action='store_true', default=False,
                         help="""indicate that the input file has no
                         header row. Uses value of --fieldnames if provided.""")
     parser.add_argument('-k', '--key', default='data',
-                        help='A label identifing this table in the data store "[%(default)s]"')
-    parser.add_argument('-c', '--no-compress', action='store_false', default=True, dest='compress',
-                        help="""Don't compress data store.""")
+                        help="""A label identifing this table in the
+                        data store "[%(default)s]" """)
+    parser.add_argument('-c', '--no-compress', action='store_false', default=True,
+                        dest='compress', help="""Don't compress data store.""")
 
 
 def action(args):
@@ -40,7 +43,8 @@ def action(args):
     try:
         import tables
     except ImportError, e:
-        sys.exit('This subcommand requires PyTables and dependencies (see README and requirements.txt)')
+        sys.exit('This subcommand requires PyTables and dependencies '
+                 '(see README and requirements.txt)')
 
     if args.outfile:
         outfile = args.outfile
