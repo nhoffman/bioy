@@ -699,6 +699,37 @@ def format_taxonomy(names, selectors, asterisk = '*'):
 
     return ';'.join(sorted(tax))
 
+
+def name_assignment(assignments, taxdict, include_stars=True):
+    """Create taxonomic names based on 'assignmnets', which are a set of
+    two-tuples: {(tax_id, is_starred), ...} where each tax_id is a key
+    into taxdict, and is_starred is a boolean indicating whether at
+    least one reference sequence had a parirwise alignment identity
+    score meeting some thresholed. 'taxdict' is a dictionary keyed by
+    tax_id and returning a dict of taxonomic data corresponding to a
+    row from the taxonomy file. If 'include_stars' is False, ignore
+    the second element of each tuple in 'assignments' and do not
+    include asterisks in the output names.
+
+    """
+
+    # may need to define additional arguments to define params for condensing tax_ids
+    # possible first step: pass assignmnets to a function that condenses tax_ids
+
+
+    pass
+
+
+def correct_copy_numbers(assignments):
+    """Return a float representing a copy number adjustment factor given
+    'assignments' (a set of two-tuples: {(tax_id, is_starred), ...})
+    and ...
+
+    """
+
+    pass
+
+
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 
 def _readfasta(handle):

@@ -13,6 +13,7 @@ from itertools import groupby
 from math import ceil
 from operator import itemgetter
 
+import numpy as np
 import pandas as pd
 
 from bioy_pkg import sequtils
@@ -21,28 +22,32 @@ from bioy_pkg.utils import Opener, opener, Csv2Dict, groupbyl
 log = logging.getLogger(__name__)
 
 def build_parser(parser):
-    parser.add_argument('blast_file',
-            help = 'CSV tabular blast file of query and subject hits.')
-    parser.add_argument('-s', '--seq-info',
-            required = True,
-            metavar = 'CSV',
-            help = 'File mapping reference seq name to tax_id')
-    parser.add_argument('-t', '--taxonomy',
-            required = True,
-            metavar = 'CSV',
-            help = 'tax table of taxids and species names')
+    parser.add_argument(
+        'blast_file', help='CSV tabular blast file of query and subject hits.')
+    parser.add_argument(
+        '-w', '--weights', metavar='CSV',
+        help="""Optional headless csv file with columns 'seqname',
+        'count' providing weights for each query sequence described in
+        the blast input (used, for example, to describe cluster sizes
+        for corresponding cluster centroids).""")
+    parser.add_argument(
+        '-s', '--seq-info', required=True, metavar='CSV',
+        help='File mapping reference seq name to tax_id')
+    parser.add_argument(
+        '-t', '--taxonomy', required=True, metavar='CSV',
+        help='tax table of taxids and species names')
 
     parser.add_argument('--all-one-group',
-            dest = 'all_one_group',
-            action = 'store_true',
+                        dest = 'all_one_group',
+            action = 'store_true', default=False,
             help = """If --map is not provided, the default behavior is to treat
                     all reads as one group; use this option to treat
                     each read as a separate group [%(default)s]""")
-    parser.add_argument('-a', '--asterisk',
-            default = 100,
-            metavar='PERCENT',
-            type = float,
-            help = 'Next to any species above a certain threshold [%(default)s]')
+    parser.add_argument(
+        '--starred', default = 100.0, metavar='PERCENT', type = float,
+        help = """Names of organisms for which at least one reference
+        sequence has pairwise identity with a query sequence of at
+        least PERCENT will be marked with an asterisk [%(default)s]""")
     parser.add_argument('--copy-numbers',
             metavar = 'CSV',
             type = Opener(),
@@ -126,13 +131,21 @@ def build_parser(parser):
             metavar='RANK',
             help = 'Rank at which to classify. Default: "%(default)s"',
             default = 'species')
-    parser.add_argument('-w', '--weights',
-            metavar = 'CSV',
-            type = Opener(),
-            help = 'columns: name, weight')
     ### csv.Sniffer.has_header is *not* reliable enough
     parser.add_argument('--has-header', action = 'store_true',
             help = 'specify this if blast data has a header')
+
+
+class Assignment(object):
+    def __init__(self, colnames):
+        self.colnames = colnames
+        self.assignments = {}
+
+    def assign(self, df):
+        assignment = frozenset(df.groupby(self.colnames).groups.keys())
+        h = hash(assignment)
+        self.assignments[h] = assignment
+        return h
 
 
 def action(args):
@@ -157,27 +170,61 @@ def action(args):
     blast_results.rename(columns=dict(zip(blast_results.columns, fieldnames)),
                          inplace=True)
 
+    # get rows corresponding to sequences with no blast hits
+    no_hit_rows = blast_results['sseqid'].isnull()
+    no_hits = blast_results[no_hit_rows]
+
+    # ... and remove them from blast_results
+    blast_results = blast_results[no_hit_rows.apply(lambda x: not x)]
+
+    # add a column indicating if a hit meets the threshold for
+    # starring.
+    blast_results['starred'] = blast_results['pident'].apply(
+        lambda x: x >= args.starred)
+
     # merge blast results with seq_info - do this first so that
     # refseqs not represented in the blast results are discarded.
-    hits = pd.merge(blast_results[['qseqid', 'sseqid', 'pident', 'coverage']],
-                    seq_info[['sseqid', 'tax_id', 'accession']],
-                    how='left', on='sseqid', sort=False)
+    hits = pd.merge(
+        # blast_results[['qseqid', 'sseqid', 'pident', 'starred', 'coverage']],
+        blast_results[['qseqid', 'sseqid', 'pident', 'starred']],
+        seq_info[['sseqid', 'tax_id', 'accession']],
+        how='left', on='sseqid', sort=False)
 
-    # merge with taxonomy to map original tax_ids with tax_ids at the
-    # specified rank.
+    # merge with taxonomy to associate original tax_ids with tax_ids
+    # at the specified rank.
     hits = pd.merge(hits, taxonomy[['tax_id', args.rank]], how='left',
                     on='tax_id', sort=False)
 
     # merge with taxonomy again to get tax_names
     hits = pd.merge(hits, taxonomy[['tax_id', 'tax_name']], how='left',
                     left_on=args.rank, right_on='tax_id')
+
+
+    # rename the column containing tax_id's at the specified rank to
+    # 'tax_id' and delete the duplicate column 'tax_id_y'; tax_id_x
+    # now refers to the original tax_ids for the reference sequences.
+    hits.rename(columns={args.rank: 'tax_id'}, inplace=True)
     del hits['tax_id_y']
 
-    groups = hits.groupby(['qseqid'])
+    # stores a hash of each frozenset containing {(tax_name, starred), ...}
+    assigner = Assignment(['tax_id', 'starred'])
 
-    for qseqid, group in groups:
-        print group.tax_name.unique()
+    grouped_by_query = hits.groupby(['qseqid'])
 
-    # what are nan results?
+    assignments = grouped_by_query.apply(assigner.assign)
+
+    for k, v in assigner.assignments.items():
+        print k,sorted(v)
+
+
+
+    # next steps...
+    # - concatenate with no_hits (corresponding to an assignment of 0? nan?)
+    # - create a DataFrame indexed by qseqid with assignments and additional column 'weights'
+    # - group by assignment and get sum of weights
+    # - create names for assignments
+    # - calculate and apply copy number correction factor
+    # - order assignments by mass desc and add assignment_id
+    # - assemble details
 
 
