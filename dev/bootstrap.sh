@@ -69,20 +69,21 @@ fi
 
 # install required libraries
 # hdf5: tables (PyTables)
-export HDF5_DIR=$(readlink -f $VENV)
-dev/install_hdf5.sh --prefix $HDF5_DIR --src $(readlink -f src)
 
-# make the above libraries available when the virtualenv is activated
-if grep -q LD_LIBRARY_PATH $VENV/bin/activate; then
-    true
-else
-    cat >> $VENV/bin/activate <<EOF
+# export HDF5_DIR=$(readlink -f $VENV)
+# dev/install_hdf5.sh --prefix $HDF5_DIR --src $(readlink -f src)
 
-# added by $0
-LD_LIBRARY_PATH="$VIRTUAL_ENV/lib"
-export LD_LIBRARY_PATH
-EOF
-fi
+# # make the above libraries available when the virtualenv is activated
+# if grep -q LD_LIBRARY_PATH $VENV/bin/activate; then
+#     true
+# else
+#     cat >> $VENV/bin/activate <<EOF
+
+# # added by $0
+# LD_LIBRARY_PATH="$VIRTUAL_ENV/lib"
+# export LD_LIBRARY_PATH
+# EOF
+# fi
 
 source $VENV/bin/activate
 
