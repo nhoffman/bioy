@@ -148,25 +148,37 @@ class Assignment(object):
         return h
 
 
-def action(args):
-    # format blast data and add additional available information
-    fieldnames = None if args.has_header else sequtils.BLAST_HEADER
+def read_csv(filename, compression=None, **kwargs):
+    """read a csv file using pandas.read_csv with compression defined by
+    the file suffix unless provided.
 
-    seq_info = pd.read_csv(args.seq_info,
-                           dtype={'seqname': str,
-                                  'tax_id': str,
-                                  'accession': str,
-                                  'description': str,
-                                  'length': int,
-                                  'ambig_count': int,
-                                  'is_type': str,
-                                  'rdp_lineage': str})
+    """
+
+    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
+    kwargs['compression'] = compression or suffixes.get(path.splitext(filename)[-1])
+
+    return pd.read_csv(filename, **kwargs)
+
+
+def action(args):
+
+    seq_info = read_csv(args.seq_info,
+                        dtype={'seqname': str,
+                               'tax_id': str,
+                               'accession': str,
+                               'description': str,
+                               'length': int,
+                               'ambig_count': int,
+                               'is_type': str,
+                               'rdp_lineage': str})
+
     seq_info.rename(columns=dict(seqname='sseqid'), inplace=True)
 
-    taxonomy = pd.read_csv(args.taxonomy, dtype=str)
+    taxonomy = read_csv(args.taxonomy, dtype=str)
 
-    compression = dict(bz2='bz2', gz='gzip').get(path.splitext(args.blast_file)[-1])
-    blast_results = pd.read_csv(args.blast_file, header=None, compression='bz2')
+    # format blast data and add additional available information
+    blast_results = read_csv(args.blast_file, header=None)
+    fieldnames = None if args.has_header else sequtils.BLAST_HEADER
     blast_results.rename(columns=dict(zip(blast_results.columns, fieldnames)),
                          inplace=True)
 
@@ -213,10 +225,10 @@ def action(args):
 
     assignments = grouped_by_query.apply(assigner.assign)
 
-    for k, v in assigner.assignments.items():
-        print k,sorted(v)
+    print assignments
 
-
+    # for k, v in assigner.assignments.items():
+    #     print sorted(v)
 
     # next steps...
     # - concatenate with no_hits (corresponding to an assignment of 0? nan?)
