@@ -16,10 +16,6 @@ import logging
 
 from os import path
 from csv import DictReader, DictWriter
-from collections import defaultdict
-from itertools import groupby
-from math import ceil
-from operator import itemgetter
 
 import numpy as np
 import pandas as pd
@@ -28,6 +24,7 @@ from bioy_pkg import sequtils
 from bioy_pkg.utils import Opener, opener, Csv2Dict, groupbyl
 
 log = logging.getLogger(__name__)
+
 
 def build_parser(parser):
 
@@ -67,7 +64,8 @@ def build_parser(parser):
 
     # output files
     parser.add_argument(
-        '-o', '--out', default=sys.stdout, type=Opener('w'), metavar='FILE',
+        '-o', '--outfile', default=sys.stdout, type=Opener('w'),
+        metavar='FILE',
         help="Classification results.")
     parser.add_argument(
         '-d', '--details', type=Opener('w'), metavar='FILE',
@@ -116,8 +114,8 @@ def build_parser(parser):
 
     # TODO: what does this do?
     parser.add_argument(
-        '--group-label', metavar = 'LABEL', default = 'all',
-        help = """Single group label for reads""")
+        '--group-label', metavar='LABEL', default='all',
+        help="""Single group label for reads""")
 
     # options for details file
     parser.add_argument(
@@ -283,12 +281,12 @@ def action(args):
     counts.name = 'reads'
 
     output = pd.DataFrame(counts)
-    output['freq'] = output/output.sum()
+    output['freq'] = output / output.sum()
     output['clusters'] = assignments.groupby(['assignment']).size()
 
     output.sort('reads', ascending=False, inplace=True)
 
-    output.to_csv(args.out)
+    output.to_csv(args.outfile)
 
     # next steps...
     # - create names for assignments
