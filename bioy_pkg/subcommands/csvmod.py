@@ -29,7 +29,7 @@ def build_parser(parser):
     parser.add_argument('-r', '--rename', metavar='FIELD_SPEC',
                         help="fields to rename in the format 'from1:to1,from2:to2,...'")
     parser.add_argument('-i', '--inplace', action='store_true', default=False,
-                        help='modify input file in place')
+                        help='modify input file in place [%(default)s]')
 
 def tmp(filename):
     dirname, fname = path.split(filename)
