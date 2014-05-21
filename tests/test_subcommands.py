@@ -68,33 +68,3 @@ class TestReverseComplement(TestBase, TestCaseSuppressOutput):
         with opener(rle) as infile, opener(rle_out) as outfile:
             self.assertEqual(len(list(infile)), len(list(outfile)))
 
-
-class TestCsv2Hdf5(TestBase, TestCaseSuppressOutput):
-
-    def main(self, arguments):
-        main(['csv2hdf5'] + arguments)
-
-    def setUp(self):
-        super(TestCsv2Hdf5, self).setUp()
-        self.outdir = self.mkoutdir()
-
-    def test01(self):
-        infile = path.join(datadir, '16S_random.csv')
-        self.main([infile, '-d', self.outdir])
-
-
-    def test02(self):
-        infile = path.join(datadir, '16S_random.csv')
-        self.main([infile, '-d', self.outdir, '--fieldnames', 'a,b,c,d'])
-
-
-    def test03(self):
-        infile = path.join(datadir, 'trim_left_rle.csv')
-        self.main([infile, '-d', self.outdir, '--no-head'])
-
-
-    def test04(self):
-        infile = path.join(datadir, 'trim_left_rle.csv')
-        self.main([infile, '-d', self.outdir, '--no-head',
-                   '--fieldnames', 'foo,bar'])
-
