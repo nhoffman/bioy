@@ -152,21 +152,26 @@ class Assignment(object):
         self.assignments[assignment_key] = assignment
         return assignment_key
 
+    def add(self, key, val):
+        """Add {key: val} directly to self.assignments (val must be an
+        integer).
 
-def assign_names(assignment, no_result='[no blast result]'):
+        """
+
+        assert isinstance(key, int)
+        self.assignments[key] = val
+
+
+def assign_names(assignment):
     """Mockup of a function to convert a frozenset containing (tax_id,
     is_starred) tuples into a taxonomic name.
 
     """
 
-    if assignment:
-        try:
-            return '-'.join(sorted({str(tax_id) for tax_id, _ in assignment}))
-        except TypeError:
-            print assignment
-            sys.exit()
+    if isinstance(assignment, str):
+        return assignment
     else:
-        return no_result
+        return '-'.join(sorted({str(tax_id) for tax_id, _ in assignment}))
 
 
 def read_csv(filename, compression=None, **kwargs):
@@ -212,24 +217,36 @@ def action(args):
             columns=dict(zip(blast_results.columns, sequtils.BLAST_HEADER)),
             inplace=True)
 
-    # debug: keep track of original qseqids here
-    qseqids_in = {x for x in blast_results.qseqid}
+    # original set of qseqids
+    qseqids_in = set(blast_results.qseqid.unique())
 
-    # Create a Series containing sequence names (ie, qseqids) with no
-    # blast hits; represent this state with a value of 0.
-    no_hit_rows = blast_results['sseqid'].isnull()
-    no_hits = pd.Series(0, index=blast_results.qseqid[no_hit_rows])
+    # Create a Series containing each of sequence names (ie, qseqids) with
+    # values indicating no blast hits (0), < min_identity (1), or >=
+    # max_idenity (2).
+    no_hit_idx = blast_results['sseqid'].isnull()
+    no_hit = pd.Series(0, index=blast_results.qseqid[no_hit_idx])
+    blast_results = blast_results[~ no_hit_idx]
 
-    # ... and remove them from blast_results
-    blast_results = blast_results[no_hit_rows.apply(lambda x: not x)]
+    # remove hits < min_identity
+    blast_results = blast_results[blast_results.pident >= args.min_identity]
+
+    # remove no_hit and remaining qseqids from the original set to
+    # leave those represented only by hits < min_identity
+    lt_min = pd.Series(1, index=qseqids_in -
+                       set(no_hit.index) -
+                       set(blast_results.qseqid.unique()))
+
+    # gt_max = blast_results.pident > args.max_identity
+    excluded = pd.concat([no_hit, lt_min])
 
     # add a column indicating if a hit meets the threshold for
     # starring.
     blast_results['starred'] = blast_results['pident'].apply(
         lambda x: x >= args.starred)
 
-    # merge blast results with seq_info - do this first so that
-    # refseqs not represented in the blast results are discarded.
+    # merge blast results with seq_info - do this early so that
+    # refseqs not represented in the blast results are discarded in
+    # the merge.
     hits = pd.merge(
         # blast_results[['qseqid', 'sseqid', 'pident', 'starred', 'coverage']],
         blast_results[['qseqid', 'sseqid', 'pident', 'starred']],
@@ -253,12 +270,15 @@ def action(args):
 
     # stores a hash of each frozenset containing {(tax_name, starred), ...}
     assigner = Assignment(['tax_id', 'starred'])
+    assigner.add(0, '[no blast_result]')
+    assigner.add(1, '<{}'.format(args.min_identity))
+    assigner.add(2, '>{}'.format(args.max_identity))
 
     grouped_by_query = hits.groupby(['qseqid'])
 
     # Determine assignment names and concatenate with sequences having
     # no blast hit.
-    assigned = pd.concat([no_hits, grouped_by_query.apply(assigner.assign)])
+    assigned = pd.concat([excluded, grouped_by_query.apply(assigner.assign)])
     assigned.name = 'assignment_key'
 
     assert set(assigned.index) == qseqids_in
