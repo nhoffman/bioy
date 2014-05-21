@@ -451,11 +451,9 @@ def action(args):
                         # drop the no_hits
                         hits = [h for h in hits if 'tax_id' in h]
                         # only report heaviest centroid
-                        heaviest_qseqid = lambda h: (h['qseqid'], weights[h['qseqid']])
-                        hits = sorted(hits, key = heaviest_qseqid,
-                                            reverse = True)[:1]
-                        hits = groupbyl(hits, key = heaviest_qseqid)
-                        hits = [h for _,g in hits for h in g]
+                        clusters_and_sizes = [(float(weights.get(c, 1.0)), c) for c in clusters]
+                        _, largest = max(clusters_and_sizes)
+                        hits = (h for h in hits if h['qseqid'] == largest)
 
                     for h in hits:
                         args.out_detail.writerow(dict(
@@ -466,3 +464,4 @@ def action(args):
                         low = args.min_identity,
                         target_rank = args.target_rank,
                         **h))
+
