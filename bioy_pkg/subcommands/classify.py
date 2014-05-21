@@ -8,7 +8,6 @@ import logging
 
 from csv import DictReader, DictWriter
 from collections import defaultdict
-from itertools import groupby
 from math import ceil
 from operator import itemgetter
 
@@ -451,11 +450,12 @@ def action(args):
                     if not args.details_full:
                         # drop the no_hits
                         hits = [h for h in hits if 'tax_id' in h]
-                        # take the largest pident/coverage for each hit
-                        hits = sorted(hits, key = itemgetter('tax_id'))
-                        hits = groupby(hits, key = itemgetter('tax_id'))
-                        hits = [sorted(v, key = itemgetter('pident', 'coverage'),
-                                          reverse = True)[0] for _,v in hits]
+                        # only report heaviest centroid
+                        heaviest_qseqid = lambda h: (h['qseqid'], weights[h['qseqid']])
+                        hits = sorted(hits, key = heaviest_qseqid,
+                                            reverse = True)[:1]
+                        hits = groupbyl(hits, key = heaviest_qseqid)
+                        hits = [h for _,g in hits for h in g]
 
                     for h in hits:
                         args.out_detail.writerow(dict(
