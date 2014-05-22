@@ -6,6 +6,11 @@
 # override the default python interpreter using
 # `PYTHON=/path/to/python bin/bootstrap.sh`
 
+if [[ -n $VIRTUAL_ENV ]]; then
+    echo "You can't run this script inside an active virtualenv"
+    exit 1
+fi
+
 set -e
 
 # options configurable from the command line
@@ -13,18 +18,19 @@ GREP_OPTIONS=--color=never
 VENV=$(basename $(pwd))-env
 PYTHON=$(which python)
 PY_VERSION=$($PYTHON -c 'import sys; print "{}.{}.{}".format(*sys.version_info[:3])')
-WHEELSTREET=$(readlink -f ~/wheelstreet)
+# WHEELSTREET=$(readlink -f ~/wheelstreet)
 REQFILE=requirements.txt
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "Create a virtualenv and install all pipeline dependencies"
     echo "Options:"
     echo "--venv            - path of virtualenv [$VENV]"
-    echo "--python          - path to an alternative python interpreter [$PYTHON]"
+    echo "--python          - path to the python interpreter [$PYTHON]"
     echo "--wheelstreet     - path to directory containing python wheels; wheel files will be"
-    echo "                    in a subdirectory named according to the python interpreter version"
-    echo "                    (eg '2.7.5') [$WHEELSTREET]"
-    echo "--requirements    - an alternative requiremets file [$REQFILE]"
+    echo "                    in a subdirectory named according to the python interpreter version;"
+    echo "                    uses WHEELSTREET if defined."
+    echo "                    (a suggested location is ~/wheelstreet) [$WHEELSTREET]"
+    echo "--requirements    - a file listing python packages to install [$REQFILE]"
     exit 0
 fi
 

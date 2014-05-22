@@ -3,13 +3,23 @@
 ==================
 
 
-upcoming
-========
+next release
+============
 
 (features to be included in the next release)
 
+ * hdf5 support
+
+
+1.8.0
+=====
+
  * remove scipy dependency
- * further simplification of details - only the top pident hit per assignment tax_id is reported
+ * add pandas dependency
+ * dev/bootstrap.sh creates a development environment
+ * further simplification of classify --details - only the top pident hit per assignment tax_id is reported
+ * tests of subcommands use bioy_pkg.scrips.main as entry point
+
 
 1.7.7
 =====

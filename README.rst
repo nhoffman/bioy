@@ -12,6 +12,7 @@ authors
 
 * Noah Hoffman
 * Chris Rosenthal
+* Tyler Land
 
 dependencies
 ============
@@ -22,9 +23,9 @@ dependencies
 
 Some functions require
 
-* biopython
-* scipy
 * numpy
+* pandas
+* biopython
 
 installation
 ============
@@ -35,6 +36,21 @@ Using setup.py or pip from the project directory::
   % python setup.py install
   # or
   % pip install -U .
+
+A virtualenv containing a complete execution environment can be
+created using `dev/bootstrap.sh`::
+
+  % dev/bootstrap.sh -h
+  Create a virtualenv and install all pipeline dependencies
+  Options:
+  --venv            - path of virtualenv [bioy-env]
+  --python          - path to the python interpreter [/usr/local/bin/python]
+  --wheelstreet     - path to directory containing python wheels; wheel files will be
+  in a subdirectory named according to the python interpreter version;
+  uses WHEELSTREET if defined.
+  (a suggested location is ~/wheelstreet) []
+  --requirements    - a file listing python packages to install [requirements.txt]
+
 
 execution
 =========
