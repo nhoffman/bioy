@@ -679,7 +679,7 @@ def format_taxonomy(names, selectors, asterisk = '*'):
     names = set(names)
     names = sorted(names) # sort by the name plus asterisk
     names = groupby(names, key = itemgetter(0)) # group by just the names
-    names = (list(g)[-1] for _,g in names) # perfer asterisk names which will be at the bottom
+    names = (list(g)[-1] for _,g in names) # prefer asterisk names which will be at the bottom
     names = (n+a for n,a in names) # combine names with asterisks
     species = lambda n: len(n.split()) == 2 # assume species names have exactly two words
     names = sorted(names, key = species)
@@ -699,6 +699,21 @@ def format_taxonomy(names, selectors, asterisk = '*'):
 
     return ';'.join(sorted(tax))
 
+def compound_assignment(assignments, taxonomy):
+    """
+    assignments = [(tax_id, boolean_asterisk),...]
+    taxonomy = {taxid:taxonomy}
+
+    Functionality: see format_taxonomy
+    """
+
+    if not taxonomy:
+        raise TypeError('taxonomy must not be empty or NoneType')
+
+    assignments = ((taxonomy[i]['tax_name'],a) for i,a in assignments)
+    assignments = zip(*assignments)
+
+    return format_taxonomy(*assignments, asterisk = '*')
 
 def name_assignment(assignments, taxdict, include_stars=True):
     """Create taxonomic names based on 'assignmnets', which are a set of
