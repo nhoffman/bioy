@@ -3,6 +3,26 @@ Run the ssearch (Smith-Waterman) pairwise aligment tool and output in csv format
 
 http://computing.bio.cam.ac.uk/local/doc/fasta_guide.pdf
 
+ q_name - query sequence name (ie, from first fasta file)
+ t_name - target sequence name (ie, from first fasta file)
+ sw_bits - Smith-Waterman bit score
+ sw_expect - Smith-Waterman E-value
+ sw_frame - alignment frame
+ sw_ident - identity score
+ sw_overlap - number of overlapping nucleotides
+ sw_score - Smith-Waterman score
+ sw_sim - similarity score (ie, reduced penalties for ambiguities or similar residues)
+ sw_sw_opt - see fasta_guide.pdf section 2.4.2 "Looking at alignments"
+ sw_zscore - Smith-Waterman Z-score
+ {q,t}_al_display_start - start position of displayed alignment
+ {q,t}_al_start - start position  of alignment in sequence
+ {q,t}_al_stop - end position  of alignment in sequence
+ {q,t}_description - full name from fasta
+ {q,t}_seq - nucleotide/AA sequence bounded by {q,t}_al_display_{start,stop}
+ {q,t}_sq_len - length of corresponding sequence
+ {q,t}_sq_offset - ?
+ {q,t}_sq_type - nucleotide or amino acid
+
 Warning: the parse_ssearch36 function does not work with stdin input at this time
 """
 
@@ -104,6 +124,12 @@ def action(args):
             return aligns
 
         aligns = imap(decode, aligns)
+
+    # calculate coverage for each item and repack into generator
+    # coverage = |query alignment| / |query length|
+    aligns = (dict(d, coverage= str(
+             (float(d['q_al_stop']) - float(d['q_al_start']))/float(d['q_sq_len'])
+             )) for d in aligns)
 
     # write results
     if args.fieldnames:
