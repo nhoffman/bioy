@@ -2,8 +2,11 @@
 Test sequtils module.
 """
 
+import cPickle
+import csv
 import logging
 import pprint
+import sys
 
 from bz2 import BZ2File
 from collections import Counter
@@ -11,7 +14,7 @@ from os import path
 
 from bioy_pkg import sequtils
 
-from __init__ import TestBase
+from __init__ import TestBase, datadir as datadir
 
 log = logging.getLogger(__name__)
 
@@ -291,4 +294,56 @@ class TestParseClusters(TestBase):
 
         # most of the clusters are singletons
         self.assertEquals(counter.most_common(1)[0][0], 1)
+
+class TestCompoundAssignment(TestBase):
+
+    datadir = path.join(datadir, 'classifier')
+
+    assignments = path.join(datadir, 'assignments.pkl.bz2')
+    assignments = BZ2File(assignments)
+    assignments = cPickle.load(assignments)
+
+    taxonomy = BZ2File(path.join(datadir, 'taxonomy.csv.bz2'))
+    taxonomy = {t['tax_id']:t for t in csv.DictReader(taxonomy)}
+
+    def test01(self):
+        """
+        test basic behavior
+        """
+
+        taxonomy = self.taxonomy
+        datadir = self.datadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        compound_assignments_ref = path.join(datadir,
+                                   this_test,
+                                   'compound_names.pkl.bz2')
+        compound_assignments_ref = BZ2File(compound_assignments_ref)
+        compound_assignments_ref = cPickle.load(compound_assignments_ref)
+
+        compound = lambda x: sequtils.compound_assignment(x, taxonomy)
+        compound_assignments = map(compound, self.assignments)
+
+        self.assertEquals(compound_assignments, compound_assignments_ref)
+
+    def test02(self):
+        """
+        test no data
+        """
+
+        taxonomy = self.taxonomy
+
+        compound = lambda x: sequtils.compound_assignment(x, taxonomy)
+        compound_assignments = map(compound, [])
+
+        self.assertEquals(compound_assignments, [])
+
+    def test03(self):
+        """
+        test no tax info
+        """
+
+        for a in self.assignments:
+            self.assertRaises(TypeError, sequtils.compound_assignment, a, {})
 
