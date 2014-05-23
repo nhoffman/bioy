@@ -47,7 +47,7 @@ done
 VENV_VERSION=1.11.4
 WHEELHOUSE=
 
-if [[ ! -z $WHEELSTREET ]]; then
+if [[ -n $WHEELSTREET ]]; then
     WHEELHOUSE=$WHEELSTREET/$PY_VERSION
     test -d $WHEELHOUSE || (echo "cannot access $WHEELHOUSE"; exit 1)
 fi

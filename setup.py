@@ -10,16 +10,16 @@ except subprocess.CalledProcessError:
     version = ''
 else:
     with open('bioy_pkg/data/version') as f:
-        version = f.read().strip()
+        version = f.read().strip().split('-')[0]
 
 setup(author = 'Noah Hoffman',
-      author_email = 'ngh2@uw.edu',
+      author_email = 'noah.hoffman@gmail.com',
       description = 'A collection of bioinformatics tools',
       name = 'bioy',
       packages = find_packages(),
       scripts = ['bioy'],
       version = version,
-      url = 'https://bitbucket.org/uwlabmed/bioy/',
+      url = 'https://github.com/nhoffman/bioy',
       requires = ['python (>= 2.7.5)'],
       install_requires = [
           'numpy==1.8.1',
