@@ -4,7 +4,12 @@ set -e
 
 GREP_OPTIONS=--color=never
 
-WHEELSTREET=$(readlink -f ~/wheelstreet)
+if [[ "$(whoami)" == "root" ]]; then
+    WHEELSTREET=/usr/local/share/python/wheels
+else
+    WHEELSTREET=$(readlink -f ~/wheelstreet)
+fi
+
 REQFILE=requirements.txt
 PYTHON=$(which python)
 
@@ -111,3 +116,5 @@ tree -F -L 2 $WHEELSTREET
 
 echo 'install wheels using'
 echo "pip install --use-wheel --find-links=$WHEELHOUSE --no-index -r $REQFILE"
+
+

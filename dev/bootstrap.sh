@@ -18,7 +18,7 @@ GREP_OPTIONS=--color=never
 VENV=$(basename $(pwd))-env
 PYTHON=$(which python)
 PY_VERSION=$($PYTHON -c 'import sys; print "{}.{}.{}".format(*sys.version_info[:3])')
-# WHEELSTREET=$(readlink -f ~/wheelstreet)
+WHEELSTREET=/usr/local/share/python/wheels
 REQFILE=requirements.txt
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
@@ -29,7 +29,7 @@ if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "--wheelstreet     - path to directory containing python wheels; wheel files will be"
     echo "                    in a subdirectory named according to the python interpreter version;"
     echo "                    uses WHEELSTREET if defined."
-    echo "                    (a suggested location is ~/wheelstreet) [$WHEELSTREET]"
+    echo "                    (a suggested alternative location is ~/wheelstreet) [$WHEELSTREET]"
     echo "--requirements    - a file listing python packages to install [$REQFILE]"
     exit 0
 fi
