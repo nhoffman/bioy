@@ -2,8 +2,7 @@
 build
 working
 test_output
-data/sha
-data/ver
+bioy_pkg/data/version
 MANIFEST
 dist
 *.egg-info

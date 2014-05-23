@@ -2,10 +2,15 @@ import subprocess
 
 from setuptools import setup, find_packages
 
-subprocess.call('git log --pretty=format:%h -n 1 > bioy_pkg/data/sha', shell = True)
-subprocess.call('git shortlog --format="XXYYXX%h" | grep -c XXYYXX > bioy_pkg/data/ver', shell = True)
-
-version = subprocess.check_output('git describe --tags', shell = True).strip()
+try:
+    subprocess.check_call(
+        'git describe --tags --long > bioy_pkg/data/version',
+        shell = True)
+except subprocess.CalledProcessError:
+    version = ''
+else:
+    with open('bioy_pkg/data/version') as f:
+        version = f.read().strip()
 
 setup(author = 'Noah Hoffman',
       author_email = 'ngh2@uw.edu',
