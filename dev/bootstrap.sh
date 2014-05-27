@@ -13,7 +13,7 @@ fi
 
 set -e
 
-# options configurable from the command line
+# defaults for options configurable from the command line
 GREP_OPTIONS=--color=never
 VENV=$(basename $(pwd))-env
 PYTHON=$(which python)
@@ -36,7 +36,7 @@ fi
 
 while true; do
     case "$1" in
-	--venv ) venv="$2"; shift 2 ;;
+	--venv ) VENV="$2"; shift 2 ;;
 	--python ) PYTHON="$2"; shift 2 ;;
 	--wheelstreet ) WHEELSTREET=$(readlink -f "$2"); shift 2 ;;
 	--requirements ) REQFILE="$2"; shift 2 ;;
