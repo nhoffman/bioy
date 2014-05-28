@@ -2,12 +2,16 @@
 
 set -e
 
+abspath(){
+    python -c "import os; print os.path.abspath(\"$1\")"
+}
+
 GREP_OPTIONS=--color=never
 
 if [[ "$(whoami)" == "root" ]]; then
     WHEELSTREET=/usr/local/share/python/wheels
 else
-    WHEELSTREET=$(readlink -f ~/wheelstreet)
+    WHEELSTREET=$(abspath ~/wheelstreet)
 fi
 
 REQFILE=requirements.txt
@@ -27,7 +31,7 @@ fi
 while true; do
     case "$1" in
 	--python ) PYTHON="$2"; shift 2 ;;
-	--wheelstreet ) WHEELSTREET=$(readlink -f "$2"); shift 2 ;;
+	--wheelstreet ) WHEELSTREET=$(abspath "$2"); shift 2 ;;
 	--requirements ) REQFILE="$2"; shift 2 ;;
 	* ) break ;;
     esac

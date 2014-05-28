@@ -13,6 +13,10 @@ fi
 
 set -e
 
+abspath(){
+    python -c "import os; print os.path.abspath(\"$1\")"
+}
+
 # defaults for options configurable from the command line
 GREP_OPTIONS=--color=never
 VENV=$(basename $(pwd))-env
@@ -38,7 +42,7 @@ while true; do
     case "$1" in
 	--venv ) VENV="$2"; shift 2 ;;
 	--python ) PYTHON="$2"; shift 2 ;;
-	--wheelstreet ) WHEELSTREET=$(readlink -f "$2"); shift 2 ;;
+	--wheelstreet ) WHEELSTREET=$(abspath "$2"); shift 2 ;;
 	--requirements ) REQFILE="$2"; shift 2 ;;
 	* ) break ;;
     esac
@@ -76,8 +80,8 @@ fi
 # install required libraries
 # hdf5: tables (PyTables)
 
-# export HDF5_DIR=$(readlink -f $VENV)
-# dev/install_hdf5.sh --prefix $HDF5_DIR --src $(readlink -f src)
+# export HDF5_DIR=$(abspath $VENV)
+# dev/install_hdf5.sh --prefix $HDF5_DIR --src $(abspath src)
 
 # # make the above libraries available when the virtualenv is activated
 # if grep -q LD_LIBRARY_PATH $VENV/bin/activate; then
