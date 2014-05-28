@@ -4,13 +4,13 @@ import tempfile
 import logging
 import re
 import subprocess
+import utils
 
 from cStringIO import StringIO
 from itertools import tee, izip_longest, groupby, takewhile, izip
 from collections import Counter, defaultdict, namedtuple
 from operator import itemgetter
 from subprocess import Popen, PIPE
-from utils import cast
 
 log = logging.getLogger(__name__)
 
@@ -586,7 +586,7 @@ def parse_ssearch36(lines, numeric = False):
             if k == 'al_cons':
                 hit[k] = ''
             else:
-                hit[prefix + k] = cast(v) if numeric else v.strip()
+                hit[prefix + k] = utils.cast(v) if numeric else v.strip()
         elif prefix and keeplines:
             if 'al_cons' in hit:
                 hit['al_cons'] += line
@@ -701,7 +701,17 @@ def format_taxonomy(names, selectors, asterisk = '*'):
 
 def compound_assignment(assignments, taxonomy):
     """
-    assignments = [(tax_id, boolean_asterisk),...]
+    Create taxonomic names based on 'assignmnets', which are a set of
+    two-tuples: {(tax_id, is_starred), ...} where each tax_id is a key
+    into taxdict, and is_starred is a boolean indicating whether at
+    least one reference sequence had a parirwise alignment identity
+    score meeting some thresholed. 'taxdict' is a dictionary keyed by
+    tax_id and returning a dict of taxonomic data corresponding to a
+    row from the taxonomy file. If 'include_stars' is False, ignore
+    the second element of each tuple in 'assignments' and do not
+    include asterisks in the output names.
+
+    assignments = [(tax_id, is_starred),...]
     taxonomy = {taxid:taxonomy}
 
     Functionality: see format_taxonomy
@@ -715,25 +725,72 @@ def compound_assignment(assignments, taxonomy):
 
     return format_taxonomy(*assignments, asterisk = '*')
 
-def name_assignment(assignments, taxdict, include_stars=True):
-    """Create taxonomic names based on 'assignmnets', which are a set of
-    two-tuples: {(tax_id, is_starred), ...} where each tax_id is a key
-    into taxdict, and is_starred is a boolean indicating whether at
-    least one reference sequence had a parirwise alignment identity
-    score meeting some thresholed. 'taxdict' is a dictionary keyed by
-    tax_id and returning a dict of taxonomic data corresponding to a
-    row from the taxonomy file. If 'include_stars' is False, ignore
-    the second element of each tuple in 'assignments' and do not
-    include asterisks in the output names.
+def condense_assignment(assignments,
+                        taxonomy,
+                        floor_rank = RANKS[-1],
+                        ceiling_rank = RANKS[0],
+                        max_size = 3,
+                        rank_thresholds = {}):
+    """
+    assignments = [(tax_id, boolean_asterisk),...]
+    taxonomy = {taxid:taxonomy}
 
+    Functionality: Group items into taxonomic groups given max rank sizes.
     """
 
-    # may need to define additional arguments to define params for condensing tax_ids
-    # possible first step: pass assignmnets to a function that condenses tax_ids
+    if not taxonomy:
+        raise TypeError('taxonomy must not be empty or NoneType')
 
+    if floor_rank not in RANKS:
+        msg = '{} not in RANKS: {}'.format(floor_rank, RANKS)
+        raise TypeError(msg)
 
-    pass
+    if ceiling_rank not in RANKS:
+        msg = '{} not in RANKS: {}'.format(ceiling_rank, RANKS)
+        raise TypeError(msg)
 
+    if RANKS.index(floor_rank) < RANKS.index(ceiling_rank):
+        msg = '{} cannot be lower rank than {}'.format(ceiling_rank, floor_rank)
+        raise TypeError(msg)
+
+    # merge is_starred
+    assignments = dict(sorted(assignments)).items()
+    # set rank to ceiling
+    assignments = {a:taxonomy[a[0]][ceiling_rank] for a in assignments}
+
+    def condense(groups, ceiling_rank = ceiling_rank, max_size = max_size):
+        new_groups = {}
+        for a,r in groups.items():
+            new_groups[a] = taxonomy[a[0]].get(ceiling_rank, r)
+
+        num_groups = len(set(new_groups.values()))
+
+        if rank_thresholds.get(ceiling_rank, max_size) < num_groups:
+            return groups
+
+        groups = new_groups
+
+        # return if we hit the floor
+        if ceiling_rank == floor_rank:
+            return groups
+
+        # else move down a rank
+        ceiling_rank = RANKS[RANKS.index(ceiling_rank) + 1]
+
+        # recurse each branch down the tax tree
+        for _,g in utils.groupbyl(groups.items(), itemgetter(1)):
+            g = condense(dict(g),
+                         ceiling_rank,
+                         max_size - num_groups + 1)
+            groups.update(g)
+
+        return groups
+
+    condensed_assignments = defaultdict(bool)
+    for (_,is_starred),n in condense(assignments).items():
+        condensed_assignments[n] |= is_starred
+
+    return condensed_assignments.items()
 
 def correct_copy_numbers(assignments):
     """Return a float representing a copy number adjustment factor given
