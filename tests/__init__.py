@@ -1,12 +1,11 @@
+import cPickle
 import sys
 import logging
 import os
 from os import path
 import unittest
-import argparse
 
-from bioy_pkg.utils import mkdir
-from bioy_pkg.scripts import globe
+from bioy_pkg.utils import mkdir, opener
 
 # set up logging for unit tests
 verbosity_flag = [x for x in sys.argv if x.startswith('-v')]
@@ -54,6 +53,9 @@ class TestBase(unittest.TestCase):
     def data(self, fname):
         return path.join(datadir, fname)
 
+    def write_pickle(self, pth, data):
+        with opener(pth, 'wb') as f:
+            cPickle.dump(data, f, protocol=cPickle.HIGHEST_PROTOCOL)
 
 class TestCaseSuppressOutput(unittest.TestCase):
 
