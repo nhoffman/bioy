@@ -18,6 +18,8 @@ from __init__ import TestBase, datadir as datadir
 
 log = logging.getLogger(__name__)
 
+sequtilsdir = path.join(datadir, 'sequtils')
+
 class TestRunSsearch(TestBase):
 
     def test01(self):
@@ -297,9 +299,9 @@ class TestParseClusters(TestBase):
 
 class TestCompoundAssignment(TestBase):
 
-    datadir = path.join(datadir, 'classifier')
+    thisdatadir = path.join(sequtilsdir, 'TestCompoundAssignment')
 
-    assignments = path.join(datadir, 'assignments.pkl.bz2')
+    assignments = path.join(sequtilsdir, 'assignments.pkl.bz2')
     assignments = BZ2File(assignments)
     assignments = cPickle.load(assignments)
 
@@ -312,11 +314,11 @@ class TestCompoundAssignment(TestBase):
         """
 
         taxonomy = self.taxonomy
-        datadir = self.datadir
+        thisdatadir = self.thisdatadir
 
         this_test = sys._getframe().f_code.co_name
 
-        compound_assignments_ref = path.join(datadir,
+        compound_assignments_ref = path.join(thisdatadir,
                                    this_test,
                                    'compound_names.pkl.bz2')
         compound_assignments_ref = BZ2File(compound_assignments_ref)
@@ -346,4 +348,123 @@ class TestCompoundAssignment(TestBase):
 
         for a in self.assignments:
             self.assertRaises(TypeError, sequtils.compound_assignment, a, {})
+
+class TestCondenseAssignment(TestBase):
+
+    thisdatadir = path.join(sequtilsdir, 'TestCondenseAssignment')
+
+    assignments = path.join(sequtilsdir, 'assignments.pkl.bz2')
+    assignments = BZ2File(assignments)
+    assignments = cPickle.load(assignments)
+
+    taxonomy = BZ2File(path.join(datadir, 'taxonomy.csv.bz2'))
+    taxonomy = {t['tax_id']:t for t in csv.DictReader(taxonomy)}
+
+    def test01(self):
+        """
+        test basic behavior, max_size = 3 behavior
+        """
+
+        taxonomy = self.taxonomy
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        condensed_assignments_ref = path.join(thisdatadir,
+                                             this_test,
+                                             'assignments.pkl.bz2')
+        condensed_assignments_ref = BZ2File(condensed_assignments_ref)
+        condensed_assignments_ref = cPickle.load(condensed_assignments_ref)
+
+        condense_assignments = lambda x: sequtils.condense_assignment(x, taxonomy, max_size = 3)
+        condensed_assignments = map(condense_assignments, self.assignments)
+
+        self.assertEquals(condensed_assignments, condensed_assignments_ref)
+
+    def test02(self):
+        """
+        test max_size = 1 behavior
+        """
+
+        taxonomy = self.taxonomy
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        condensed_assignments_ref = path.join(thisdatadir,
+                                             this_test,
+                                             'assignments.pkl.bz2')
+        condensed_assignments_ref = BZ2File(condensed_assignments_ref)
+        condensed_assignments_ref = cPickle.load(condensed_assignments_ref)
+
+        condense_assignments = lambda x: sequtils.condense_assignment(x, taxonomy, max_size = 1)
+        condensed_assignments = map(condense_assignments, self.assignments)
+
+
+        self.assertEquals(condensed_assignments, condensed_assignments_ref)
+
+    def test03(self):
+        """
+        test max_size = 0
+        """
+
+        taxonomy = self.taxonomy
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        condensed_assignments_ref = path.join(thisdatadir,
+                                             this_test,
+                                             'assignments.pkl.bz2')
+        condensed_assignments_ref = BZ2File(condensed_assignments_ref)
+        condensed_assignments_ref = cPickle.load(condensed_assignments_ref)
+
+        condense_assignments = lambda x: sequtils.condense_assignment(x, taxonomy, max_size = 0)
+        condensed_assignments = map(condense_assignments, self.assignments)
+
+        self.assertEquals(condensed_assignments, condensed_assignments_ref)
+
+    def test04(self):
+        """
+        test no taxonomy
+        """
+
+        for a in self.assignments:
+            self.assertRaises(TypeError, sequtils.condense_assignment, a, None)
+
+    def test05(self):
+        """
+        test wrong floor_rank
+        """
+
+        taxonomy = self.taxonomy
+
+        for a in self.assignments:
+            self.assertRaises(TypeError, sequtils.condense_assignment, a, taxonomy, floor_rank = '')
+
+    def test06(self):
+        """
+        test wrong ceiling
+        """
+
+        taxonomy = self.taxonomy
+
+        for a in self.assignments:
+            self.assertRaises(TypeError, sequtils.condense_assignment, a, taxonomy, ceiling_rank = '')
+
+    def test07(self):
+        """
+        test ceiling too high
+        """
+
+        taxonomy = self.taxonomy
+
+        for a in self.assignments:
+            self.assertRaises(TypeError,
+                              sequtils.condense_assignment,
+                              a,
+                              taxonomy,
+                              ceiling_rank = 'species',
+                              floor_rank = 'superkingdom')
+
 
