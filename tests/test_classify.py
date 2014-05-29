@@ -21,11 +21,12 @@ class TestClassify(TestBase, TestCaseSuppressOutput):
 
     log_info = 'bioy classify {}'
 
+    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2')
+
     datadir = path.join(datadir, 'classify')
 
     tax = path.join(datadir, 'taxonomy.csv.bz2')
     info = path.join(datadir, 'seq_info.csv.bz2')
-    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv')
 
     def test01(self):
         """
