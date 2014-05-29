@@ -467,4 +467,61 @@ class TestCondenseAssignment(TestBase):
                               ceiling_rank = 'species',
                               floor_rank = 'superkingdom')
 
+class TestCorrectCopyNumbers(TestBase):
+
+    thisdatadir = path.join(sequtilsdir, 'TestCorrectCopyNumbers')
+
+    assignments = path.join(sequtilsdir, 'assignments.pkl.bz2')
+    assignments = BZ2File(assignments)
+    assignments = cPickle.load(assignments)
+
+    copy_numbers = BZ2File(path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2'))
+    copy_numbers = {c['tax_id']:c['median'] for c in csv.DictReader(copy_numbers)}
+
+    def test01(self):
+        """
+        test basic behavior
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        corrections_ref = path.join(thisdatadir,
+                                    this_test,
+                                    'copy_numbers.pkl.bz2')
+        corrections_ref = BZ2File(corrections_ref)
+        corrections_ref = cPickle.load(corrections_ref)
+
+        corrections = lambda x: sequtils.correct_copy_numbers(x, self.copy_numbers)
+        corrections = map(corrections, self.assignments)
+
+        self.assertEquals(corrections_ref, corrections)
+
+    def test02(self):
+        """
+        test empty copy_corrections
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        corrections_ref = path.join(thisdatadir,
+                                    this_test,
+                                    'copy_numbers.pkl.bz2')
+        corrections_ref = BZ2File(corrections_ref)
+        corrections_ref = cPickle.load(corrections_ref)
+
+        corrections = lambda x: sequtils.correct_copy_numbers(x, self.copy_numbers)
+        corrections = map(corrections, self.assignments)
+
+        self.assertEquals(corrections_ref, corrections)
+
+    def test03(self):
+        """
+        test empty assignments
+        """
+
+        self.assertRaises(TypeError, sequtils.correct_copy_numbers, [], self.copy_numbers)
 

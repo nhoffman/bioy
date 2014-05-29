@@ -2,6 +2,7 @@ import csv
 import contextlib
 import tempfile
 import logging
+import numpy
 import re
 import subprocess
 import utils
@@ -792,15 +793,22 @@ def condense_assignment(assignments,
 
     return condensed_assignments.items()
 
-def correct_copy_numbers(assignments):
+def correct_copy_numbers(assignments, copy_numbers):
     """Return a float representing a copy number adjustment factor given
     'assignments' (a set of two-tuples: {(tax_id, is_starred), ...})
-    and ...
+    and .
 
     """
 
-    pass
+    if not assignments:
+        raise TypeError('assignments must not be empty or NoneType')
 
+    if copy_numbers:
+        assignments = map(itemgetter(0), assignments)
+        corrections = [float(copy_numbers[i]) for i in assignments]
+        return numpy.mean(corrections)
+    else:
+        return 1
 
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 
