@@ -15,13 +15,12 @@ import sys
 import logging
 
 from os import path
-from csv import DictReader, DictWriter
 
 import numpy as np
 import pandas as pd
 
 from bioy_pkg import sequtils
-from bioy_pkg.utils import Opener, opener, Csv2Dict, groupbyl
+from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
@@ -64,11 +63,11 @@ def build_parser(parser):
 
     # output files
     parser.add_argument(
-        '-o', '--outfile', default=sys.stdout, type=Opener('w'),
+        '-o', '--out', default=sys.stdout, type=Opener('w'),
         metavar='FILE',
         help="Classification results.")
     parser.add_argument(
-        '-d', '--details', type=Opener('w'), metavar='FILE',
+        '-O', '--out-details', type=Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
 
     # classification parameters
@@ -113,6 +112,8 @@ def build_parser(parser):
         genus:2""")
 
     # TODO: what does this do?
+    # CR: text label to handle all blast results as one group when no specimen
+    # map is specified.  Goes with the all-one-group option above
     parser.add_argument(
         '--group-label', metavar='LABEL', default='all',
         help="""Single group label for reads""")
@@ -125,55 +126,6 @@ def build_parser(parser):
         '--details-full', action='store_true', default='False',
         help='do not limit out_details to only larget cluster per assignment')
 
-
-class Assignment(object):
-    """An instance of the Assignment class is used to create a dictionary
-    of group keys. Each time the assign() method is called, the
-    provided DataFrame 'df' is grouped according to self.colnames and
-    the group keys are added to self.assignment keyed by a hash.
-
-    """
-
-    def __init__(self, colnames):
-        """'colnames' is a list of column names on which to group the input of
-        the 'assign' method.
-
-        """
-        self.colnames = colnames
-        self.assignments = {}
-
-    def assign(self, df):
-        """Store the group keys resulting from grouping 'df' by self.colnames
-        in self.assignments and return the hash.
-
-        """
-        assignment = frozenset(df.groupby(self.colnames).groups.keys())
-        assignment_key = hash(assignment)
-        self.assignments[assignment_key] = assignment
-        return assignment_key
-
-    def add(self, key, val):
-        """Add {key: val} directly to self.assignments (val must be an
-        integer).
-
-        """
-
-        assert isinstance(key, int)
-        self.assignments[key] = val
-
-
-def assign_names(assignment):
-    """Mockup of a function to convert a frozenset containing (tax_id,
-    is_starred) tuples into a taxonomic name.
-
-    """
-
-    if isinstance(assignment, str):
-        return assignment
-    else:
-        return '-'.join(sorted({str(tax_id) for tax_id, _ in assignment}))
-
-
 def read_csv(filename, compression=None, **kwargs):
     """read a csv file using pandas.read_csv with compression defined by
     the file suffix unless provided.
@@ -181,7 +133,8 @@ def read_csv(filename, compression=None, **kwargs):
     """
 
     suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
-    kwargs['compression'] = compression or suffixes.get(path.splitext(filename)[-1])
+    compression = compression or suffixes.get(path.splitext(filename)[-1])
+    kwargs['compression'] = compression
 
     return pd.read_csv(filename, **kwargs)
 
@@ -192,121 +145,108 @@ def read_csv(filename, compression=None, **kwargs):
 # 'tax_name', 'target_rank', 'rank', 'hi', 'low']
 
 def action(args):
+#    pd.set_option('display.max_columns', None)
+#    pd.set_option('display.max_rows', None)
 
     seq_info = read_csv(args.seq_info,
-                        dtype={'seqname': str,
-                               'tax_id': str,
-                               'accession': str,
-                               'description': str,
+                        dtype={'tax_id':str,
                                'length': int,
                                'ambig_count': int,
-                               'is_type': str,
-                               'rdp_lineage': str})
-
-    seq_info.rename(columns=dict(seqname='sseqid'), inplace=True)
+                               'is_type': bool})
+    seq_info = seq_info.rename(columns=dict(seqname='sseqid'))
+    seq_info = seq_info.set_index('sseqid')
 
     taxonomy = read_csv(args.taxonomy, dtype=str)
+    taxonomy = taxonomy.set_index('tax_id')
 
     # format blast data and add additional available information
-    blast_results = read_csv(
-        args.blast_file, header=0 if args.has_header else None)
+    blast_results = read_csv(args.blast_file,
+                             header=0 if args.has_header else None)
 
     if not args.has_header:
-        # assert len(blast_results.columns) == len(sequtils.BLAST_HEADER)
-        blast_results.rename(
-            columns=dict(zip(blast_results.columns, sequtils.BLAST_HEADER)),
-            inplace=True)
-
-    # original set of qseqids
-    qseqids_in = set(blast_results.qseqid.unique())
-
-    # Create a Series containing each of sequence names (ie, qseqids) with
-    # values indicating no blast hits (0), < min_identity (1), or >=
-    # max_idenity (2).
-    no_hit_idx = blast_results['sseqid'].isnull()
-    no_hit = pd.Series(0, index=blast_results.qseqid[no_hit_idx])
-    blast_results = blast_results[~ no_hit_idx]
-
-    # remove hits < min_identity
-    blast_results = blast_results[blast_results.pident >= args.min_identity]
-
-    # remove no_hit and remaining qseqids from the original set to
-    # leave those represented only by hits < min_identity
-    lt_min = pd.Series(1, index=qseqids_in -
-                       set(no_hit.index) -
-                       set(blast_results.qseqid.unique()))
-
-    # gt_max = blast_results.pident > args.max_identity
-    excluded = pd.concat([no_hit, lt_min])
+        columns = dict(zip(blast_results.columns, sequtils.BLAST_HEADER))
+        blast_results = blast_results.rename(columns=columns)
 
     # add a column indicating if a hit meets the threshold for
     # starring.
-    blast_results['starred'] = blast_results['pident'].apply(
-        lambda x: x >= args.starred)
+    is_starred = lambda x: x >= args.starred
+    blast_results['starred'] = blast_results['pident'].apply(is_starred)
 
     # merge blast results with seq_info - do this early so that
     # refseqs not represented in the blast results are discarded in
     # the merge.
-    hits = pd.merge(
+    blast_results = pd.merge(
         # blast_results[['qseqid', 'sseqid', 'pident', 'starred', 'coverage']],
         blast_results[['qseqid', 'sseqid', 'pident', 'starred']],
-        seq_info[['sseqid', 'tax_id', 'accession']],
-        how='left', on='sseqid', sort=False)
+        seq_info[['tax_id', 'accession']],
+        how='left', left_on='sseqid', sort=False, right_index=True)
 
     # merge with taxonomy to associate original tax_ids with tax_ids
     # at the specified rank.
-    hits = pd.merge(hits, taxonomy[['tax_id', args.rank]], how='left',
-                    on='tax_id', sort=False)
+    blast_results = pd.merge(blast_results,
+                             taxonomy[[args.rank]],
+                             how = 'left',
+                             left_on = 'tax_id',
+                             right_index = True)
 
     # merge with taxonomy again to get tax_names
-    hits = pd.merge(hits, taxonomy[['tax_id', 'tax_name']], how='left',
-                    left_on=args.rank, right_on='tax_id')
+    blast_results = pd.merge(blast_results,
+                             taxonomy[['tax_name']],
+                             how = 'left',
+                             left_on = args.rank,
+                             right_index = True)
 
-    # rename the column containing tax_id's at the specified rank to
-    # 'tax_id' and delete the duplicate column 'tax_id_y'; tax_id_x
-    # now refers to the original tax_ids for the reference sequences.
-    hits.rename(columns={args.rank: 'tax_id'}, inplace=True)
-    del hits['tax_id_y']
+    # output to details.csv.bz2
+    if args.out_details:
+        if args.details_full:
+            with args.out_details as out_details:
+                blast_results.to_csv(out_details,
+                                     header=True,
+                                     index=False)
+        else:
+            print 'details summary not implemented yet'
+            return
 
-    # stores a hash of each frozenset containing {(tax_name, starred), ...}
-    assigner = Assignment(['tax_id', 'starred'])
-    assigner.add(0, '[no blast_result]')
-    assigner.add(1, '<{}'.format(args.min_identity))
-    assigner.add(2, '>{}'.format(args.max_identity))
+    ## concludes our blast results details, now for some grouping and summarizing
 
-    grouped_by_query = hits.groupby(['qseqid'])
+    # Create a Series containing each of sequence names (ie, qseqids) with
+    # values indicating no blast hits (0), < min_identity (1), or >=
+    # max_idenity (2).
+    no_hit_idx = blast_results.sseqid.isnull()
 
-    # Determine assignment names and concatenate with sequences having
-    # no blast hit.
-    assigned = pd.concat([excluded, grouped_by_query.apply(assigner.assign)])
-    assigned.name = 'assignment_key'
+    not_assigned = blast_results[no_hit_idx]
+    not_assigned['assignment'] = '[no blast_result]'
 
-    assert set(assigned.index) == qseqids_in
+    tax_dict = {i:t.to_dict() for i,t in taxonomy.fillna('').iterrows()}
 
-    assignments = pd.DataFrame(assigned)
-    assignments['qseqid'] = assignments.index
+    def assign(df):
+        ids_stars = df.groupby(by=['tax_id', 'starred']).groups.keys()
+        condensed = sequtils.condense_assignment(ids_stars, tax_dict)
+        assignment = sequtils.compound_assignment(condensed, tax_dict)
+        df['assignment'] = assignment
+        return df
+
+    assigned = blast_results[~ no_hit_idx].groupby(['qseqid']).apply(assign)
+
+    assigned = pd.concat([assigned, not_assigned])
 
     if args.weights:
         weights = read_csv(args.weights, header=None, names=['qseqid', 'weight'])
-        assignments = pd.merge(assignments, weights, how='left', on='qseqid')
+        assigned = pd.merge(assigned, weights, how='left', on='qseqid')
     else:
-        assignments['weight'] = 1
-
-    # add assignments
-    assignments['assignment'] = assignments.assignment_key.map(
-        lambda x: assign_names(assigner.assignments.get(x)))
+        assigned['weight'] = 1
 
     # group by assignment
-    counts = assignments.groupby(['assignment']).weight.sum()
+    counts = assigned.groupby(['assignment']).weight.sum()
     counts.name = 'reads'
 
     output = pd.DataFrame(counts)
     output['freq'] = output / output.sum()
-    output['clusters'] = assignments.groupby(['assignment']).size()
+    output['clusters'] = assigned.groupby(['assignment']).size()
 
     output.sort('reads', ascending=False, inplace=True)
 
-    output.to_csv(args.outfile)
+#    output.to_csv(args.outfile)
 
     # next steps...
     # - create names for assignments
