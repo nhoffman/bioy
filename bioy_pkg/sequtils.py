@@ -761,8 +761,9 @@ def condense_assignment(assignments,
 
     def condense(groups, ceiling_rank = ceiling_rank, max_size = max_size):
         new_groups = {}
+
         for a,r in groups.items():
-            new_groups[a] = taxonomy[a[0]].get(ceiling_rank, r)
+            new_groups[a] = taxonomy[a[0]][ceiling_rank] or r
 
         num_groups = len(set(new_groups.values()))
 
