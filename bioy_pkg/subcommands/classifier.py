@@ -16,7 +16,6 @@ import logging
 
 from os import path
 
-import numpy as np
 import pandas as pd
 
 from bioy_pkg import sequtils
@@ -138,120 +137,151 @@ def read_csv(filename, compression=None, **kwargs):
 
     return pd.read_csv(filename, **kwargs)
 
-
-# details columns (maybe)
-# ['specimen', 'assignment', 'assignment_id', 'qseqid', 'sseqid',
-# 'pident', 'coverage', 'ambig_count', 'accession', 'tax_id',
-# 'tax_name', 'target_rank', 'rank', 'hi', 'low']
-
 def action(args):
 #    pd.set_option('display.max_columns', None)
 #    pd.set_option('display.max_rows', None)
 
-    seq_info = read_csv(args.seq_info,
-                        dtype={'tax_id':str,
-                               'length': int,
-                               'ambig_count': int,
-                               'is_type': bool})
-    seq_info = seq_info.rename(columns=dict(seqname='sseqid'))
+    seq_info = read_csv(
+            args.seq_info,
+            dtype = dict(tax_id = str,
+                         length = int,
+                         ambig_count = int,
+                         is_type = bool))
+    seq_info = seq_info.rename(columns = dict(seqname='sseqid'))
+    seq_info = seq_info[['sseqid', 'tax_id', 'accession']]
     seq_info = seq_info.set_index('sseqid')
 
-    taxonomy = read_csv(args.taxonomy, dtype=str)
+    taxonomy = read_csv(args.taxonomy, dtype = str)
     taxonomy = taxonomy.set_index('tax_id')
 
     # format blast data and add additional available information
     blast_results = read_csv(args.blast_file,
-                             header=0 if args.has_header else None)
+                             header = 0 if args.has_header else None)
 
     if not args.has_header:
         columns = dict(zip(blast_results.columns, sequtils.BLAST_HEADER))
-        blast_results = blast_results.rename(columns=columns)
-
-    # add a column indicating if a hit meets the threshold for
-    # starring.
-    is_starred = lambda x: x >= args.starred
-    blast_results['starred'] = blast_results['pident'].apply(is_starred)
+        blast_results = blast_results.rename(columns = columns)
 
     # merge blast results with seq_info - do this early so that
     # refseqs not represented in the blast results are discarded in
     # the merge.
-    blast_results = pd.merge(
-        # blast_results[['qseqid', 'sseqid', 'pident', 'starred', 'coverage']],
-        blast_results[['qseqid', 'sseqid', 'pident', 'starred']],
-        seq_info[['tax_id', 'accession']],
-        how='left', left_on='sseqid', sort=False, right_index=True)
+    blast_results = blast_results[['qseqid', 'sseqid', 'pident']]
+
+    blast_results['target_rank'] = args.rank
+
+    blast_results = blast_results.merge(
+            seq_info,
+            how = 'left',
+            left_on = 'sseqid',
+            right_index = True)
 
     # merge with taxonomy to associate original tax_ids with tax_ids
     # at the specified rank.
-    blast_results = pd.merge(blast_results,
-                             taxonomy[[args.rank]],
-                             how = 'left',
-                             left_on = 'tax_id',
-                             right_index = True)
+    blast_results = blast_results.merge(
+            taxonomy[[args.rank]],
+            how = 'left',
+            left_on = 'tax_id',
+            right_index = True)
 
     # merge with taxonomy again to get tax_names
-    blast_results = pd.merge(blast_results,
-                             taxonomy[['tax_name']],
-                             how = 'left',
-                             left_on = args.rank,
-                             right_index = True)
+    blast_results = blast_results.merge(
+            taxonomy[['tax_name']],
+            how = 'left',
+            left_on = args.rank,
+            right_index = True)
+
+    # assign seqs that had no results to [no blast_result]
+    no_hits = blast_results[blast_results.sseqid.isnull()]
+    no_hits['assignment'] = '[no blast result]'
+    no_hits['assignment_hash'] = 0
+
+    # move on to seqs that had hits
+    blast_results = blast_results[blast_results.sseqid.notnull()]
+
+    # TODO: this is taking a lot of time, integrate pandas into sequtils
+    tax_dict = {i:t.to_dict() for i,t in taxonomy.fillna('').iterrows()}
+
+    # create mapping from tax_id to its condensed id and set assignment hash
+    def condense_ids(df):
+        condensed = sequtils.condense_ids(df.tax_id.unique(), tax_dict)
+        condensed = pd.DataFrame(
+                condensed.items(),
+                columns = ['tax_id', 'condensed_id'])
+        assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
+        condensed['assignment_hash'] = assignment_hash
+        condensed = condensed.set_index('tax_id')
+        return df.merge(condensed,
+                how = 'left',
+                left_on = 'tax_id',
+                right_index = True)
+
+    # create condensed assignment hashes by qseqid
+    blast_results = blast_results.groupby(by = ['qseqid']).apply(condense_ids)
+
+    # if any hit meets the star criteria mark it as starred
+    def star(df):
+        df['starred'] = df.pident.apply(lambda x: x >= args.starred).any()
+        return df
+
+    # star condensed ids
+    blast_results = blast_results.groupby(by = ['assignment_hash', 'condensed_id']).apply(star)
+
+    def assign(df):
+        ids_stars = df.groupby(by = ['condensed_id', 'starred']).groups.keys()
+        df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
+        return df
+
+    blast_results = blast_results.groupby(['assignment_hash']).apply(assign)
+
+    # put assignments and no assignments back together
+    blast_results = pd.concat([blast_results, no_hits])
 
     # output to details.csv.bz2
     if args.out_details:
-        if args.details_full:
-            with args.out_details as out_details:
-                blast_results.to_csv(out_details,
-                                     header=True,
-                                     index=False)
-        else:
-            print 'details summary not implemented yet'
-            return
+        with args.out_details as out_details:
+            if args.details_full:
+                blast_results.drop('assignment_hash', axis = 1).to_csv(out_details,
+                                     header = True,
+                                     index = False,
+                                     float_format = '%.2f')
+            else:
+                print 'details summary not implemented yet'
 
-    ## concludes our blast results details, now for some grouping and summarizing
+    ### concludes our blast details
 
-    # Create a Series containing each of sequence names (ie, qseqids) with
-    # values indicating no blast hits (0), < min_identity (1), or >=
-    # max_idenity (2).
-    no_hit_idx = blast_results.sseqid.isnull()
+    # now for some assignment grouping and summarizing
+    output = blast_results[['assignment_hash', 'assignment', 'target_rank']]
+    output = output.set_index('assignment_hash')
+    output = output.drop_duplicates()
 
-    not_assigned = blast_results[no_hit_idx]
-    not_assigned['assignment'] = '[no blast_result]'
-
-    tax_dict = {i:t.to_dict() for i,t in taxonomy.fillna('').iterrows()}
-
-    def assign(df):
-        ids_stars = df.groupby(by=['tax_id', 'starred']).groups.keys()
-        condensed = sequtils.condense_assignment(ids_stars, tax_dict)
-        assignment = sequtils.compound_assignment(condensed, tax_dict)
-        df['assignment'] = assignment
-        return df
-
-    assigned = blast_results[~ no_hit_idx].groupby(['qseqid']).apply(assign)
-
-    assigned = pd.concat([assigned, not_assigned])
+    # the qseqid cluster stats
+    counts = blast_results[['qseqid', 'assignment_hash']]
+    counts = counts.drop_duplicates()
 
     if args.weights:
-        weights = read_csv(args.weights, header=None, names=['qseqid', 'weight'])
-        assigned = pd.merge(assigned, weights, how='left', on='qseqid')
+        weights = read_csv(args.weights,
+                           header = None,
+                           names = ['qseqid', 'weight'])
+        counts = counts.merge(weights, how = 'left', on = 'qseqid')
     else:
-        assigned['weight'] = 1
+        counts['weight'] = 1
 
-    # group by assignment
-    counts = assigned.groupby(['assignment']).weight.sum()
-    counts.name = 'reads'
+    counts = counts.groupby(by=['assignment_hash'])
 
-    output = pd.DataFrame(counts)
-    output['freq'] = output / output.sum()
-    output['clusters'] = assigned.groupby(['assignment']).size()
+    output['reads'] = counts.weight.sum()
+    output['freq'] = output['reads'] / output['reads'].sum() * 100
+    output['clusters'] = counts.size()
 
-    output.sort('reads', ascending=False, inplace=True)
+    # qseqid hit ranges
+    assignment_groups = blast_results.groupby(by=['assignment_hash'])
+    output['max_percent'] = assignment_groups['pident'].max()
+    output['min_percent'] = assignment_groups['pident'].min()
 
-#    output.to_csv(args.outfile)
+    output = output.sort('reads', ascending = False)
+    output.to_csv(args.out, float_format='%.2f')
 
     # next steps...
     # - create names for assignments
     # - calculate and apply copy number correction factor
     # - add assignment_ids
-    # - assemble details
-
 
