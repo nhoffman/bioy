@@ -726,14 +726,14 @@ def compound_assignment(assignments, taxonomy):
 
     return format_taxonomy(*assignments, asterisk = '*')
 
-def condense_assignment(assignments,
-                        taxonomy,
-                        floor_rank = RANKS[-1],
-                        ceiling_rank = RANKS[0],
-                        max_size = 3,
-                        rank_thresholds = {}):
+def condense_ids(assignments,
+                 taxonomy,
+                 floor_rank = RANKS[-1],
+                 ceiling_rank = RANKS[0],
+                 max_size = 3,
+                 rank_thresholds = {}):
     """
-    assignments = [(tax_id, boolean_asterisk),...]
+    assignments = [tax_ids...]
     taxonomy = {taxid:taxonomy}
 
     Functionality: Group items into taxonomic groups given max rank sizes.
@@ -754,16 +754,14 @@ def condense_assignment(assignments,
         msg = '{} cannot be lower rank than {}'.format(ceiling_rank, floor_rank)
         raise TypeError(msg)
 
-    # merge is_starred
-    assignments = dict(sorted(assignments)).items()
     # set rank to ceiling
-    assignments = {a:taxonomy[a[0]][ceiling_rank] for a in assignments}
+    assignments = {a:taxonomy[a][ceiling_rank] for a in assignments}
 
     def condense(groups, ceiling_rank = ceiling_rank, max_size = max_size):
         new_groups = {}
 
         for a,r in groups.items():
-            new_groups[a] = taxonomy[a[0]][ceiling_rank] or r
+            new_groups[a] = taxonomy[a][ceiling_rank] or r
 
         num_groups = len(set(new_groups.values()))
 
@@ -788,11 +786,7 @@ def condense_assignment(assignments,
 
         return groups
 
-    condensed_assignments = defaultdict(bool)
-    for (_,is_starred),n in condense(assignments).items():
-        condensed_assignments[n] |= is_starred
-
-    return condensed_assignments.items()
+    return condense(assignments)
 
 def correct_copy_numbers(assignments, copy_numbers):
     """Return a float representing a copy number adjustment factor given
