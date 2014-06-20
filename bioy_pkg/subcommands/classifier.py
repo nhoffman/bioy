@@ -57,7 +57,7 @@ def build_parser(parser):
         metavar='FILE',
         help="Classification results.")
     parser.add_argument(
-        '-O', '--out-details', type=Opener('w'), metavar='FILE',
+        '-O', '--details-out', type=Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
     # classification parameters
     parser.add_argument(
@@ -97,6 +97,9 @@ def build_parser(parser):
     parser.add_argument(
         '--details-full', action='store_true',
         help='do not limit out_details to only larget cluster per assignment')
+    parser.add_argument(
+        '--rank-thresholds', metavar='CSV',
+        help='columns [tax_id,hi,low,rank]')
 
 
 def read_csv(filename, compression=None, **kwargs):
@@ -126,47 +129,20 @@ def action(args):
                              header=header,
                              usecols=usecols)
 
-    # filter out high and low identity hits and low coverage hits
-    blast_results = blast_results[
-        blast_results['pident'] >= args.min_identity]
-    blast_results = blast_results[
-        blast_results['pident'] <= args.max_identity]
+    # get a set of qseqids for identifying [no blast hits] after filtering
+    qseqids = blast_results[['qseqid']].drop_duplicates().set_index('qseqid')
+
+    # filter out low coverage hits
     blast_results = blast_results[
         blast_results['coverage'] >= args.min_coverage]
 
-    # assign specimen names
-    specimens = blast_results['qseqid'].drop_duplicates()
-    specimens = specimens.reset_index().set_index('qseqid')
-    specimens = specimens.drop('index', axis=1)
-
-    if args.specimen_map:
-        spec_map = read_csv(args.specimen_map,
-                            names=['qseqid', 'specimen'],
-                            index_col='qseqid')
-        specimens = specimens.join(spec_map)
-    elif args.specimen:
-        specimens['specimen'] = args.specimen
-    else:
-        specimens['specimen'] = specimens.index
-
-    blast_results = blast_results.join(specimens, on='qseqid')
-
-    # hi and low
-    blast_results['hi'] = args.max_identity
-    blast_results['low'] = args.min_identity
-
-    # assign target rank
-    # TODO: read in thresholds file
-    blast_results['target_rank'] = args.rank
-
-    seq_info = read_csv(
-        args.seq_info,
-        usecols=['seqname', 'tax_id', 'accession'],
-        dtype=dict(tax_id=str,
-                   length=int,
-                   ambig_count=int,
-                   is_type=bool),
-        index_col='seqname')
+    seq_info = read_csv(args.seq_info,
+                        usecols=['seqname', 'tax_id', 'accession'],
+                        dtype=dict(tax_id=str,
+                                   length=int,
+                                   ambig_count=int,
+                                   is_type=bool),
+                        index_col='seqname')
     seq_info.index.name = 'sseqid'
 
     # must set index after assigning datatype
@@ -184,6 +160,42 @@ def action(args):
     # merge with taxonomy again to get tax_names
     blast_results = blast_results.join(taxonomy[['tax_name']], on=args.rank)
 
+    # assign target rank
+    if args.rank_thresholds:
+        rank_thresholds = read_csv(args.rank_thresholds,
+                                   index_col=['taxid', 'hi', 'low'])
+        print rank_thresholds
+    else:
+        blast_results['target_rank'] = args.rank
+        blast_results['hi'] = args.max_identity
+        blast_results['low'] = args.min_identity
+        blast_results = blast_results[
+            blast_results['pident'] <= args.max_identity]
+        blast_results = blast_results[
+            blast_results['pident'] > args.min_identity]
+
+    # merge filtered qseqids back into blast_results for assignment
+    blast_results = qseqids.join(
+        blast_results.set_index('qseqid'),
+        how='outer').reset_index()
+
+    # load specimen-map and assign specimen names
+    specimens = blast_results['qseqid'].drop_duplicates()
+    specimens = specimens.reset_index().set_index('qseqid')
+    specimens = specimens.drop('index', axis=1)
+
+    if args.specimen_map:
+        spec_map = read_csv(args.specimen_map,
+                            names=['qseqid', 'specimen'],
+                            index_col='qseqid')
+        specimens = specimens.join(spec_map)
+    elif args.specimen:
+        specimens['specimen'] = args.specimen
+    else:
+        specimens['specimen'] = specimens.index
+
+    blast_results = blast_results.join(specimens, on='qseqid')
+
     # assign seqs that had no results to [no blast_result]
     no_hits = blast_results[blast_results.sseqid.isnull()]
     no_hits['assignment'] = '[no blast result]'
@@ -197,10 +209,13 @@ def action(args):
 
     # create mapping from tax_id to its condensed id and set assignment hash
     def condense_ids(df):
-        condensed = sequtils.condense_ids(df.tax_id.unique(), tax_dict)
-        condensed = pd.DataFrame(
-            condensed.items(),
-            columns=['tax_id', 'condensed_id'])
+        floor_rank = df['target_rank'].head(1).tolist()[0]
+        condensed = sequtils.condense_ids(df.tax_id.unique(),
+                                          tax_dict,
+                                          floor_rank=floor_rank,
+                                          max_size=args.target_max_group_size)
+        condensed = pd.DataFrame(condensed.items(),
+                                 columns=['tax_id', 'condensed_id'])
         condensed = condensed.set_index('tax_id')
         assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
         condensed['assignment_hash'] = assignment_hash
@@ -239,31 +254,31 @@ def action(args):
     output = output.set_index(['specimen', 'assignment_hash'])
 
     # the qseqid cluster stats
-    qseqids = blast_results[['qseqid', 'specimen', 'assignment_hash']]
-    qseqids = qseqids.drop_duplicates().set_index('qseqid')
+    clusters = blast_results[['qseqid', 'specimen', 'assignment_hash']]
+    clusters = clusters.drop_duplicates().set_index('qseqid')
 
     if args.weights:
         weights = read_csv(args.weights,
                            header=None,
                            names=['qseqid', 'weight'],
                            index_col='qseqid')
-        qseqids = qseqids.join(weights)
+        clusters = clusters.join(weights)
         # switch back to int and set no info to weight of 1
-        qseqids['weight'] = qseqids['weight'].fillna(1).astype(int)
+        clusters['weight'] = clusters['weight'].fillna(1).astype(int)
     else:
-        qseqids['weight'] = 1
+        clusters['weight'] = 1
 
-    qseqids = qseqids.groupby(by=['specimen', 'assignment_hash'], sort=False)
+    clusters = clusters.groupby(by=['specimen', 'assignment_hash'], sort=False)
 
-    output['reads'] = qseqids.weight.sum()
+    output['reads'] = clusters.weight.sum()
 
     def freq(df):
-        df['freq'] = df['reads'] / df['reads'].sum() * 100
+        df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
         return df
 
     output = output.groupby(level='specimen').apply(freq)
 
-    output['clusters'] = qseqids.size()
+    output['clusters'] = clusters.size()
 
     if args.copy_numbers:
         copy_numbers = read_csv(
@@ -308,7 +323,7 @@ def action(args):
     output.to_csv(args.out, index=True, float_format='%.2f')
 
     # output to details.csv.bz2
-    if args.out_details:
+    if args.details_out:
         with args.out_details as out_details:
             if args.details_full:
                 blast_results.to_csv(out_details,
@@ -316,7 +331,7 @@ def action(args):
                                      index=True,
                                      float_format='%.2f')
             else:
-                largest = qseqids.apply(lambda x: x['weight'].nlargest(1))
+                largest = clusters.apply(lambda x: x['weight'].nlargest(1))
                 largest = largest.reset_index()
                 largest.merge(blast_results).to_csv(out_details,
                                                     header=True,
