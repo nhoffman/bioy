@@ -153,18 +153,17 @@ def action(args):
     # the merge.
     blast_results = blast_results.join(seq_info, on='sseqid')
 
-    # merge with taxonomy to associate original tax_ids with tax_ids
-    # at the specified rank.
-    blast_results = blast_results.join(taxonomy[[args.rank]], on='tax_id')
-
-    # merge with taxonomy again to get tax_names
-    blast_results = blast_results.join(taxonomy[['tax_name']], on=args.rank)
+    # merge with taxonomy.
+    # Cannot simply merge onto target_rank because some hits may
+    # above the target_rank within the rank thresholds
+    blast_results = blast_results.join(
+        taxonomy[['tax_name', 'rank']], on='tax_id')
 
     # assign target rank
     if args.rank_thresholds:
-        rank_thresholds = read_csv(args.rank_thresholds,
-                                   index_col=['taxid', 'hi', 'low'])
+        rank_thresholds = read_csv(args.rank_thresholds, index_col='tax_rank')
         print rank_thresholds
+        return
     else:
         blast_results['target_rank'] = args.rank
         blast_results['hi'] = args.max_identity
@@ -174,15 +173,14 @@ def action(args):
         blast_results = blast_results[
             blast_results['pident'] > args.min_identity]
 
-    # merge filtered qseqids back into blast_results for assignment
+    # merge filtered qseqids back into blast_results
     blast_results = qseqids.join(
         blast_results.set_index('qseqid'),
         how='outer').reset_index()
 
     # load specimen-map and assign specimen names
-    specimens = blast_results['qseqid'].drop_duplicates()
-    specimens = specimens.reset_index().set_index('qseqid')
-    specimens = specimens.drop('index', axis=1)
+    specimens = blast_results[['qseqid']].drop_duplicates()
+    specimens = specimens.set_index('qseqid')
 
     if args.specimen_map:
         spec_map = read_csv(args.specimen_map,
@@ -251,6 +249,7 @@ def action(args):
     output = blast_results[['specimen', 'assignment_hash',
                             'assignment', 'target_rank']]
     output = output.drop_duplicates()
+
     output = output.set_index(['specimen', 'assignment_hash'])
 
     # the qseqid cluster stats
@@ -305,6 +304,7 @@ def action(args):
             return df
 
         output = output.groupby(level='specimen').apply(pct_corrected)
+
         # reset corrected counts to int
         output['corrected'] = output['corrected'].apply(math.ceil)
         output['corrected'] = output['corrected'].astype(int)
@@ -315,16 +315,28 @@ def action(args):
     output['max_percent'] = assignment_groups['pident'].max()
     output['min_percent'] = assignment_groups['pident'].min()
 
-    reads = ['corrected'] if 'corrected' in output else ['reads']
-
+    # drop assingment_hash in favor of assignment ids (below)
     output = output.reset_index(level='assignment_hash', drop=True)
+
+    # sort by read count and specimen
+    reads = ['corrected'] if 'corrected' in output else ['reads']
     output = output.sort(columns=reads, ascending=False)
     output = output.sort_index()
+
+    # create assignment ids by specimen
+    def assignment_id(df):
+        df = df.reset_index(drop=True)
+        df.index.name = 'assignment_id'
+        return df
+
+    output = output.groupby(by=output.index, sort=False).apply(assignment_id)
+
+    # output results
     output.to_csv(args.out, index=True, float_format='%.2f')
 
     # output to details.csv.bz2
     if args.details_out:
-        with args.out_details as out_details:
+        with args.details_out as out_details:
             if args.details_full:
                 blast_results.to_csv(out_details,
                                      header=True,
@@ -335,5 +347,5 @@ def action(args):
                 largest = largest.reset_index()
                 largest.merge(blast_results).to_csv(out_details,
                                                     header=True,
-                                                    index=False,
+                                                    index=True,
                                                     float_format='%.2f')
