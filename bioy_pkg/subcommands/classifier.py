@@ -49,7 +49,7 @@ def build_parser(parser):
         as belonging to one specimen.""")
     # input file parameters
     parser.add_argument(
-        '--has-header', action='store_true', default=False,
+        '--has-header', action='store_true',
         help='specify this if blast data has a header')
     # output files
     parser.add_argument(
@@ -145,43 +145,100 @@ def action(args):
                         index_col='seqname')
     seq_info.index.name = 'sseqid'
 
-    # must set index after assigning datatype
-    taxonomy = read_csv(args.taxonomy, dtype=str).set_index('tax_id')
-
     # merge blast results with seq_info - do this early so that
     # refseqs not represented in the blast results are discarded in
     # the merge.
     blast_results = blast_results.join(seq_info, on='sseqid')
 
-    # merge with taxonomy.
-    # Cannot simply merge onto target_rank because some hits may
-    # above the target_rank within the rank thresholds
-    blast_results = blast_results.join(
-        taxonomy[['tax_name', 'rank']], on='tax_id')
+    # load taxonomy
+    tax_cols = ['tax_id', 'tax_name']
+    if args.rank_thresholds:
+        rank_thresholds = read_csv(
+            args.rank_thresholds, dtype=dict(tax_id=str))
+        rank_thresholds['rank_index'] = rank_thresholds['tax_rank'].apply(
+            lambda x: sequtils.RANKS.index(x))
+        # sort items by RANK specificity
+        rank_thresholds = rank_thresholds.sort(
+            columns=['rank_index'], ascending=False)
+        rank_thresholds = rank_thresholds.drop('rank_index', axis=1)
+        rank_thresholds = rank_thresholds.reset_index(drop=True)
+        ranks = set(rank_thresholds['target_rank'].unique())
+        floor_rank = sorted(
+            ranks, key=lambda x: sequtils.RANKS.index(x), reverse=True)[0]
+        tax_ranks = set(rank_thresholds['tax_rank'].unique())
+        ranks = list(ranks | tax_ranks)
+    else:
+        floor_rank = args.rank
+        ranks = [args.rank]
+
+    taxonomy = read_csv(args.taxonomy, dtype=str)
+    # set index after assigning dtype and preserve tax_id column for later
+    taxonomy = taxonomy.set_index('tax_id', drop=False)
+
+    blast_results = blast_results.join(taxonomy[ranks], on='tax_id')
+    #  tax_id will be later set to the target_rank
+    blast_results = blast_results.drop('tax_id', axis=1)
 
     # assign target rank
     if args.rank_thresholds:
-        rank_thresholds = read_csv(args.rank_thresholds, index_col='tax_rank')
-        print rank_thresholds
-        return
+        target_ranks = []
+        for i, r in rank_thresholds.iterrows():
+            # pivot tax_rank and tax_id
+            r[r['tax_rank']] = r['tax_id']
+            matches = blast_results[
+                (r['tax_id'] == blast_results[r['tax_rank']]) &
+                (r['hi'] >= blast_results['pident']) &
+                (r['low'] <= blast_results['pident'])]
+            # drop these keys in preperation of merge
+            r = r.drop(['tax_rank', 'tax_id'])
+            r = pd.DataFrame(r.to_dict(), index=[i])
+            r['target_priority'] = i
+            # append merged matches and remove merged blast results
+            target_ranks.append(matches.merge(r))
+            not_matches = blast_results.index.diff(matches.index)
+            blast_results = blast_results.loc[not_matches]
+
+        # put blast hits back together with specified target ranks
+        blast_results = pd.concat(target_ranks)
+
+        # remove similar but less specific target_rank hits
+        def trim_results(df):
+            curated = pd.DataFrame(columns=df.columns.tolist() + tax_cols)
+            for (_, r), v in df.groupby(by=['target_priority', 'target_rank']):
+                curated_ids = curated[r].unique()
+                in_curated = lambda x: x[r] not in curated_ids
+                v = v[v.apply(in_curated, axis=1)]
+                v = v.join(taxonomy[tax_cols], on=r)
+                curated = curated.append(v)
+            return curated
+
+        blast_results = blast_results.groupby(
+            by='qseqid', sort=False, group_keys=False)
+        blast_results = blast_results.apply(trim_results)
     else:
-        blast_results['target_rank'] = args.rank
-        blast_results['hi'] = args.max_identity
-        blast_results['low'] = args.min_identity
         blast_results = blast_results[
             blast_results['pident'] <= args.max_identity]
         blast_results = blast_results[
-            blast_results['pident'] > args.min_identity]
+            blast_results['pident'] >= args.min_identity]
+        blast_results = blast_results.join(
+            taxonomy[tax_cols], on=args.rank)
+        blast_results['target_rank'] = args.rank
+        blast_results['target_priority'] = 0
+        blast_results['hi'] = args.max_identity
+        blast_results['low'] = args.min_identity
+
+    # TODO: up rank these hits
+    blast_results = blast_results[blast_results['tax_id'].notnull()]
 
     # merge filtered qseqids back into blast_results
     blast_results = qseqids.join(
         blast_results.set_index('qseqid'),
         how='outer').reset_index()
 
-    # load specimen-map and assign specimen names
     specimens = blast_results[['qseqid']].drop_duplicates()
     specimens = specimens.set_index('qseqid')
 
+    # load specimen-map and assign specimen names
     if args.specimen_map:
         spec_map = read_csv(args.specimen_map,
                             names=['qseqid', 'specimen'],
@@ -207,7 +264,6 @@ def action(args):
 
     # create mapping from tax_id to its condensed id and set assignment hash
     def condense_ids(df):
-        floor_rank = df['target_rank'].head(1).tolist()[0]
         condensed = sequtils.condense_ids(df.tax_id.unique(),
                                           tax_dict,
                                           floor_rank=floor_rank,
@@ -246,8 +302,7 @@ def action(args):
     # concludes our blast details, on to summarizing output
 
     # now for some assignment grouping and summarizing
-    output = blast_results[['specimen', 'assignment_hash',
-                            'assignment', 'target_rank']]
+    output = blast_results[['specimen', 'assignment_hash', 'assignment']]
     output = output.drop_duplicates()
 
     output = output.set_index(['specimen', 'assignment_hash'])
@@ -315,37 +370,42 @@ def action(args):
     output['max_percent'] = assignment_groups['pident'].max()
     output['min_percent'] = assignment_groups['pident'].min()
 
-    # drop assingment_hash in favor of assignment ids (below)
-    output = output.reset_index(level='assignment_hash', drop=True)
-
     # sort by read count and specimen
     reads = ['corrected'] if 'corrected' in output else ['reads']
     output = output.sort(columns=reads, ascending=False)
+    output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
 
     # create assignment ids by specimen
     def assignment_id(df):
-        df = df.reset_index(drop=True)
+        df = df.reset_index()
+        # specimen is retained in the group key
+        df = df.drop(labels='specimen', axis=1)
         df.index.name = 'assignment_id'
         return df
 
-    output = output.groupby(by=output.index, sort=False).apply(assignment_id)
+    # TODO: check out group_keys=False
+    output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
     output.to_csv(args.out, index=True, float_format='%.2f')
 
     # output to details.csv.bz2
     if args.details_out:
+        blast_results = blast_results.merge(output.reset_index(), how='left')
+        # nobody cares about the assignment hash
+        blast_results = blast_results.drop(labels='assignment_hash', axis=1)
         with args.details_out as out_details:
             if args.details_full:
                 blast_results.to_csv(out_details,
                                      header=True,
-                                     index=True,
+                                     index=False,
                                      float_format='%.2f')
             else:
                 largest = clusters.apply(lambda x: x['weight'].nlargest(1))
                 largest = largest.reset_index()
+                largest = largest.drop(labels='assignment_hash', axis=1)
                 largest.merge(blast_results).to_csv(out_details,
                                                     header=True,
-                                                    index=True,
+                                                    index=False,
                                                     float_format='%.2f')
