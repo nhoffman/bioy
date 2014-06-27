@@ -27,31 +27,41 @@ def build_parser(parser):
     parser.add_argument(
         'blast_file', help='CSV tabular blast file of query and subject hits.')
     parser.add_argument(
-        '-w', '--weights', metavar='CSV',
-        help="""Optional headless csv file with columns 'seqname',
-        'count' providing weights for each query sequence described in
-        the blast input (used, for example, to describe cluster sizes
-        for corresponding cluster centroids).""")
-    parser.add_argument(
-        '-s', '--seq-info', required=True, metavar='CSV',
+        'seq_info', metavar='CSV',
         help='File mapping reference seq name to tax_id')
     parser.add_argument(
-        '-t', '--taxonomy', required=True, metavar='CSV',
+        'taxonomy', metavar='CSV',
         help="""Table defining the taxonomy for each tax_id""")
     parser.add_argument(
         '--copy-numbers', metavar='CSV',
         help="""Estimated 16s rRNA gene copy number for each tax_ids
         (CSV file with columns: tax_id, median)""")
     parser.add_argument(
-        '-m', '--specimen-map', metavar='CSV',
-        help="""CSV file with columns (name, specimen) assigning sequences to
-        groups. The default behavior is to treat all query sequences
-        as belonging to one specimen.""")
-    # input file parameters
+        '--details-full', action='store_true',
+        help='do not limit out_details to only larget cluster per assignment')
+    parser.add_argument(
+        '--group-def', metavar='INTEGER', action='append',
+        default=[], help="""define a group threshold for a
+        particular rank overriding --target-max-group-size. example:
+        genus:2 (NOT IMPLEMENTED)""")
     parser.add_argument(
         '--has-header', action='store_true',
         help='specify this if blast data has a header')
-    # output files
+    parser.add_argument(
+        '--min-identity', default=90.0, metavar='PERCENT', type=float,
+        help="""minimum identity threshold
+        for accepting matches [>= %(default)s]""")
+    parser.add_argument(
+        '--max-identity', default=100.0, metavar='PERCENT', type=float,
+        help="""maximum identity threshold for
+        accepting matches [<= %(default)s]""")
+    parser.add_argument(
+        '--min-cluster-size', default=1, metavar='INTEGER', type=int,
+        help="""minimum cluster size to include in
+        classification output [%(default)s]""")
+    parser.add_argument(
+        '--min-coverage', default=95.0, type=float, metavar='PERCENT',
+        help='percent of alignment coverage of blast result [%(default)s]')
     parser.add_argument(
         '-o', '--out', default=sys.stdout, type=Opener('w'),
         metavar='FILE',
@@ -59,47 +69,35 @@ def build_parser(parser):
     parser.add_argument(
         '-O', '--details-out', type=Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
-    # classification parameters
     parser.add_argument(
-        '--rank', default='species',
-        help='Rank at which to classify. Default: "%(default)s"')
+        '--rank-thresholds', metavar='CSV',
+        help="""Overrides target-rank.  Columns [tax_id,hi,low,rank]""")
     parser.add_argument(
-        '--min-identity', default=90.0, metavar='PERCENT', type=float,
-        help="""minimum identity threshold
-        for accepting matches [> %(default)s]""")
+        '--specimen', metavar='LABEL',
+        help="""Single group label for reads""")
     parser.add_argument(
-        '--max-identity', default=100.0, metavar='PERCENT', type=float,
-        help="""maximum identity threshold for
-        accepting matches [<= %(default)s]""")
+        '--specimen-map', metavar='CSV',
+        help="""CSV file with columns (name, specimen) assigning sequences to
+        groups. The default behavior is to treat all query sequences
+        as belonging to one specimen.""")
     parser.add_argument(
         '--starred', default=100.0, metavar='PERCENT', type=float,
         help="""Names of organisms for which at least one reference
         sequence has pairwise identity with a query sequence of at
         least PERCENT will be marked with an asterisk [%(default)s]""")
     parser.add_argument(
-        '--min_coverage', default=95.0, type=float, metavar='PERCENT',
-        help='percent of alignment coverage of blast result [%(default)s]')
-    parser.add_argument(
-        '--min-cluster-size', default=1, metavar='INTEGER', type=int,
-        help='minimum cluster size to include in classification output')
-    parser.add_argument(
-        '--specimen', metavar='LABEL',
-        help="""Single group label for reads""")
-    parser.add_argument(
         '--target-max-group-size', metavar='INTEGER', default=3, type=int,
         help="""group multiple target-rank assignments that excede a
         threshold to a higher rank [%(default)s]""")
     parser.add_argument(
-        '--group-def', metavar='INTEGER', action='append',
-        default=[], help="""define a group threshold for a
-        particular rank overriding --target-max-group-size. example:
-        genus:2""")
+        '--target-rank', default='species',
+        help='Rank at which to classify. Default: "%(default)s"')
     parser.add_argument(
-        '--details-full', action='store_true',
-        help='do not limit out_details to only larget cluster per assignment')
-    parser.add_argument(
-        '--rank-thresholds', metavar='CSV',
-        help='columns [tax_id,hi,low,rank]')
+        '-w', '--weights', metavar='CSV',
+        help="""Optional headless csv file with columns 'seqname',
+        'count' providing weights for each query sequence described in
+        the blast input (used, for example, to describe cluster sizes
+        for corresponding cluster centroids).""")
 
 
 def read_csv(filename, compression=None, **kwargs):
@@ -123,11 +121,12 @@ def action(args):
     names = None if args.has_header else sequtils.BLAST_HEADER
     header = 0 if args.has_header else None
     usecols = ['qseqid', 'sseqid', 'pident', 'coverage']
-    blast_results = read_csv(args.blast_file,
-                             names=names,
-                             na_filter=True,  # False is faster
-                             header=header,
-                             usecols=usecols)
+    blast_results = read_csv(
+        args.blast_file,
+        names=names,
+        na_filter=True,  # False is faster
+        header=header,
+        usecols=usecols)
 
     # get a set of qseqids for identifying [no blast hits] after filtering
     qseqids = blast_results[['qseqid']].drop_duplicates().set_index('qseqid')
@@ -136,13 +135,11 @@ def action(args):
     blast_results = blast_results[
         blast_results['coverage'] >= args.min_coverage]
 
-    seq_info = read_csv(args.seq_info,
-                        usecols=['seqname', 'tax_id', 'accession'],
-                        dtype=dict(tax_id=str,
-                                   length=int,
-                                   ambig_count=int,
-                                   is_type=bool),
-                        index_col='seqname')
+    seq_info = read_csv(
+        args.seq_info,
+        usecols=['seqname', 'tax_id', 'accession'],
+        dtype=dict(tax_id=str, length=int, ambig_count=int, is_type=bool),
+        index_col='seqname')
     seq_info.index.name = 'sseqid'
 
     # merge blast results with seq_info - do this early so that
@@ -154,101 +151,118 @@ def action(args):
     tax_cols = ['tax_id', 'tax_name']
     if args.rank_thresholds:
         rank_thresholds = read_csv(
-            args.rank_thresholds, dtype=dict(tax_id=str))
-        rank_thresholds['rank_index'] = rank_thresholds['tax_rank'].apply(
+            args.rank_thresholds,
+            dtype=dict(tax_id=str))
+        rank_thresholds.index = rank_thresholds['tax_rank'].apply(
             lambda x: sequtils.RANKS.index(x))
         # sort items by RANK specificity
-        rank_thresholds = rank_thresholds.sort(
-            columns=['rank_index'], ascending=False)
-        rank_thresholds = rank_thresholds.drop('rank_index', axis=1)
+        rank_thresholds = rank_thresholds.sort(ascending=False)
         rank_thresholds = rank_thresholds.reset_index(drop=True)
+
+        # we will need tax columns from both the target_rank and tax_rank
         ranks = set(rank_thresholds['target_rank'].unique())
+
+        # calculate the floor rank from most specific target_rank
         floor_rank = sorted(
             ranks, key=lambda x: sequtils.RANKS.index(x), reverse=True)[0]
+
+        # get the tax_ranks as well and combine them with the target_ranks
         tax_ranks = set(rank_thresholds['tax_rank'].unique())
         ranks = list(ranks | tax_ranks)
     else:
-        floor_rank = args.rank
-        ranks = [args.rank]
+        floor_rank = args.target_rank
+        ranks = [args.target_rank]
 
     taxonomy = read_csv(args.taxonomy, dtype=str)
     # set index after assigning dtype and preserve tax_id column for later
     taxonomy = taxonomy.set_index('tax_id', drop=False)
 
     blast_results = blast_results.join(taxonomy[ranks], on='tax_id')
-    #  tax_id will be later set to the target_rank
+    #  tax_id will be later set from the target_rank
     blast_results = blast_results.drop('tax_id', axis=1)
 
     # assign target rank
     if args.rank_thresholds:
         target_ranks = []
-        for i, r in rank_thresholds.iterrows():
-            # pivot tax_rank and tax_id
-            r[r['tax_rank']] = r['tax_id']
+        # iter through sorted/prioritized rank_thresholds
+        for i, threshold in rank_thresholds.iterrows():
+            # filter for hits that match the threshold
             matches = blast_results[
-                (r['tax_id'] == blast_results[r['tax_rank']]) &
-                (r['hi'] >= blast_results['pident']) &
-                (r['low'] <= blast_results['pident'])]
-            # drop these keys in preperation of merge
-            r = r.drop(['tax_rank', 'tax_id'])
-            r = pd.DataFrame(r.to_dict(), index=[i])
-            r['target_priority'] = i
+                (threshold['tax_id'] == blast_results[threshold['tax_rank']]) &
+                (threshold['hi'] >= blast_results['pident']) &
+                (threshold['low'] <= blast_results['pident'])]
+
+            # pivot tax_rank and tax_id and drop for merging
+            threshold[threshold['tax_rank']] = threshold['tax_id']
+            threshold = threshold.drop(['tax_rank', 'tax_id'])
+            threshold = pd.DataFrame(threshold.to_dict(), index=[i])
+            threshold['target_priority'] = i
+
             # append merged matches and remove merged blast results
-            target_ranks.append(matches.merge(r))
+            target_ranks.append(matches.merge(threshold))
             not_matches = blast_results.index.diff(matches.index)
             blast_results = blast_results.loc[not_matches]
 
         # put blast hits back together with specified target ranks
         blast_results = pd.concat(target_ranks)
 
-        # remove similar but less specific target_rank hits
-        def trim_results(df):
-            curated = pd.DataFrame(columns=df.columns.tolist() + tax_cols)
-            for (_, r), v in df.groupby(by=['target_priority', 'target_rank']):
-                curated_ids = curated[r].unique()
-                in_curated = lambda x: x[r] not in curated_ids
-                v = v[v.apply(in_curated, axis=1)]
-                v = v.join(taxonomy[tax_cols], on=r)
-                curated = curated.append(v)
-            return curated
+        # FIXME:CR - this is very time consuming, is there a better way?
+        def slim_results(df):
+            """
+            Remove less specific target_rank hits.
+
+            If a hit's target rank shares taxonomy with a more specific
+            target hit then it will be dropped in favor
+            of the more specific target hit(s)
+            """
+            slimmed = pd.DataFrame(columns=df.columns.tolist() + tax_cols)
+            slimmed['target_priority'] = slimmed['target_priority'].astype(int)
+            df = df.groupby(by=['target_priority', 'target_rank'])
+            for (_, target_rank), vals in df:
+                curated_ids = slimmed[target_rank].drop_duplicates()
+                vals = vals[~vals[target_rank].isin(curated_ids)]
+                vals = vals.join(taxonomy[tax_cols], on=target_rank)
+                slimmed = slimmed.append(vals)
+            return slimmed
 
         blast_results = blast_results.groupby(
-            by='qseqid', sort=False, group_keys=False)
-        blast_results = blast_results.apply(trim_results)
+            by='qseqid', sort=False, group_keys=False).apply(slim_results)
     else:
         blast_results = blast_results[
             blast_results['pident'] <= args.max_identity]
         blast_results = blast_results[
             blast_results['pident'] >= args.min_identity]
         blast_results = blast_results.join(
-            taxonomy[tax_cols], on=args.rank)
-        blast_results['target_rank'] = args.rank
+            taxonomy[tax_cols], on=args.target_rank)
+        blast_results['target_rank'] = args.target_rank
         blast_results['target_priority'] = 0
         blast_results['hi'] = args.max_identity
         blast_results['low'] = args.min_identity
 
-    # TODO: up rank these hits
+    # TODO: up-rank hits that happen to have no tax_id at the given target rank
     blast_results = blast_results[blast_results['tax_id'].notnull()]
 
-    # merge filtered qseqids back into blast_results
+    # merge qseqids that have no hits back into blast_results
     blast_results = qseqids.join(
-        blast_results.set_index('qseqid'),
-        how='outer').reset_index()
+        blast_results.set_index('qseqid'), how='outer').reset_index()
 
+    # assign specimen groups
     specimens = blast_results[['qseqid']].drop_duplicates()
     specimens = specimens.set_index('qseqid')
 
     # load specimen-map and assign specimen names
     if args.specimen_map:
-        spec_map = read_csv(args.specimen_map,
-                            names=['qseqid', 'specimen'],
-                            index_col='qseqid')
+        spec_map = read_csv(
+            args.specimen_map,
+            names=['qseqid', 'specimen'],
+            index_col='qseqid')
         specimens = specimens.join(spec_map)
     elif args.specimen:
         specimens['specimen'] = args.specimen
     else:
         specimens['specimen'] = specimens.index
 
+    # join back into results.  Now all hits have an assigned specimen label
     blast_results = blast_results.join(specimens, on='qseqid')
 
     # assign seqs that had no results to [no blast_result]
@@ -256,20 +270,22 @@ def action(args):
     no_hits['assignment'] = '[no blast result]'
     no_hits['assignment_hash'] = 0
 
-    # move on to seqs that had hits
+    # move on to seqs that have blast hits
     blast_results = blast_results[blast_results.sseqid.notnull()]
 
-    # TODO: this is taking a lot of time, integrate pandas into sequtils
+    # TODO: this is slow, integrate pandas into sequtils.condense_ids
     tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
 
     # create mapping from tax_id to its condensed id and set assignment hash
     def condense_ids(df):
-        condensed = sequtils.condense_ids(df.tax_id.unique(),
-                                          tax_dict,
-                                          floor_rank=floor_rank,
-                                          max_size=args.target_max_group_size)
-        condensed = pd.DataFrame(condensed.items(),
-                                 columns=['tax_id', 'condensed_id'])
+        condensed = sequtils.condense_ids(
+            df.tax_id.unique(),
+            tax_dict,
+            floor_rank=floor_rank,
+            max_size=args.target_max_group_size)
+        condensed = pd.DataFrame(
+            condensed.items(),
+            columns=['tax_id', 'condensed_id'])
         condensed = condensed.set_index('tax_id')
         assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
         condensed['assignment_hash'] = assignment_hash
@@ -302,20 +318,33 @@ def action(args):
     # concludes our blast details, on to summarizing output
 
     # now for some assignment grouping and summarizing
-    output = blast_results[['specimen', 'assignment_hash', 'assignment']]
-    output = output.drop_duplicates()
 
-    output = output.set_index(['specimen', 'assignment_hash'])
+    def agg_columns(df):
+        agg = {}
+        agg['hi'] = df['hi'].max()
+        agg['low'] = df['low'].min()
+        agg['target_rank'] = df.sort(
+            columns='target_priority').head(1)['target_rank']
+        agg['max_percent'] = df['pident'].max()
+        agg['min_percent'] = df['pident'].min()
+        return pd.DataFrame(agg)
 
-    # the qseqid cluster stats
+    output = blast_results.set_index(
+        ['specimen', 'assignment_hash', 'assignment'])
+    output = output.groupby(
+        level=['specimen', 'assignment_hash'],
+        group_keys=False).apply(agg_columns)
+    output = output.reset_index(level='assignment')
+
+    # qseqid cluster stats
     clusters = blast_results[['qseqid', 'specimen', 'assignment_hash']]
     clusters = clusters.drop_duplicates().set_index('qseqid')
 
     if args.weights:
-        weights = read_csv(args.weights,
-                           header=None,
-                           names=['qseqid', 'weight'],
-                           index_col='qseqid')
+        weights = read_csv(
+            args.weights,
+            names=['qseqid', 'weight'],
+            index_col='qseqid')
         clusters = clusters.join(weights)
         # switch back to int and set no info to weight of 1
         clusters['weight'] = clusters['weight'].fillna(1).astype(int)
@@ -324,7 +353,7 @@ def action(args):
 
     clusters = clusters.groupby(by=['specimen', 'assignment_hash'], sort=False)
 
-    output['reads'] = clusters.weight.sum()
+    output['reads'] = clusters['weight'].sum()
 
     def freq(df):
         df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
@@ -334,13 +363,15 @@ def action(args):
 
     output['clusters'] = clusters.size()
 
+    # copy number corrections
     if args.copy_numbers:
         copy_numbers = read_csv(
             args.copy_numbers,
             dtype=dict(tax_id=str),
             usecols=['tax_id', 'median']).set_index('tax_id')
 
-        # get root out '1' and set it as the default correction value
+        # get root out '1' and set it as the
+        # default correction value with index nan
         default = copy_numbers.get_value('1', 'median')
         default = pd.DataFrame(default, index=[None], columns=['median'])
         copy_numbers = copy_numbers.append(default)
@@ -364,48 +395,35 @@ def action(args):
         output['corrected'] = output['corrected'].apply(math.ceil)
         output['corrected'] = output['corrected'].astype(int)
 
-    # qseqid hit ranges
-    assignment_groups = blast_results.groupby(
-        by=['specimen', 'assignment_hash'], sort=False)
-    output['max_percent'] = assignment_groups['pident'].max()
-    output['min_percent'] = assignment_groups['pident'].min()
-
     # sort by read count and specimen
-    reads = ['corrected'] if 'corrected' in output else ['reads']
-    output = output.sort(columns=reads, ascending=False)
+    columns = ['corrected'] if 'corrected' in output else ['reads']
+    output = output.sort(columns=columns, ascending=False)
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
 
     # create assignment ids by specimen
     def assignment_id(df):
-        df = df.reset_index()
-        # specimen is retained in the group key
-        df = df.drop(labels='specimen', axis=1)
+        df = df.reset_index(drop=True)  # specimen is retained in the group key
         df.index.name = 'assignment_id'
         return df
 
-    # TODO: check out group_keys=False
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
-    output.to_csv(args.out, index=True, float_format='%.2f')
+    with args.out as out:
+        output.to_csv(out, index=True, float_format='%.2f')
 
     # output to details.csv.bz2
     if args.details_out:
         blast_results = blast_results.merge(output.reset_index(), how='left')
-        # nobody cares about the assignment hash
+
+        if not args.details_full:
+            largest = clusters.apply(lambda x: x['weight'].nlargest(1))
+            blast_results = blast_results.merge(largest.reset_index())
+
+        # nobody wants to see the assignment hash
         blast_results = blast_results.drop(labels='assignment_hash', axis=1)
+
         with args.details_out as out_details:
-            if args.details_full:
-                blast_results.to_csv(out_details,
-                                     header=True,
-                                     index=False,
-                                     float_format='%.2f')
-            else:
-                largest = clusters.apply(lambda x: x['weight'].nlargest(1))
-                largest = largest.reset_index()
-                largest = largest.drop(labels='assignment_hash', axis=1)
-                largest.merge(blast_results).to_csv(out_details,
-                                                    header=True,
-                                                    index=False,
-                                                    float_format='%.2f')
+            blast_results.to_csv(
+                out_details, header=True, index=False, float_format='%.2f')
