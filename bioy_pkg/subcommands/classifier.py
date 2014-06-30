@@ -138,8 +138,9 @@ def action(args):
     seq_info = read_csv(
         args.seq_info,
         usecols=['seqname', 'tax_id', 'accession'],
-        dtype=dict(tax_id=str, length=int, ambig_count=int, is_type=bool),
+        dtype=dict(tax_id=str),
         index_col='seqname')
+    # rename index to match blast results
     seq_info.index.name = 'sseqid'
 
     # merge blast results with seq_info - do this early so that
@@ -173,13 +174,25 @@ def action(args):
         floor_rank = args.target_rank
         ranks = [args.target_rank]
 
+    # TODO: consider getting rank orderding from columns of taxomomy table
     taxonomy = read_csv(args.taxonomy, dtype=str)
     # set index after assigning dtype and preserve tax_id column for later
-    taxonomy = taxonomy.set_index('tax_id', drop=False)
+    taxonomy = taxonomy.set_index('tax_id', drop=False)  # keep tax_id column
 
     blast_results = blast_results.join(taxonomy[ranks], on='tax_id')
     #  tax_id will be later set from the target_rank
     blast_results = blast_results.drop('tax_id', axis=1)
+
+
+# - construct table hits by joining blast_results and seq_info (seqname, tax_id, pident); add boolean column classified
+# - construct table tax_info by joining seq_info with taxonomy (seqname, tax_id, column for each rank) [may need to fill in missing values for some or all ranks]
+
+# for rank, threshold in thresholds:
+# - create a table by:
+#   1. join rows of hits where classified is False and pident > threshold (could use a second table to look up tax-id specific thresholds at this rank) with tax_info using tax_id --> seqname, pident, target_tank, tax_id (tax_id at this target rank corresponding to the appropriate column in tax_info)
+#   2. set hits.classified = True for all seqnames represented in the table
+
+# stack up these tables, group by seqname, and combine names
 
     # assign target rank
     if args.rank_thresholds:
@@ -187,6 +200,7 @@ def action(args):
         # iter through sorted/prioritized rank_thresholds
         for i, threshold in rank_thresholds.iterrows():
             # filter for hits that match the threshold
+            # TODO: is it ok to use <= (vs <) in the lower range?
             matches = blast_results[
                 (threshold['tax_id'] == blast_results[threshold['tax_rank']]) &
                 (threshold['hi'] >= blast_results['pident']) &
@@ -198,7 +212,8 @@ def action(args):
             threshold = pd.DataFrame(threshold.to_dict(), index=[i])
             threshold['target_priority'] = i
 
-            # append merged matches and remove merged blast results
+            # append merged matches to target ranks and remove from
+            # blast_results
             target_ranks.append(matches.merge(threshold))
             not_matches = blast_results.index.diff(matches.index)
             blast_results = blast_results.loc[not_matches]
