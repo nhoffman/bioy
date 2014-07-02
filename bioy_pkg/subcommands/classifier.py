@@ -148,63 +148,82 @@ def action(args):
     # the merge.
     blast_results = blast_results.join(seq_info, on='sseqid')
 
-    # load taxonomy
+    # TODO: consider getting rank orderding from columns of taxomomy table
+    taxonomy = read_csv(args.taxonomy, dtype=str)
+    # set index after assigning dtype and preserve tax_id column for later
+    taxonomy = taxonomy.set_index('tax_id')
+
     tax_cols = ['tax_id', 'tax_name']
     if args.rank_thresholds:
         rank_thresholds = read_csv(
             args.rank_thresholds,
             dtype=dict(tax_id=str))
-        rank_thresholds.index = rank_thresholds['tax_rank'].apply(
+
+        rank_thresholds['rank_index'] = rank_thresholds['tax_rank'].apply(
             lambda x: sequtils.RANKS.index(x))
-        # sort items by RANK specificity
-        rank_thresholds = rank_thresholds.sort(ascending=False)
-        rank_thresholds = rank_thresholds.reset_index(drop=True)
 
-        # we will need tax columns from both the target_rank and tax_rank
-        ranks = set(rank_thresholds['target_rank'].unique())
+        # sort by rank index
+        rank_thresholds = rank_thresholds.sort(
+            columns='rank_index', ascending=False)
 
-        # calculate the floor rank from most specific target_rank
-        floor_rank = sorted(
-            ranks, key=lambda x: sequtils.RANKS.index(x), reverse=True)[0]
+        targeted = pd.DataFrame(columns=taxonomy.columns)
+        for i, r in rank_thresholds.iterrows():
+            tax = taxonomy[taxonomy[r['tax_rank']] == r['tax_id']]
+            tax['target_rank'] = r['target_rank']
+            targeted = targeted.append(tax)
+            taxonomy = taxonomy.loc[taxonomy.index.diff(targeted.index)]
 
-        # get the tax_ranks as well and combine them with the target_ranks
-        tax_ranks = set(rank_thresholds['tax_rank'].unique())
-        ranks = list(ranks | tax_ranks)
-    else:
-        floor_rank = args.target_rank
-        ranks = [args.target_rank]
+        # set the rest of the taxonomy to args.target_rank and append
+        taxonomy['target_rank'] = args.target_rank
+        targeted = targeted.append(taxonomy)
 
-    # TODO: consider getting rank orderding from columns of taxomomy table
-    taxonomy = read_csv(args.taxonomy, dtype=str)
-    # set index after assigning dtype and preserve tax_id column for later
-    taxonomy = taxonomy.set_index('tax_id', drop=False)  # keep tax_id column
+        # and reassign taxonomy with new targeted
+        taxonomy = targeted
 
-    blast_results = blast_results.join(taxonomy[ranks], on='tax_id')
-    #  tax_id will be later set from the target_rank
-    blast_results = blast_results.drop('tax_id', axis=1)
+        blast_results = blast_results.join(taxonomy, on='tax_id')
 
+        """
+        - construct table hits by joining blast_results and seq_info
+          (seqname, tax_id, pident); add boolean column classified
+        - construct table tax_info by joining seq_info with taxonomy
+          (seqname, tax_id, column for each rank)
+          [may need to fill in missing values for some or all ranks]
 
-# - construct table hits by joining blast_results and seq_info (seqname, tax_id, pident); add boolean column classified
-# - construct table tax_info by joining seq_info with taxonomy (seqname, tax_id, column for each rank) [may need to fill in missing values for some or all ranks]
+        for rank, threshold in thresholds:
+        - create a table by:
+           1. join rows of hits where classified is False and
+              pident > threshold (could use a second table to look up
+               tax-id specific thresholds at this rank) with tax_info
+               using tax_id
+               --> seqname, pident, target_tank, tax_id (tax_id at this
+                   target rank corresponding to the
+                   appropriate column in tax_info)
+           2. set hits.classified = True for all seqnames
+                                    represented in the table
 
-# for rank, threshold in thresholds:
-# - create a table by:
-#   1. join rows of hits where classified is False and pident > threshold (could use a second table to look up tax-id specific thresholds at this rank) with tax_info using tax_id --> seqname, pident, target_tank, tax_id (tax_id at this target rank corresponding to the appropriate column in tax_info)
-#   2. set hits.classified = True for all seqnames represented in the table
+        stack up these tables, group by seqname, and combine names
 
-# stack up these tables, group by seqname, and combine names
+        CR - summary: only use blast hits per qseqid that meet the highest
+                      qualifying threshold (ignore everything else)
+                      We will develop a better way to designated good hits
+                      within this threshold later
 
-    # assign target rank
-    if args.rank_thresholds:
+        """
+
+        blast_results = blast_results.groupby(
+            by='qseqid', sort=False, group_keys=False).apply(slim_results)
+
         target_ranks = []
         # iter through sorted/prioritized rank_thresholds
         for i, threshold in rank_thresholds.iterrows():
             # filter for hits that match the threshold
             # TODO: is it ok to use <= (vs <) in the lower range?
+            # CR: yes, for the next iteration I will simply use the
+            # floor threshold
             matches = blast_results[
                 (threshold['tax_id'] == blast_results[threshold['tax_rank']]) &
                 (threshold['hi'] >= blast_results['pident']) &
-                (threshold['low'] <= blast_results['pident'])]
+                (threshold['min'] <= blast_results['pident'])]
 
             # pivot tax_rank and tax_id and drop for merging
             threshold[threshold['tax_rank']] = threshold['tax_id']
@@ -243,6 +262,10 @@ def action(args):
         blast_results = blast_results.groupby(
             by='qseqid', sort=False, group_keys=False).apply(slim_results)
     else:
+        blast_results = blast_results.join(
+            taxonomy[args.target_rank], on='tax_id')
+        #  tax_id will be later set from the target_rank
+        blast_results = blast_results.drop('tax_id', axis=1)
         blast_results = blast_results[
             blast_results['pident'] <= args.max_identity]
         blast_results = blast_results[
@@ -411,7 +434,7 @@ def action(args):
         output['corrected'] = output['corrected'].astype(int)
 
     # sort by read count and specimen
-    columns = ['corrected'] if 'corrected' in output else ['reads']
+    columns = ['corrected'] if args.copy_numbers in output else ['reads']
     output = output.sort(columns=columns, ascending=False)
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
