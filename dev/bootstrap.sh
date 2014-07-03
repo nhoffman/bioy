@@ -48,10 +48,10 @@ while true; do
     esac
 done
 
-VENV_VERSION=1.11.4
+VENV_VERSION=1.11.6
 WHEELHOUSE=
 
-if [[ -n $WHEELSTREET ]]; then
+if [[ -d $WHEELSTREET && -n $WHEELSTREET ]]; then
     WHEELHOUSE=$WHEELSTREET/$PY_VERSION
     test -d $WHEELHOUSE || (echo "cannot access $WHEELHOUSE"; exit 1)
 fi
