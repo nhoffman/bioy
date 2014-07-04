@@ -1,0 +1,6 @@
+tax_rank,tax_id,low,target_rank
+root,1,99,species
+root,1,97,genus
+root,1,95,family
+genus,838,99,genus
+family,342,90,genus
