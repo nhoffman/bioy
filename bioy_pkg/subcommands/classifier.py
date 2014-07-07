@@ -25,12 +25,13 @@ log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument(
-        'blast_file', help='CSV tabular blast file of query and subject hits.')
+        'blast_file', metavar='blast.csv(.bz2)',
+        help='CSV tabular blast file of query and subject hits.')
     parser.add_argument(
-        'seq_info', metavar='CSV',
+        'seq_info', metavar='seq_info.csv(.bz2)',
         help='File mapping reference seq name to tax_id')
     parser.add_argument(
-        'taxonomy', metavar='CSV',
+        'taxonomy', metavar='taxonomy.csv(.bz2)',
         help="""Table defining the taxonomy for each tax_id""")
     parser.add_argument(
         '--copy-numbers', metavar='CSV',
@@ -100,22 +101,81 @@ def build_parser(parser):
         for corresponding cluster centroids).""")
 
 
-def read_csv(filename, compression=None, **kwargs):
-    """read a csv file using pandas.read_csv with compression defined by
-    the file suffix unless provided.
-
-    """
-
-    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
-    compression = compression or suffixes.get(path.splitext(filename)[-1])
-    kwargs['compression'] = compression
-
-    return pd.read_csv(filename, **kwargs)
-
-
 def action(args):
-    # pd.set_option('display.max_columns', None)
-    # pd.set_option('display.max_rows', None)
+    # action functinos defined here and first
+    # TODO: figure out a way to move these functions out of the action
+    # to help simplify this script
+    def read_csv(filename, compression=None, **kwargs):
+        """read a csv file using pandas.read_csv with compression defined by
+        the file suffix unless provided.
+
+        """
+
+        suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
+        compression = compression or suffixes.get(path.splitext(filename)[-1])
+        kwargs['compression'] = compression
+
+        return pd.read_csv(filename, **kwargs)
+
+    def slim_results(df):
+        # first drop unqualified hits
+        df = df[df['low'] <= df['pident']]
+        # return remaining most specific hits
+        return df[df['low'].max() <= df['pident']]
+
+    def star(df):
+        df['starred'] = df.pident.apply(lambda x: x >= args.starred).any()
+        return df
+
+    def condense_ids(df):
+        """ create mapping from tax_id to its
+            condensed id and set assignment hash """
+        condensed = sequtils.condense_ids(
+            df.tax_id.unique(),
+            tax_dict,
+            max_size=args.target_max_group_size)
+        condensed = pd.DataFrame(
+            condensed.items(),
+            columns=['tax_id', 'condensed_id']).set_index('tax_id')
+        assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
+        condensed['assignment_hash'] = assignment_hash
+        return df.join(condensed, on='tax_id')
+
+    def assign(df):
+        ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
+        df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
+        return df
+
+    def agg_columns(df):
+        agg = {}
+        agg['low'] = df['low'].min()
+        agg['max_percent'] = df['pident'].max()
+        agg['min_percent'] = df['pident'].min()
+        target_rank = df['target_rank'].dropna().drop_duplicates()
+        if target_rank.empty:
+            target_rank = None
+        else:
+            specificity = lambda x: sequtils.RANKS.index(x)
+            target_rank.index = target_rank.apply(specificity)
+            target_rank = target_rank.sort_index()
+            target_rank = target_rank.iloc[-1]
+        agg['target_rank'] = target_rank
+        return pd.Series(agg)
+
+    def pct_corrected(df):
+        df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
+        return df
+
+    def assignment_id(df):
+        df = df.reset_index(drop=True)  # specimen is retained in the group key
+        df.index.name = 'assignment_id'
+        return df
+
+    def freq(df):
+        df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
+        return df
+
+    # start the script
 
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER
@@ -198,12 +258,6 @@ def action(args):
         taxonomy[['tax_name', 'rank']], on='tax_id')
 
     # keep most specific hits
-    def slim_results(df):
-        # first drop unqualified hits
-        df = df[df['low'] <= df['pident']]
-        # return remaining most specific hits
-        return df[df['low'].max() <= df['pident']]
-
     blast_results = blast_results.groupby(
         by=['qseqid'], sort=False, group_keys=False).apply(slim_results)
 
@@ -239,36 +293,13 @@ def action(args):
     # TODO: this is slow, integrate pandas into sequtils.condense_ids
     tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
 
-    # create mapping from tax_id to its condensed id and set assignment hash
-    def condense_ids(df):
-        condensed = sequtils.condense_ids(
-            df.tax_id.unique(),
-            tax_dict,
-            max_size=args.target_max_group_size)
-        condensed = pd.DataFrame(
-            condensed.items(),
-            columns=['tax_id', 'condensed_id']).set_index('tax_id')
-        assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
-        condensed['assignment_hash'] = assignment_hash
-        return df.join(condensed, on='tax_id')
-
     # create condensed assignment hashes by qseqid
     blast_results = blast_results.groupby(
         by=['qseqid'], sort=False).apply(condense_ids)
 
-    # star hits if one hit meets star threshold
-    def star(df):
-        df['starred'] = df.pident.apply(lambda x: x >= args.starred).any()
-        return df
-
-    # star condensed ids
+    # star condensed ids if one hit meets star threshold
     blast_results = blast_results.groupby(
         by=['assignment_hash', 'condensed_id'], sort=False).apply(star)
-
-    def assign(df):
-        ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
-        df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
-        return df
 
     blast_results = blast_results.groupby(
         by=['assignment_hash'], sort=False).apply(assign)
@@ -279,22 +310,6 @@ def action(args):
     # concludes our blast details, on to summarizing output
 
     # now for some assignment grouping and summarizing
-
-    def agg_columns(df):
-        agg = {}
-        agg['low'] = df['low'].min()
-        agg['max_percent'] = df['pident'].max()
-        agg['min_percent'] = df['pident'].min()
-        target_rank = df['target_rank'].dropna().drop_duplicates()
-        if target_rank.empty:
-            target_rank = None
-        else:
-            specificity = lambda x: sequtils.RANKS.index(x)
-            target_rank.index = target_rank.apply(specificity)
-            target_rank = target_rank.sort_index()
-            target_rank = target_rank.iloc[-1]
-        agg['target_rank'] = target_rank
-        return pd.Series(agg)
 
     output = blast_results.groupby(
         by=['specimen', 'assignment_hash', 'assignment'])
@@ -319,10 +334,6 @@ def action(args):
     clusters = clusters.groupby(by=['specimen', 'assignment_hash'], sort=False)
 
     output['reads'] = clusters['weight'].sum()
-
-    def freq(df):
-        df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
-        return df
 
     output = output.groupby(level='specimen').apply(freq)
 
@@ -350,10 +361,6 @@ def action(args):
         corrections = corrections['median'].mean()
         output['corrected'] = output['reads'] / corrections
 
-        def pct_corrected(df):
-            df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
-            return df
-
         output = output.groupby(level='specimen').apply(pct_corrected)
 
         # reset corrected counts to int
@@ -367,11 +374,6 @@ def action(args):
     output = output.sort_index()
 
     # create assignment ids by specimen
-    def assignment_id(df):
-        df = df.reset_index(drop=True)  # specimen is retained in the group key
-        df.index.name = 'assignment_id'
-        return df
-
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
