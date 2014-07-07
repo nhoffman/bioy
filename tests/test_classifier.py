@@ -7,7 +7,6 @@ import logging
 from os import path
 
 import filecmp
-import pandas as pd
 import sys
 
 from bioy_pkg.scripts.main import main
@@ -22,55 +21,255 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
     def main(self, arguments):
         main(['classifier'] + [str(a) for a in arguments])
 
-    log_info = 'bioy classify {}'
+    log_info = 'bioy classifier {}'
 
-    datadir = path.join(datadir, 'classifier')
-    thisdatadir = path.join(datadir, 'TestClassifier')
-
-    blast = path.join(datadir, 'rdp.blast.bz2')
-    taxonomy = path.join(datadir, 'taxonomy.csv.bz2')
-    seq_info = path.join(datadir, 'seq_info.csv.bz2')
     copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv')
-    weights = path.join(datadir, 'weights.csv')
+
+    thisdatadir = path.join(datadir, 'classifier', 'TestClassifier')
 
     def test01(self):
         """
         Minimal inputs.
         """
 
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
         outdir = self.mkoutdir()
-        outfile = path.join(outdir, 'classifications.csv')
 
-        self.main([
-            '--seq-info', self.seq_info,
-            '--taxonomy', self.taxonomy,
-            '--outfile', outfile,
-            self.blast])
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
 
-        result = pd.read_csv(outfile)
-        blast_data = pd.read_csv(self.blast, compression='bz2', header=None)
-        self.assertEqual(result['reads'].sum(), len(blast_data[0].unique()))
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
 
     def test02(self):
         """
         Include weights.
         """
 
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        weights = path.join(thisdatadir, 'weights.csv.bz2')
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
         outdir = self.mkoutdir()
-        outfile = path.join(outdir, 'classifications.csv')
 
-        self.main([
-            '--seq-info', self.seq_info,
-            '--taxonomy', self.taxonomy,
-            '--weights', self.weights,
-            '--outfile', outfile,
-            self.blast])
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
 
-        result = pd.read_csv(outfile)
-        weights = pd.read_csv(self.weights, header=None)
-        self.assertEqual(result['reads'].sum(), weights[1].sum())
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--weights', weights,
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
 
     def test03(self):
+        """
+        Include specimen-map.
+        """
+
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        specimen_map = path.join(thisdatadir, 'map.csv.bz2')
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--specimen-map', specimen_map,
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test04(self):
+        """
+        Include generic rank thresholds
+        """
+
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        rank_thresholds = path.join(thisdatadir, 'rank_thresholds.csv.bz2')
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--rank-thresholds', rank_thresholds,
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test05(self):
+        """
+        min-identity 99, max-identity 100
+        """
+
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--max-identity', '100',
+            '--min-identity', '99',
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test06(self):
+        """
+        All together
+        """
+
+        this_test = sys._getframe().f_code.co_name
+
+        thisdatadir = self.thisdatadir
+
+        weights = path.join(thisdatadir, 'weights.csv.bz2')
+        specimen_map = path.join(thisdatadir, 'map.csv.bz2')
+        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = path.join(thisdatadir, 'blast.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = path.join(outdir, 'classifications.csv.bz2')
+        details_out = path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = [
+            '--has-header',
+            '--max-identity', '100',
+            '--min-identity', '99',
+            '--specimen-map', specimen_map,
+            '--weights', weights,
+            '--out', classify_out,
+            '--details-out', details_out,
+            blast,
+            seq_info,
+            taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test07(self):
         """
         Test validation of type strains
         """
