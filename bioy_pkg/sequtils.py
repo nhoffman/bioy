@@ -25,7 +25,7 @@ BLAST_HEADER = BLAST_FORMAT.split()[1:] + ['coverage']
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
-        'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
+                  'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
 
 RANKS = ['root', 'superkingdom', 'phylum', 'class',
          'order', 'family', 'genus', 'species']
@@ -35,22 +35,22 @@ gap = '-'
 homogap = '='
 
 IUPAC = {('A',): 'A',
-        ('C',): 'C',
-        ('G',): 'G',
-        ('T',): 'T',
-        (gap,): gap,
-        (homogap,): homogap,
-        ('A', 'C'): 'M',
-        ('A', 'G'): 'R',
-        ('A', 'T'): 'W',
-        ('C', 'G'): 'S',
-        ('C', 'T'): 'Y',
-        ('G', 'T'): 'K',
-        ('A', 'C', 'G'): 'V',
-        ('A', 'C', 'T'): 'H',
-        ('A', 'G', 'T'): 'D',
-        ('C', 'G', 'T'): 'B',
-        ('A', 'C', 'G', 'T'): 'N',}
+         ('C',): 'C',
+         ('G',): 'G',
+         ('T',): 'T',
+         (gap,): gap,
+         (homogap,): homogap,
+         ('A', 'C'): 'M',
+         ('A', 'G'): 'R',
+         ('A', 'T'): 'W',
+         ('C', 'G'): 'S',
+         ('C', 'T'): 'Y',
+         ('G', 'T'): 'K',
+         ('A', 'C', 'G'): 'V',
+         ('A', 'C', 'T'): 'H',
+         ('A', 'G', 'T'): 'D',
+         ('C', 'G', 'T'): 'B',
+         ('A', 'C', 'G', 'T'): 'N', }
 
 CAPUI = {v: set(k) for k, v in IUPAC.items()}
 
@@ -103,6 +103,7 @@ UNCLASSIFIED_REGEX = re.compile(
                                r'vent\b',
                                ])))
 
+
 def homoencode(seq):
     """Run length encode a string
 
@@ -117,11 +118,12 @@ def homoencode(seq):
 
     seq = seq.upper()
     seq = groupby(seq)
-    seq = ((c, len(list(g))) for c,g in seq)
+    seq = ((c, len(list(g))) for c, g in seq)
 
     chars, counts = izip(*seq)
 
     return ''.join(chars), list(counts)
+
 
 def homodecodealignment(seq1, counts1, seq2, counts2, insertion=homogap):
     """Decode a pair of aligned, run length encoded sequences.
@@ -143,20 +145,24 @@ def homodecodealignment(seq1, counts1, seq2, counts2, insertion=homogap):
     assert not seq1[0] == seq2[0] == gap
 
     if seq1[0] == gap:
-        suff1, suff2 = homodecodealignment(seq1[1:], counts1, seq2[1:], counts2[1:])
+        suff1, suff2 = homodecodealignment(
+            seq1[1:], counts1, seq2[1:], counts2[1:])
         deseq1 = gap * counts2[0] + suff1
         deseq2 = seq2[0] * counts2[0] + suff2
     elif seq2[0] == gap:
-        suff1, suff2 = homodecodealignment(seq1[1:], counts1[1:], seq2[1:], counts2)
+        suff1, suff2 = homodecodealignment(
+            seq1[1:], counts1[1:], seq2[1:], counts2)
         deseq1 = seq1[0] * counts1[0] + suff1
         deseq2 = gap * counts1[0] + suff2
     else:
         m = max(counts1[0], counts2[0])
-        suff1, suff2 = homodecodealignment(seq1[1:], counts1[1:], seq2[1:], counts2[1:])
+        suff1, suff2 = homodecodealignment(
+            seq1[1:], counts1[1:], seq2[1:], counts2[1:])
         deseq1 = seq1[0] * counts1[0] + insertion * (m - counts1[0]) + suff1
         deseq2 = seq2[0] * counts2[0] + insertion * (m - counts2[0]) + suff2
 
     return deseq1, deseq2
+
 
 def homodecode(seq, counts, insertion=homogap):
     """Expand a run length encoded sequence.
@@ -178,6 +184,7 @@ def homodecode(seq, counts, insertion=homogap):
     else:
         return seq[0] * counts[0] + homodecode(seq[1:], counts[1:])
 
+
 def to_ascii(nums):
     """
     Encode a list of integers as an ascii string. Max allowed value is
@@ -191,13 +198,15 @@ def to_ascii(nums):
 
     return ''.join([chr(i + 48) for i in nums])
 
+
 def from_ascii(chars):
     """
     Decode an ascii-encoded list of integers.
     """
     return [ord(c) - 48 for c in chars]
 
-def cons_rle(c, ceiling = False):
+
+def cons_rle(c, ceiling=False):
     """
     Choose a consensus run length given counts of run lengths in
     Counter object `c`. Choose the most common run length count. In
@@ -206,13 +215,14 @@ def cons_rle(c, ceiling = False):
 
     # TODO: return counts for only chosen cons base
     most_common = c.most_common()
-    _,top_freq = most_common[0]
-    most_common = [cnt for cnt,freq in most_common if freq == top_freq]
-    most_common = sorted(most_common, reverse = ceiling)
+    _, top_freq = most_common[0]
+    most_common = [cnt for cnt, freq in most_common if freq == top_freq]
+    most_common = sorted(most_common, reverse=ceiling)
 
     return most_common[0]
 
-def cons_char(c, gap_ratio = 0.5):
+
+def cons_char(c, gap_ratio=0.5):
     """
     Choose a consensus character given counts of characters in Counter
     object `c`.
@@ -225,11 +235,12 @@ def cons_char(c, gap_ratio = 0.5):
     del c[gap]
 
     most_common = c.most_common()
-    _,top_freq = most_common[0]
-    most_common = [ch.upper() for ch,freq in most_common if freq == top_freq]
+    _, top_freq = most_common[0]
+    most_common = [ch.upper() for ch, freq in most_common if freq == top_freq]
     most_common = sorted(most_common)
 
     return IUPAC[tuple(most_common)]
+
 
 def get_char_counts(seqs):
     """
@@ -245,6 +256,7 @@ def get_char_counts(seqs):
 
     # counters, sorted by position
     return [count for position, count in sorted(counter.items())]
+
 
 def get_rle_counts(seqs, rlelist):
     """
@@ -274,7 +286,8 @@ def get_rle_counts(seqs, rlelist):
     # tuples of counters, sorted by position
     return [(char_counter[i], rle_counter[i]) for i in xrange(len(char_counter))]
 
-def consensus(seqs, rlelist = None, degap = True):
+
+def consensus(seqs, rlelist=None, degap=True):
     """
     Calculate a consensus for an iterable of SeqRecord objects. seqs
     are decoded using corresponding lists of read length counts in
@@ -282,14 +295,16 @@ def consensus(seqs, rlelist = None, degap = True):
     """
 
     if rlelist:
-        cons = [cons_char(c) * cons_rle(n) for c, n in get_rle_counts(seqs, rlelist)]
+        cons = [cons_char(c) * cons_rle(n)
+                for c, n in get_rle_counts(seqs, rlelist)]
     else:
         cons = [cons_char(c) for c in get_char_counts(seqs)]
 
-    return ''.join(cons).replace(gap,'') if degap else ''.join(cons)
+    return ''.join(cons).replace(gap, '') if degap else ''.join(cons)
+
 
 @contextlib.contextmanager
-def fasta_tempfile(seqs, dir = None):
+def fasta_tempfile(seqs, dir=None):
     """Creates a temporary FASTA file representing an iterable of
     objects *seqs* containing attributes `description` and `seq` (eg,
     SeqRecord or fastalite objects). Returns the name of a temorary
@@ -297,7 +312,7 @@ def fasta_tempfile(seqs, dir = None):
     """
 
     handle = tempfile.NamedTemporaryFile(
-            mode='w', suffix = '.fasta', dir = dir)
+        mode='w', suffix='.fasta', dir=dir)
 
     handle.write(''.join('>{s.id}\n{s.seq}\n'.format(s=s) for s in seqs))
     handle.flush()
@@ -309,11 +324,10 @@ def fasta_tempfile(seqs, dir = None):
 
 
 @contextlib.contextmanager
-def run_ssearch(query, target, outfile = None, cleanup = True,
-                ssearch = 'ssearch36', max_hits = None,
-                full_length = True, m10 = True, dna = True,
-                forward_only = True, args = None):
-
+def run_ssearch(query, target, outfile=None, cleanup=True,
+                ssearch='ssearch36', max_hits=None,
+                full_length=True, m10=True, dna=True,
+                forward_only=True, args=None):
     """Align sequences in fasta-format files ``query`` and ``target``
     using ssearch36. Returns a file-like object open for
     reading. This is meant to be run in a with block. Other options are follows:
@@ -372,6 +386,7 @@ def run_ssearch(query, target, outfile = None, cleanup = True,
         if not outfile and cleanup:
             handle.close()
 
+
 def all_pairwise(seqs):
     """
     Perform all pairwise alignments among sequences in list of SeqRecords `seqs`
@@ -381,8 +396,8 @@ def all_pairwise(seqs):
         seqs = list(seqs)
 
     for i in xrange(len(seqs) - 1):
-        with fasta_tempfile([seqs[i]]) as target, fasta_tempfile(seqs[i+1:]) as query:
-            with run_ssearch(query, target, max_hits = 1) as aligned:
+        with fasta_tempfile([seqs[i]]) as target, fasta_tempfile(seqs[i + 1:]) as query:
+            with run_ssearch(query, target, max_hits=1) as aligned:
                 for d in parse_ssearch36(aligned):
                     yield (d['t_name'], d['q_name'], float(d['sw_ident']))
 
@@ -401,7 +416,7 @@ def names_from_pairs(pairs):
             yield t
 
 
-def run_muscle(seqs, tmpdir = None, keep_order = True):
+def run_muscle(seqs, tmpdir=None, keep_order=True):
     """
     Write an iterable of SeqRecord objects to a temporary file, align
     with muscle, and return an iterable of aligned SeqRecords. Output
@@ -420,7 +435,7 @@ def run_muscle(seqs, tmpdir = None, keep_order = True):
 
     if keep_order:
         seqs, seqs1 = tee(seqs)
-        sortdict = {s.id: i for i,s in enumerate(seqs1)}
+        sortdict = {s.id: i for i, s in enumerate(seqs1)}
 
     with fasta_tempfile(seqs, tmpdir) as f:
         command = ['muscle', '-quiet', '-seqtype', 'dna', '-in', f]
@@ -430,9 +445,10 @@ def run_muscle(seqs, tmpdir = None, keep_order = True):
     aligned = fastalite(StringIO(seqstr))
 
     if keep_order:
-        aligned = iter(sorted(aligned, key = lambda s: sortdict[s.id]))
+        aligned = iter(sorted(aligned, key=lambda s: sortdict[s.id]))
 
     return aligned
+
 
 def parse_uc(infile):
     """
@@ -442,7 +458,7 @@ def parse_uc(infile):
     cluster_ids = {}
     cluster_sizes = {}
 
-    rows = csv.DictReader(infile, delimiter = '\t', fieldnames = UCLUST_HEADERS)
+    rows = csv.DictReader(infile, delimiter='\t', fieldnames=UCLUST_HEADERS)
     for row in rows:
         cluster = int(row['cluster_number'])
         if row['type'] == 'C':
@@ -452,10 +468,12 @@ def parse_uc(infile):
 
     return cluster_ids, cluster_sizes
 
-def parse_blast(blast, extras = []):
+
+def parse_blast(blast, extras=[]):
     for line in blast:
         if line and not line[0] == '#':
             yield dict(zip(BLAST_HEADERS + extras, line.split()))
+
 
 def itemize_errors(ref, query):
     """
@@ -472,39 +490,44 @@ def itemize_errors(ref, query):
 
     """
 
-    query = query[_find_homochar_length(ref, gap):] # shift query to preserve alignment
-    ref = ref.strip(gap) # strip terminal gaps
+    # shift query to preserve alignment
+    query = query[_find_homochar_length(ref, gap):]
+    ref = ref.strip(gap)  # strip terminal gaps
 
     t = h = 0
     m = min(len(query), len(ref))
     results = []
 
     while t < m:
-        h += max(_find_homochar_length(ref[t:]), _find_homochar_length(query[t:]))
+        h += max(_find_homochar_length(ref[t:]),
+                 _find_homochar_length(query[t:]))
 
-        assert (t < h) # strange chars found or miss-alignment
+        assert (t < h)  # strange chars found or miss-alignment
 
         results.append({
-            'i':len(ref[:t].replace(gap, '').replace(homogap, '')),
-            'ref':ref[t:h],
-            'query':query[t:h]
-            })
+            'i': len(ref[:t].replace(gap, '').replace(homogap, '')),
+            'ref': ref[t:h],
+            'query': query[t:h]
+        })
 
         t = h
 
     return results
 
-def _find_homochar_length(s, char = '', ignore = [gap, homogap]):
+
+def _find_homochar_length(s, char='', ignore=[gap, homogap]):
     '''
     Returns the length of repeating chars from the left side of a string
     '''
     i = 0
     if s:
         char = char or ('' if s[0] in ignore else s[0])
-        while char == s[i:i+1]: i += 1
+        while char == s[i:i + 1]:
+            i += 1
     return i
 
-def error_category(e, gap = gap, homogap = homogap, errors = ERRORS):
+
+def error_category(e, gap=gap, homogap=homogap, errors=ERRORS):
     i, r, q = e['i'], e['ref'], e['query']
     if r == q:
         return 'equal'
@@ -517,20 +540,22 @@ def error_category(e, gap = gap, homogap = homogap, errors = ERRORS):
     else:
         return errors[3]
 
+
 def error_count(errors):
     cnt = Counter()
     for e in errors:
         cnt[error_category(e)] += 1
         cnt['length'] += len(e['ref'].strip('-='))
 
-        ### homoindel counts..
+        # homoindel counts..
         #lr = len(d['ref'].strip(homogap))
         #lq = len(d['query'].strip(homogap))
         #cnt[(lr if lr <= args.max else gtceil, lq if lq <= args.max else gtceil)] += 1
 
     return cnt
 
-def parse_ssearch36(lines, numeric = False):
+
+def parse_ssearch36(lines, numeric=False):
     """
     Parse output of 'ssearch36 -m 10 query.fasta library.fasta'
 
@@ -562,7 +587,7 @@ def parse_ssearch36(lines, numeric = False):
         elif line.startswith('>>>'):
             # start of a new hit
             if not line.startswith('>>>///'):
-                query_count +=1
+                query_count += 1
             q_name = line.lstrip('>').split(',')[0]
         elif line.startswith('>>') or line.startswith('>--'):
             # hit-specific results; keep results starting here
@@ -575,15 +600,15 @@ def parse_ssearch36(lines, numeric = False):
             prefix = ''
             keeplines = True
             hit = {'q_name': q_name,
-                    't_name': t_name,
-                    't_description': t_description,
-                    'q_seq': '',
-                    't_seq': ''}
+                   't_name': t_name,
+                   't_description': t_description,
+                   'q_seq': '',
+                   't_seq': ''}
         elif line.startswith('>'):
             prefix = 't_' if prefix else 'q_'
         elif line.startswith(';') and keeplines:
             k, v = line.lstrip('; ').split(':', 1)
-            k = k.replace(gap,'').replace(' ','_').lower()
+            k = k.replace(gap, '').replace(' ', '_').lower()
             if k == 'al_cons':
                 hit[k] = ''
             else:
@@ -599,23 +624,25 @@ def parse_ssearch36(lines, numeric = False):
 
     log.info('%s queries, %s hits' % (query_count, hit_count))
 
+
 def wrap(text, width=60):
     """
     Wraps input string [text] to [width] characters. Return a list of
     substrings.
     """
 
-    r1 = range(0, len(text)+1, width)
-    r2 = range(width, len(text) + width +1, width)
-    return [text[f:t] for f,t in zip(r1,r2)]
+    r1 = range(0, len(text) + 1, width)
+    r2 = range(width, len(text) + width + 1, width)
+    return [text[f:t] for f, t in zip(r1, r2)]
 
 
-def format_alignment(seq1, seq2, name1 = '', name2 = '', seqwidth = 80, namewidth = 15):
+def format_alignment(seq1, seq2, name1='', name2='', seqwidth=80, namewidth=15):
 
-    izl = lambda s: izip_longest(*s, fillvalue = '')
+    izl = lambda s: izip_longest(*s, fillvalue='')
 
     seqs = [seq1,
-            ''.join((':' if c1 == c2 else ' ') for c1,c2 in izl([seq1, seq2])),
+            ''.join((':' if c1 == c2 else ' ')
+                    for c1, c2 in izl([seq1, seq2])),
             seq2]
 
     names = [name1, '', name2]
@@ -629,8 +656,8 @@ def format_alignment(seq1, seq2, name1 = '', name2 = '', seqwidth = 80, namewidt
 
     return '\n'.join(ss)
 
-def grouper(n, iterable, pad = False):
 
+def grouper(n, iterable, pad=False):
     """
     Return sequence of n-tuples composed of successive elements of
     iterable; If pad is True, the last tuple is padded with None to
@@ -646,11 +673,12 @@ def grouper(n, iterable, pad = False):
     else:
         return (takewhile(lambda x: x is not None, c) for c in iterout)
 
-def show_errors(errorlist, width = 40):
-    errors = sorted(errorlist, key = lambda e: e['i'])
+
+def show_errors(errorlist, width=40):
+    errors = sorted(errorlist, key=lambda e: e['i'])
     out = ''
     for group in grouper(width, errors):
-        ii, rr, qq, cc = [],[],[],[]
+        ii, rr, qq, cc = [], [], [], []
         for d in group:
             i, r, q = str(d['i']), d['ref'], d['query']
             fstr = '%-' + str(max([len(r), len(q), len(i)])) + 's'
@@ -658,7 +686,7 @@ def show_errors(errorlist, width = 40):
             rr.append(fstr % r)
             qq.append(fstr % q)
             c = error_category(d)[0]
-            cc.append(fstr % ('' if c =='e' else c))
+            cc.append(fstr % ('' if c == 'e' else c))
 
         out += '\n  i:   ' + '|'.join(ii)
         out += '\nref:   ' + '|'.join(rr)
@@ -668,7 +696,8 @@ def show_errors(errorlist, width = 40):
 
     return out
 
-def format_taxonomy(names, selectors, asterisk = '*'):
+
+def format_taxonomy(names, selectors, asterisk='*'):
     """
     Create a friendly formatted string of taxonomy names. Names will
     have an asterisk value appended *only* if the cooresponding
@@ -676,29 +705,36 @@ def format_taxonomy(names, selectors, asterisk = '*'):
     """
 
     names = izip_longest(names, selectors)
-    names = ((n, asterisk if s else '') for n,s in names) # add asterisk to selected names
+    names = ((n, asterisk if s else '')
+             for n, s in names)  # add asterisk to selected names
     names = set(names)
-    names = sorted(names) # sort by the name plus asterisk
-    names = groupby(names, key = itemgetter(0)) # group by just the names
-    names = (list(g)[-1] for _,g in names) # prefer asterisk names which will be at the bottom
-    names = (n+a for n,a in names) # combine names with asterisks
-    species = lambda n: len(n.split()) == 2 # assume species names have exactly two words
-    names = sorted(names, key = species)
-    names = groupby(names, key = species)
+    names = sorted(names)  # sort by the name plus asterisk
+    names = groupby(names, key=itemgetter(0))  # group by just the names
+    # prefer asterisk names which will be at the bottom
+    names = (list(g)[-1] for _, g in names)
+    names = (n + a for n, a in names)  # combine names with asterisks
+    # assume species names have exactly two words
+    species = lambda n: len(n.split()) == 2
+    names = sorted(names, key=species)
+    names = groupby(names, key=species)
 
     tax = []
 
-    for species,assigns in names:
+    for species, assigns in names:
         if species:
             # take the species word and combine them with a '/'
             assigns = (a.split() for a in assigns)
-            assigns = groupby(assigns, key = itemgetter(0)) # group by genus name
-            assigns = ((k, map(itemgetter(1), g)) for k,g in assigns) # get a list of the species names
-            assigns = ('{} {}'.format(k, '/'.join(g)) for k,g in assigns) # combine species names with '/'
+            # group by genus name
+            assigns = groupby(assigns, key=itemgetter(0))
+            assigns = ((k, map(itemgetter(1), g))
+                       for k, g in assigns)  # get a list of the species names
+            assigns = ('{} {}'.format(k, '/'.join(g))
+                       for k, g in assigns)  # combine species names with '/'
 
         tax.extend(assigns)
 
     return ';'.join(sorted(tax))
+
 
 def compound_assignment(assignments, taxonomy):
     """
@@ -721,17 +757,18 @@ def compound_assignment(assignments, taxonomy):
     if not taxonomy:
         raise TypeError('taxonomy must not be empty or NoneType')
 
-    assignments = ((taxonomy[i]['tax_name'],a) for i,a in assignments)
+    assignments = ((taxonomy[i]['tax_name'], a) for i, a in assignments)
     assignments = zip(*assignments)
 
-    return format_taxonomy(*assignments, asterisk = '*')
+    return format_taxonomy(*assignments, asterisk='*')
+
 
 def condense_ids(assignments,
                  taxonomy,
-                 floor_rank = RANKS[-1],
-                 ceiling_rank = RANKS[0],
-                 max_size = 3,
-                 rank_thresholds = {}):
+                 floor_rank=RANKS[-1],
+                 ceiling_rank=RANKS[0],
+                 max_size=3,
+                 rank_thresholds={}):
     """
     assignments = [tax_ids...]
     taxonomy = {taxid:taxonomy}
@@ -751,16 +788,21 @@ def condense_ids(assignments,
         raise TypeError(msg)
 
     if RANKS.index(floor_rank) < RANKS.index(ceiling_rank):
-        msg = '{} cannot be lower rank than {}'.format(ceiling_rank, floor_rank)
+        msg = '{} cannot be lower rank than {}'.format(
+            ceiling_rank, floor_rank)
         raise TypeError(msg)
 
     # set rank to ceiling
-    assignments = {a:taxonomy[a][ceiling_rank] for a in assignments}
+    try:
+        assignments = {a: taxonomy[a][ceiling_rank] for a in assignments}
+    except KeyError:
+        error = ('Assignment id not found in taxonomy.')
+        raise KeyError(error)
 
-    def condense(groups, ceiling_rank = ceiling_rank, max_size = max_size):
+    def condense(groups, ceiling_rank=ceiling_rank, max_size=max_size):
         new_groups = {}
 
-        for a,r in groups.items():
+        for a, r in groups.items():
             new_groups[a] = taxonomy[a][ceiling_rank] or r
 
         num_groups = len(set(new_groups.values()))
@@ -778,7 +820,7 @@ def condense_ids(assignments,
         ceiling_rank = RANKS[RANKS.index(ceiling_rank) + 1]
 
         # recurse each branch down the tax tree
-        for _,g in utils.groupbyl(groups.items(), itemgetter(1)):
+        for _, g in utils.groupbyl(groups.items(), itemgetter(1)):
             g = condense(dict(g),
                          ceiling_rank,
                          max_size - num_groups + 1)
@@ -787,6 +829,7 @@ def condense_ids(assignments,
         return groups
 
     return condense(assignments)
+
 
 def correct_copy_numbers(assignments, copy_numbers):
     """Return a float representing a copy number adjustment factor given
@@ -807,6 +850,7 @@ def correct_copy_numbers(assignments, copy_numbers):
 
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 
+
 def _readfasta(handle):
     """
     Lightweight fasta parser. Returns iterator of namedtuple instances
@@ -819,6 +863,7 @@ def _readfasta(handle):
         for h in handle.lstrip('> ').split('\n>'):
             part = h.find('\n')
             yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
+
 
 def _iterfasta(handle):
     """
@@ -838,7 +883,8 @@ def _iterfasta(handle):
     if name and seq:
         yield SeqLite(name.split()[0], name, seq)
 
-def fastalite(handle, readfile = False):
+
+def fastalite(handle, readfile=False):
     """
     Return a sequence of namedtupe objects given fasta format open
     file-like object `handle`. Sequence is a list if `readfile` is
@@ -846,7 +892,9 @@ def fastalite(handle, readfile = False):
     """
     return _readfasta(handle) if readfile else _iterfasta(handle)
 
-### Taken from Connor McCoy's Deenurp
+# Taken from Connor McCoy's Deenurp
+
+
 def tax_of_genbank(gb):
     """
     Get the tax id from a genbank record, returning None if no taxonomy is
@@ -856,13 +904,15 @@ def tax_of_genbank(gb):
     try:
         source = next(i for i in gb.features if i.type == 'source')
         return re.findall('\d+', next(i[6:] for i in source.qualifiers.get('db_xref', [])
-                     if i.startswith('taxon:')))[0]
+                                      if i.startswith('taxon:')))[0]
     except StopIteration:
         return None
+
 
 def count_ambiguous(seq):
     s = frozenset('ACGT')
     return sum(i not in s for i in seq)
+
 
 def is_type(gb):
     """
