@@ -2,11 +2,61 @@
 
 Optional grouping by specimen and query sequences
 
-The output is a table containing the following columns:
+TODO: describe the algorithm here...
+
+ Input details
+===============
+
+rank_thresholds
+---------------
+
+This table defines the similarity thresholds at rank. The structure is
+as follows::
+
+  +--------+-----+--------------|
+  | tax_id | low | target_rank  |
+  +--------+-----+--------------|
+  | 1      | 99  | species      |
+  | 1      | 97  | genus        |
+  | 1      | 95  | family       |
+  +--------+-----+--------------|
+
+The `tax_id` column identifies the subtree of the taxonomy to which
+the threshold defined in `low` should be applied. In the example
+above, the threshold of 99 applies to all tax_ids with an ancestor of
+tax_id=1 (ie, the entire taxonomy). A more useful example might be this::
+
+ |--------+-----+-------------|
+ | tax_id | low | target_rank |
+ |--------+-----+-------------|
+ |   2049 |  97 | species     |
+ |   2049 |  95 | genus       |
+ |   2049 |  93 | family      |
+ |--------+-----+-------------|
+
+Here, all organisms belonging to family Actinomycetaceae (tax_id 2049)
+will be classified to the species level using a threshold of 97%
+instead of 99% in the first example, because we know that there is
+more species-level heterogeneity within this family.
+
+seq_info
+--------
+
+A csv file with columns "seqname","tax_id" and an optional column
+"accession", which gets passed through into the details output.
+
+
+Output
+======
+
+* `--out` is a table containing the following columns:
 
 specimen, max_percent, min_percent, max_coverage, min_coverage,
 assignment_id, assignment, clusters, reads, pct_read, corrected,
-pct_corrected, target_rank, hi, low, tax_ids
+pct_corrected, target_rank, low, tax_ids
+
+
+
 """
 
 import sys
@@ -39,9 +89,17 @@ def read_csv(filename, compression=None, **kwargs):
     return pd.read_csv(filename, **kwargs)
 
 def slim_results(df):
-    # first drop unqualified hits
+    """Drop unqualified hits and return remaining hits above the identiy
+    threshold defined for this rank.
+
+    """
+
+    # first drop all rows corresponding to hits that don't meet the
+    # threshold at the specified target rank
     df = df[df['low'] <= df['pident']]
-    # return remaining most specific hits
+
+    # among the remaining hits, keep hits at the most stringent
+    # threshold.
     return df[df['low'].max() <= df['pident']]
 
 
@@ -51,6 +109,7 @@ def star(df, starred):
 
 
 def condense_ids(df, tax_dict, max_group_size):
+
     """ create mapping from tax_id to its
         condensed id and set assignment hash """
     condensed = sequtils.condense_ids(
@@ -97,7 +156,7 @@ def assignment_id(df):
     df.index.name = 'assignment_id'
     return df
 
-
+# TODO: organize options as 1) all inputs 2) all outputs 3) other options
 def build_parser(parser):
     parser.add_argument(
         'blast_file', metavar='blast.csv(.bz2)',
@@ -197,6 +256,7 @@ def action(args):
         blast_results = blast_results[
             blast_results['coverage'] >= args.min_coverage]
 
+    # Define default thresholds; these will be overwritten by rank-specific thresholds below.
     # apply pident ceiling
     blast_results = blast_results[
         blast_results['pident'] <= args.max_identity]
@@ -218,7 +278,7 @@ def action(args):
     # the merge.
     blast_results = blast_results.join(seq_info, on='sseqid')
 
-    # TODO: consider getting rank orderding from columns of taxomomy tabl
+    # TODO: consider getting rank orderding from columns of taxomomy table
     usecols = ['tax_id', 'tax_name', 'rank'] + sequtils.RANKS
     taxonomy = read_csv(args.taxonomy, usecols=usecols, dtype=str)
     # set index after assigning dtype and preserve tax_id column
@@ -226,30 +286,75 @@ def action(args):
 
     targeted = []
     if args.rank_thresholds:
+        # Each tax_id T in the tax_id column of rank_thresholds
+        # identifies a subtree of the taxonomy. The value in "low"
+        # provides the threshold for tax_id T; all child tax_ids in
+        # this subtree should be given a value of NULL.
+
         rank_thresholds = read_csv(
             args.rank_thresholds,
             dtype=dict(tax_id=str))
 
+        # create a data_frame with columns tax_id, low defining the
+        # classification threshold for each tax_id using
+        # rank_thresholds.
+        thresholds = .... {'543': 95, '570': None, '571': None}
+
         blast_results = blast_results.join(
             taxonomy[sequtils.RANKS], on='tax_id')
 
-        # sort by rank and low threshold
-        rank_thresholds['rank_index'] = rank_thresholds['tax_rank'].apply(
-            lambda x: sequtils.RANKS.index(x))
-        rank_thresholds = rank_thresholds.sort(
-            columns=['rank_index', 'low'], ascending=False)
+        # sort thresholds by rank and low threshold
+        # rank_thresholds['rank_index'] = rank_thresholds['tax_rank'].apply(
+        #     lambda x: sequtils.RANKS.index(x))
+        # rank_thresholds = rank_thresholds.sort(
+        #     columns=['rank_index', 'low'], ascending=False)
+
+        # iterate over target_ranks, most specific first
+        hitlist = []
+        for target_rank in [rank for rank in sequtils.RANKS if rank in rank_thresholds.target_rank]:
+            # define the threshold "low" for each tax_id at this target rank
+
+            # use the tax_ids for this target_rank to define the
+            # classification threshold for this iteration by joining
+            # thresholds on thresholds.tax_id =
+            # blast_results.<target_rank>
+            # lows is a series with length = the number of rows in blast_results
+            lows = <threshold defined in thresholds for the column in blast_results corresponding to the current target_rank>
+            hits = blast_results[blast_results['pident'] >= lows]
+            hits['target_rank'] = target_rank
+            hitlist.append(hits)
+
+            blast_results = (all rows in blast_results not in hits, but not including any qseqs represented in hits)
+
+        # any qsesqs remaining in blast_results should be classified as [no blast result]
+
+        # concatenate hitlist, group by qseq, and create assignments based on
+        # remaining reference sequences for each qseq
 
         for i, threshold in rank_thresholds.iterrows():
+            # threshold['tax_rank'] is the column containing the
+            # tax_id (provided in threshold['tax_id']) to whose
+            # children (in column 'target_rank') we will assign the
+            # threshold ('low') defined in this iteration.
+
             hits = blast_results[
                 (blast_results[threshold['tax_rank']] == threshold['tax_id']) &
                 (blast_results['pident'] >= threshold['low'])]
+
             hits['low'] = threshold['low']
             hits['target_rank'] = threshold['target_rank']
+
+            # retain tax_id of target rank only
             hits = hits.drop('tax_id', axis=1)
+
+            # define tax_ids at target_rank
             hits['tax_id'] = hits[threshold['target_rank']]
+
+            # keep hits not meeting the threshold for the next iteration
             diff = blast_results.index.diff(hits.index)
             blast_results = blast_results.loc[diff]
             targeted.append(hits)
+
 
     blast_results['low'] = args.min_identity
     blast_results['target_rank'] = args.target_rank
