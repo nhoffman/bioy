@@ -23,7 +23,7 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
     log_info = 'bioy classifier {}'
 
-    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv')
+    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2')
 
     thisdatadir = path.join(datadir, 'classifier', 'TestClassifier')
 
@@ -256,6 +256,7 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             '--min-identity', '99',
             '--specimen-map', specimen_map,
             '--weights', weights,
+            '--copy-numbers', self.copy_numbers,
             '--out', classify_out,
             '--details-out', details_out,
             blast,

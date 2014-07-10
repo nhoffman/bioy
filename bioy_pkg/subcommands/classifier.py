@@ -183,6 +183,7 @@ def action(args):
     usecols = ['qseqid', 'sseqid', 'pident', 'coverage']
     blast_results = read_csv(
         args.blast_file,
+        dtype=dict(qseqid=str, sseqid=str, pident=float, coverage=float),
         names=names,
         na_filter=True,  # False is faster
         header=header,
@@ -196,7 +197,7 @@ def action(args):
         blast_results = blast_results[
             blast_results['coverage'] >= args.min_coverage]
 
-    # apply ceiling
+    # apply pident ceiling
     blast_results = blast_results[
         blast_results['pident'] <= args.max_identity]
 
@@ -361,14 +362,22 @@ def action(args):
         corrections = corrections['median'].mean()
         output['corrected'] = output['reads'] / corrections
 
+        # reset corrected counts to int before calculating pct_corrected
+        output['corrected'] = output['corrected'].apply(math.ceil)
+        output['corrected'] = output['corrected'].fillna(1).astype(int)
+
         output = output.groupby(level='specimen').apply(pct_corrected)
 
-        # reset corrected counts to int
-        output['corrected'] = output['corrected'].apply(math.ceil)
-        output['corrected'] = output['corrected'].astype(int)
+    # round up anything < 0.01 for before applying float_format
+    round_up = lambda x: max(0.01, x)
+    output['pct_reads'] = output['pct_reads'].map(round_up)
+    if args.copy_numbers:
+        output['pct_corrected'] = output['pct_corrected'].map(round_up)
 
-    # sort by read count and specimen
-    columns = ['corrected'] if args.copy_numbers in output else ['reads']
+    # sort in this order, 1) read count (or corrected) 2) cluster count
+    # 3) alpha assignment and finally 4) specimen
+    columns = ['corrected'] if args.copy_numbers else ['reads']
+    columns += ['clusters', 'assignment']
     output = output.sort(columns=columns, ascending=False)
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
