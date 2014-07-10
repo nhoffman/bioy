@@ -8,12 +8,10 @@ next release
 
 (features to be included in the next release)
 
- * hdf5 support
-
-
 1.8.0
 =====
 
+ * new faster classifier with test cases
  * remove scipy dependency
  * add pandas dependency
  * dev/bootstrap.sh creates a development environment
