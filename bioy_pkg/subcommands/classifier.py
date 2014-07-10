@@ -22,6 +22,81 @@ from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
+def freq(df):
+    df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
+    return df
+
+def read_csv(filename, compression=None, **kwargs):
+    """read a csv file using pandas.read_csv with compression defined by
+    the file suffix unless provided.
+
+    """
+
+    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
+    compression = compression or suffixes.get(path.splitext(filename)[-1])
+    kwargs['compression'] = compression
+
+    return pd.read_csv(filename, **kwargs)
+
+def slim_results(df):
+    # first drop unqualified hits
+    df = df[df['low'] <= df['pident']]
+    # return remaining most specific hits
+    return df[df['low'].max() <= df['pident']]
+
+
+def star(df, starred):
+    df['starred'] = df.pident.apply(lambda x: x >= starred).any()
+    return df
+
+
+def condense_ids(df, tax_dict, max_group_size):
+    """ create mapping from tax_id to its
+        condensed id and set assignment hash """
+    condensed = sequtils.condense_ids(
+        df.tax_id.unique(),
+        tax_dict,
+        max_size=max_group_size)
+    condensed = pd.DataFrame(
+        condensed.items(),
+        columns=['tax_id', 'condensed_id']).set_index('tax_id')
+    assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
+    condensed['assignment_hash'] = assignment_hash
+    return df.join(condensed, on='tax_id')
+
+
+def assign(df, tax_dict):
+    ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
+    df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
+    return df
+
+
+def agg_columns(df):
+    agg = {}
+    agg['low'] = df['low'].min()
+    agg['max_percent'] = df['pident'].max()
+    agg['min_percent'] = df['pident'].min()
+    target_rank = df['target_rank'].dropna().drop_duplicates()
+    if target_rank.empty:
+        target_rank = None
+    else:
+        specificity = lambda x: sequtils.RANKS.index(x)
+        target_rank.index = target_rank.apply(specificity)
+        target_rank = target_rank.sort_index()
+        target_rank = target_rank.iloc[-1]
+    agg['target_rank'] = target_rank
+    return pd.Series(agg)
+
+
+def pct_corrected(df):
+    df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
+    return df
+
+def assignment_id(df):
+    df = df.reset_index(drop=True)  # specimen is retained in the group key
+    df.index.name = 'assignment_id'
+    return df
+
 
 def build_parser(parser):
     parser.add_argument(
@@ -102,81 +177,6 @@ def build_parser(parser):
 
 
 def action(args):
-    # action functinos defined here and first
-    # TODO: figure out a way to move these functions out of the action
-    # to help simplify this script
-    def read_csv(filename, compression=None, **kwargs):
-        """read a csv file using pandas.read_csv with compression defined by
-        the file suffix unless provided.
-
-        """
-
-        suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
-        compression = compression or suffixes.get(path.splitext(filename)[-1])
-        kwargs['compression'] = compression
-
-        return pd.read_csv(filename, **kwargs)
-
-    def slim_results(df):
-        # first drop unqualified hits
-        df = df[df['low'] <= df['pident']]
-        # return remaining most specific hits
-        return df[df['low'].max() <= df['pident']]
-
-    def star(df):
-        df['starred'] = df.pident.apply(lambda x: x >= args.starred).any()
-        return df
-
-    def condense_ids(df):
-        """ create mapping from tax_id to its
-            condensed id and set assignment hash """
-        condensed = sequtils.condense_ids(
-            df.tax_id.unique(),
-            tax_dict,
-            max_size=args.target_max_group_size)
-        condensed = pd.DataFrame(
-            condensed.items(),
-            columns=['tax_id', 'condensed_id']).set_index('tax_id')
-        assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
-        condensed['assignment_hash'] = assignment_hash
-        return df.join(condensed, on='tax_id')
-
-    def assign(df):
-        ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
-        df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
-        return df
-
-    def agg_columns(df):
-        agg = {}
-        agg['low'] = df['low'].min()
-        agg['max_percent'] = df['pident'].max()
-        agg['min_percent'] = df['pident'].min()
-        target_rank = df['target_rank'].dropna().drop_duplicates()
-        if target_rank.empty:
-            target_rank = None
-        else:
-            specificity = lambda x: sequtils.RANKS.index(x)
-            target_rank.index = target_rank.apply(specificity)
-            target_rank = target_rank.sort_index()
-            target_rank = target_rank.iloc[-1]
-        agg['target_rank'] = target_rank
-        return pd.Series(agg)
-
-    def pct_corrected(df):
-        df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
-        return df
-
-    def assignment_id(df):
-        df = df.reset_index(drop=True)  # specimen is retained in the group key
-        df.index.name = 'assignment_id'
-        return df
-
-    def freq(df):
-        df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
-        return df
-
-    # start the script
-
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER
     header = 0 if args.has_header else None
@@ -296,14 +296,14 @@ def action(args):
 
     # create condensed assignment hashes by qseqid
     blast_results = blast_results.groupby(
-        by=['qseqid'], sort=False).apply(condense_ids)
+        by=['qseqid'], sort=False).apply(lambda x: condense_ids(x, tax_dict, args.target_max_group_size))
 
     # star condensed ids if one hit meets star threshold
     blast_results = blast_results.groupby(
-        by=['assignment_hash', 'condensed_id'], sort=False).apply(star)
+        by=['assignment_hash', 'condensed_id'], sort=False).apply(lambda x: star(x, args.starred))
 
     blast_results = blast_results.groupby(
-        by=['assignment_hash'], sort=False).apply(assign)
+        by=['assignment_hash'], sort=False).apply(lambda x: assign(x, tax_dict))
 
     # put assignments and no assignments back together
     blast_results = pd.concat([blast_results, no_hits])
