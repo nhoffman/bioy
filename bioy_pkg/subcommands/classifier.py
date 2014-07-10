@@ -298,7 +298,11 @@ def action(args):
         # create a data_frame with columns tax_id, low defining the
         # classification threshold for each tax_id using
         # rank_thresholds.
-        thresholds = .... {'543': 95, '570': None, '571': None}
+        thresholds =
+        # tax_id, low
+        # '543', 95
+        # '570', NA
+        # '571', NA
 
         blast_results = blast_results.join(
             taxonomy[sequtils.RANKS], on='tax_id')
