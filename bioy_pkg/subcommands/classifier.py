@@ -308,9 +308,7 @@ def action(args):
     # put assignments and no assignments back together
     blast_results = pd.concat([blast_results, no_hits])
 
-    # concludes our blast details, on to summarizing output
-
-    # now for some assignment grouping and summarizing
+    # concludes our blast details, on to assignments and output summary
 
     output = blast_results.groupby(
         by=['specimen', 'assignment_hash', 'assignment'])
@@ -327,7 +325,7 @@ def action(args):
             names=['qseqid', 'weight'],
             index_col='qseqid')
         clusters = clusters.join(weights)
-        # switch back to int and set no info to weight of 1
+        # enforce weight dtype as int and unlisted qseq's to weight of 1
         clusters['weight'] = clusters['weight'].fillna(1).astype(int)
     else:
         clusters['weight'] = 1
@@ -347,7 +345,7 @@ def action(args):
             dtype=dict(tax_id=str),
             usecols=['tax_id', 'median']).set_index('tax_id')
 
-        # get root out '1' and set it as the
+        # get root out (taxid: 1) and set it as the
         # default correction value with index nan
         default = copy_numbers.get_value('1', 'median')
         default = pd.DataFrame(default, index=[None], columns=['median'])
@@ -368,14 +366,17 @@ def action(args):
 
         output = output.groupby(level='specimen').apply(pct_corrected)
 
-    # round up anything < 0.01 for before applying float_format
+    # round up any pct < 0.01 for before sorting
     round_up = lambda x: max(0.01, x)
     output['pct_reads'] = output['pct_reads'].map(round_up)
     if args.copy_numbers:
         output['pct_corrected'] = output['pct_corrected'].map(round_up)
 
-    # sort in this order, 1) read count (or corrected) 2) cluster count
-    # 3) alpha assignment and finally 4) specimen
+    # sort by:
+    # 1) specimen
+    # 2) read/corrected count
+    # 3) cluster count
+    # 4) alpha assignment
     columns = ['corrected'] if args.copy_numbers else ['reads']
     columns += ['clusters', 'assignment']
     output = output.sort(columns=columns, ascending=False)
