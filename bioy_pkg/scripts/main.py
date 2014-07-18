@@ -15,6 +15,7 @@ from bioy_pkg import subcommands, __version__ as version, __doc__ as docstring
 log = logging
 # log = logging.getLogger(__name__)
 
+
 def main(argv):
     action, arguments = parse_arguments(argv)
 
@@ -35,6 +36,7 @@ def main(argv):
 
     return action(arguments)
 
+
 def parse_arguments(argv):
     """
     Create the argument parser
@@ -43,16 +45,16 @@ def parse_arguments(argv):
     parser = argparse.ArgumentParser(description=docstring)
 
     parser.add_argument('-V', '--version', action='version',
-        version = version,
-        help = 'Print the version number and exit')
+                        version=version,
+                        help='Print the version number and exit')
 
     parser.add_argument('-v', '--verbose',
-        action='count', dest='verbosity', default=1,
-        help='Increase verbosity of screen output (eg, -v is verbose, '
-             '-vv more so)')
+                        action='count', dest='verbosity', default=1,
+                        help='Increase verbosity of screen output (eg, -v is verbose, '
+                        '-vv more so)')
     parser.add_argument('-q', '--quiet',
-        action='store_const', dest='verbosity', const=0,
-        help='Suppress output')
+                        action='store_const', dest='verbosity', const=0,
+                        help='Suppress output')
 
     ##########################
     # Setup all sub-commands #
@@ -67,7 +69,8 @@ def parse_arguments(argv):
     # End help sub-command
 
     # Organize submodules by argv
-    modules = [name for _,name,_ in pkgutil.iter_modules(subcommands.__path__)]
+    modules = [
+        name for _, name, _ in pkgutil.iter_modules(subcommands.__path__)]
     run = [m for m in modules if m in argv]
 
     actions = {}
@@ -87,14 +90,14 @@ def parse_arguments(argv):
             mod = import_module('{}.{}'.format(subcommands.__name__, name))
         except Exception, e:
             log.error('error importing module {}.{}'.format(
-                    subcommands.__name__, name))
+                subcommands.__name__, name))
             log.error(e)
             continue
 
         subparser = subparsers.add_parser(
-            name, help = mod.__doc__.lstrip().split('\n', 1)[0],
-            description = mod.__doc__,
-            formatter_class = argparse.RawDescriptionHelpFormatter)
+            name, help=mod.__doc__.lstrip().split('\n', 1)[0],
+            description=mod.__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
         subparser = globe.parse_args(subparser)
         mod.build_parser(subparser)
         actions[name] = mod.action

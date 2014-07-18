@@ -11,4 +11,3 @@ try:
         __version__ = v.read().strip()
 except Exception, e:
     __version__ = ''
-
