@@ -25,7 +25,8 @@ BLAST_HEADER = BLAST_FORMAT.split()[1:] + ['coverage']
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
 UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
-                  'query_start', 'seed_start', 'alignment', 'query_label', 'target_label']
+                  'query_start', 'seed_start', 'alignment', 'query_label',
+                  'target_label']
 
 RANKS = ['root', 'superkingdom', 'phylum', 'class',
          'order', 'family', 'genus', 'species']
@@ -266,7 +267,8 @@ def get_rle_counts(seqs, rlelist):
     in in `seqs`.
 
      * seqs - sequence of SeqRecord objects
-     * rlelist - sequence of lists of run length counts correponding to seach sequence
+     * rlelist - sequence of lists of run length
+                 counts correponding to seach sequence
     """
 
     char_counter = defaultdict(Counter)
@@ -284,7 +286,8 @@ def get_rle_counts(seqs, rlelist):
             rle_counter[i][rle_counts.next() if c != gap else 1] += 1
 
     # tuples of counters, sorted by position
-    return [(char_counter[i], rle_counter[i]) for i in xrange(len(char_counter))]
+    return [(char_counter[i], rle_counter[i])
+            for i in xrange(len(char_counter))]
 
 
 def consensus(seqs, rlelist=None, degap=True):
@@ -330,7 +333,8 @@ def run_ssearch(query, target, outfile=None, cleanup=True,
                 forward_only=True, args=None):
     """Align sequences in fasta-format files ``query`` and ``target``
     using ssearch36. Returns a file-like object open for
-    reading. This is meant to be run in a with block. Other options are follows:
+    reading. This is meant to be run in a with block.
+    Other options are follows:
 
     * max_hits      if provided an integer value, specify option '-d <value>'
     * full_length   if True, specify '-a'
@@ -389,17 +393,19 @@ def run_ssearch(query, target, outfile=None, cleanup=True,
 
 def all_pairwise(seqs):
     """
-    Perform all pairwise alignments among sequences in list of SeqRecords `seqs`
+    Perform all pairwise alignments among
+    sequences in list of SeqRecords `seqs`
     """
 
     if not hasattr(seqs, 'len'):
         seqs = list(seqs)
 
     for i in xrange(len(seqs) - 1):
-        with fasta_tempfile([seqs[i]]) as target, fasta_tempfile(seqs[i + 1:]) as query:
-            with run_ssearch(query, target, max_hits=1) as aligned:
-                for d in parse_ssearch36(aligned):
-                    yield (d['t_name'], d['q_name'], float(d['sw_ident']))
+        with fasta_tempfile([seqs[i]]) as target:
+            with fasta_tempfile(seqs[i + 1:]) as query:
+                with run_ssearch(query, target, max_hits=1) as aligned:
+                    for d in parse_ssearch36(aligned):
+                        yield (d['t_name'], d['q_name'], float(d['sw_ident']))
 
 
 def names_from_pairs(pairs):
@@ -528,14 +534,15 @@ def _find_homochar_length(s, char='', ignore=[gap, homogap]):
 
 
 def error_category(e, gap=gap, homogap=homogap, errors=ERRORS):
-    i, r, q = e['i'], e['ref'], e['query']
+    r, q = e['ref'], e['query']
     if r == q:
         return 'equal'
     elif gap in r or gap in q:
         return errors[1]
     elif len(r) == 1:
         return errors[0]
-    elif set(c for c in r if c != homogap) == set(c for c in q if c != homogap):
+    elif set(c for c in r if c != homogap) == \
+            set(c for c in q if c != homogap):
         return errors[2]
     else:
         return errors[3]
@@ -546,12 +553,6 @@ def error_count(errors):
     for e in errors:
         cnt[error_category(e)] += 1
         cnt['length'] += len(e['ref'].strip('-='))
-
-        # homoindel counts..
-        #lr = len(d['ref'].strip(homogap))
-        #lq = len(d['query'].strip(homogap))
-        #cnt[(lr if lr <= args.max else gtceil, lq if lq <= args.max else gtceil)] += 1
-
     return cnt
 
 
@@ -636,7 +637,8 @@ def wrap(text, width=60):
     return [text[f:t] for f, t in zip(r1, r2)]
 
 
-def format_alignment(seq1, seq2, name1='', name2='', seqwidth=80, namewidth=15):
+def format_alignment(seq1, seq2, name1='', name2='',
+                     seqwidth=80, namewidth=15):
 
     izl = lambda s: izip_longest(*s, fillvalue='')
 
@@ -765,8 +767,9 @@ def compound_assignment(assignments, taxonomy):
 
 def condense_ids(assignments,
                  taxonomy,
-                 floor_rank=RANKS[-1],
-                 ceiling_rank=RANKS[0],
+                 ranks=RANKS,
+                 floor_rank=None,
+                 ceiling_rank=None,
                  max_size=3,
                  rank_thresholds={}):
     """
@@ -776,18 +779,21 @@ def condense_ids(assignments,
     Functionality: Group items into taxonomic groups given max rank sizes.
     """
 
+    floor_rank = floor_rank or ranks[-1]
+    ceiling_rank = ceiling_rank or ranks[0]
+
     if not taxonomy:
         raise TypeError('taxonomy must not be empty or NoneType')
 
-    if floor_rank not in RANKS:
-        msg = '{} not in RANKS: {}'.format(floor_rank, RANKS)
+    if floor_rank not in ranks:
+        msg = '{} not in ranks: {}'.format(floor_rank, ranks)
         raise TypeError(msg)
 
-    if ceiling_rank not in RANKS:
-        msg = '{} not in RANKS: {}'.format(ceiling_rank, RANKS)
+    if ceiling_rank not in ranks:
+        msg = '{} not in ranks: {}'.format(ceiling_rank, ranks)
         raise TypeError(msg)
 
-    if RANKS.index(floor_rank) < RANKS.index(ceiling_rank):
+    if ranks.index(floor_rank) < ranks.index(ceiling_rank):
         msg = '{} cannot be lower rank than {}'.format(
             ceiling_rank, floor_rank)
         raise TypeError(msg)
@@ -796,6 +802,7 @@ def condense_ids(assignments,
     try:
         assignments = {a: taxonomy[a][ceiling_rank] for a in assignments}
     except KeyError:
+        print assignments
         error = ('Assignment id not found in taxonomy.')
         raise KeyError(error)
 
@@ -817,7 +824,7 @@ def condense_ids(assignments,
             return groups
 
         # else move down a rank
-        ceiling_rank = RANKS[RANKS.index(ceiling_rank) + 1]
+        ceiling_rank = ranks[ranks.index(ceiling_rank) + 1]
 
         # recurse each branch down the tax tree
         for _, g in utils.groupbyl(groups.items(), itemgetter(1)):
@@ -862,7 +869,10 @@ def _readfasta(handle):
     if handle:
         for h in handle.lstrip('> ').split('\n>'):
             part = h.find('\n')
-            yield SeqLite(h[:part].split()[0], h[:part], ''.join(h[part:].split()))
+            idee = h[:part].split()[0]
+            desc = h[:part]
+            seq = ''.join(h[part:].split())
+            yield SeqLite(idee, desc, seq)
 
 
 def _iterfasta(handle):
@@ -903,8 +913,10 @@ def tax_of_genbank(gb):
     # Check for bad name
     try:
         source = next(i for i in gb.features if i.type == 'source')
-        return re.findall('\d+', next(i[6:] for i in source.qualifiers.get('db_xref', [])
-                                      if i.startswith('taxon:')))[0]
+        taxon = source.qualifiers.get('db_xref', [])
+        taxon = next(i[6:] for i in taxon if i.startswith('taxon:'))
+        taxon = re.findall('\d+', taxon)[0]
+        return taxon
     except StopIteration:
         return None
 
@@ -916,8 +928,10 @@ def count_ambiguous(seq):
 
 def is_type(gb):
     """
-    Returns a boolean indicating whether a sequence is a member of a type strain,
-    as indicated by the presence of the string '(T)' within the record description.
+    Returns a boolean indicating whether a
+    sequence is a member of a type strain,
+    as indicated by the presence of the string
+    '(T)' within the record description.
     """
     return '(T)' in gb.description
 ###
