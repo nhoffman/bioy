@@ -51,7 +51,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--out', classify_out,
             '--details-out', details_out,
             blast,
@@ -90,7 +89,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--weights', weights,
             '--out', classify_out,
             '--details-out', details_out,
@@ -130,7 +128,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--specimen-map', specimen_map,
             '--out', classify_out,
             '--details-out', details_out,
@@ -170,7 +167,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--rank-thresholds', rank_thresholds,
             '--out', classify_out,
             '--details-out', details_out,
@@ -209,7 +205,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--max-identity', '100',
             '--min-identity', '99',
             '--out', classify_out,
@@ -251,7 +246,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--has-header',
             '--max-identity', '100',
             '--min-identity', '99',
             '--specimen-map', specimen_map,
