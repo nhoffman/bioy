@@ -1,4 +1,4 @@
-"""
+"""DEPRECATED: use the classifier subcommand
 Classify sequences by grouping blast output by matching taxonomic names
 
 Optional grouping by specimen and query sequences
