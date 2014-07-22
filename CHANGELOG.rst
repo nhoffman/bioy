@@ -11,7 +11,7 @@ next release
 1.8.0
 =====
 
- * new faster classifier with test cases
+ * classify is now deprecated for the new faster classifier with test cases
  * remove scipy dependency
  * add pandas dependency
  * dev/bootstrap.sh creates a development environment
