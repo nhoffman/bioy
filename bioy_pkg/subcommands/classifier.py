@@ -93,23 +93,33 @@ def read_csv(filename, compression=None, **kwargs):
     return pd.read_csv(filename, **kwargs)
 
 
-def slim_results(df):
+def focus_results_by_specificity(df):
     """Remove less specific target_rank hits.
 
        If a hit's target rank shares taxonomy with a more specific
        target hit then it will be dropped in favor
-       of the more specific target hit(s)
+       of the more specific target hit(s).
+
+       ex - Given a group of blast hits (by qseqid), if a hit matches a
+       Helicobacter pylori species sequence and also matches
+       a Helicobacter genus sequence the H. pylori sequence will be accepted
+       while the genus level hit will be dropped from the
+       group.
     """
 
-    slimmed = pd.DataFrame(columns=df.columns)
+    results = pd.DataFrame(columns=df.columns)
     # Items are already sorted by priority
     # from the rank_threshold assignment
     df = df.groupby(by=['priority', 'target_rank'], sort=False)
     for (_, target_rank), vals in df:
-        curated_ids = slimmed[target_rank].drop_duplicates()
-        vals = vals[~vals[target_rank].isin(curated_ids)]
-        slimmed = slimmed.append(vals)
-    return slimmed
+        # 1) create a set of pruned tax_ids by target_rank
+        more_specific = results[target_rank].drop_duplicates()
+        # 2) filter out sequences that are already included in the pruned
+        # results at the target_rank
+        vals = vals[~vals[target_rank].isin(more_specific)]
+        # 3) append the unique hits at the current target_rank
+        results = results.append(vals)
+    return results
 
 
 def star(df, starred):
@@ -421,7 +431,7 @@ def action(args):
     rank_thresholds['tax_rank'] = rank_thresholds['tax_id'].map(
         lambda x: taxonomy.loc[x]['rank'])
 
-    # assign a priority index for both the taxonomic subtrees by specificity
+    # assign a priority index for taxonomic subtrees by specificity
     rank_thresholds['tax_priority'] = rank_thresholds['tax_rank'].map(
         lambda x: taxonomy.columns.get_loc(x))
 
@@ -429,7 +439,7 @@ def action(args):
     rank_thresholds['target_priority'] = rank_thresholds['target_rank'].map(
         lambda x: taxonomy.columns.get_loc(x))
 
-    # sort by [tax_priority, target_priority] indexes
+    # sort by tax_priority(s) and target_priority(s)
     rank_thresholds = rank_thresholds.sort(
         columns=['tax_priority', 'target_priority'], ascending=False)
 
@@ -448,9 +458,9 @@ def action(args):
         matches['low'] = threshold['low']
         matches['priority'] = i
 
+        # remove matches from blast_results, append and continue
         not_matches = blast_results.index.diff(matches.index)
         blast_results = blast_results.loc[not_matches]
-
         targeted.append(matches)
 
     # remaings blast_results (if any) get default low and target_rank
@@ -460,15 +470,18 @@ def action(args):
     # reconstruct the newly targeted blast_results
     blast_results = pd.concat(targeted + [blast_results])
 
-    # Keep most specific hits. See slim_results above
+    # Keep most specific hits.  This step is required so taxonomic
+    # assignments are not masked in the results by hits to their
+    # more generic taxonomic parents
     blast_results = blast_results.groupby(
-        by=['qseqid'], sort=False, group_keys=False).apply(slim_results)
+        by=['qseqid'], sort=False, group_keys=False).apply(
+            focus_results_by_specificity)
 
-    # tax_id will be the target_rank id
+    # set tax_id as the target_rank id
     blast_results['tax_id'] = blast_results.apply(
         most_specific, args=(rank_cols,), axis=1)
 
-    # and now assign our tax_name and rank
+    # join with taxonomy for tax_name and rank
     blast_results = blast_results.join(
         taxonomy[['tax_name', 'rank']], on='tax_id')
 
@@ -480,6 +493,8 @@ def action(args):
 
     # load specimen-map and assign specimen names
     if args.specimen_map:
+        # if a specimen_map is defined and a qseqid is not included in the map
+        # hits to that qseqid will be dropped
         spec_map = read_csv(
             args.specimen_map,
             names=['qseqid', 'specimen'],
@@ -488,9 +503,9 @@ def action(args):
     elif args.specimen:
         specimens['specimen'] = args.specimen
     else:
-        specimens['specimen'] = specimens.index
+        specimens['specimen'] = specimens.index  # qseqid
 
-    # join back into results.  Now all hits have an assigned specimen label
+    # join specimen labels onto blast_results
     blast_results = blast_results.join(specimens, on='qseqid')
 
     # assign seqs that had no results to [no blast_result]
@@ -501,7 +516,8 @@ def action(args):
     # move on to seqs that have blast hits
     blast_results = blast_results[blast_results.sseqid.notnull()]
 
-    # TODO: this is slow, integrate pandas into sequtils.condense_ids
+    # TODO: this is relatively slow, need to integrate
+    # pandas into sequtils.condense_ids
     tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
 
     # create condensed assignment hashes by qseqid
@@ -520,7 +536,7 @@ def action(args):
     # put assignments and no assignments back together
     blast_results = pd.concat([blast_results, no_hits])
 
-    # concludes our blast details, on to assignments and output summary
+    # concludes our blast details, on to output summary
 
     output = blast_results.groupby(
         by=['specimen', 'assignment_hash', 'assignment'])
@@ -592,6 +608,7 @@ def action(args):
     columns = ['corrected'] if args.copy_numbers else ['reads']
     columns += ['clusters', 'assignment']
     output = output.sort(columns=columns, ascending=False)
+    # nobody cares about assignment_hash
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
 
@@ -610,7 +627,7 @@ def action(args):
             largest = clusters.apply(lambda x: x['weight'].nlargest(1))
             blast_results = blast_results.merge(largest.reset_index())
 
-        # nobody cares about the assignment hash
+        # nobody cares about assignment_hash
         blast_results = blast_results.drop(labels='assignment_hash', axis=1)
 
         with args.details_out as out_details:
