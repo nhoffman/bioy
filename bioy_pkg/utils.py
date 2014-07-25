@@ -5,6 +5,7 @@ import logging
 import re
 import shutil
 import sys
+import signal
 
 from itertools import takewhile, izip_longest, groupby
 from csv import DictReader
@@ -12,6 +13,7 @@ from collections import Iterable, OrderedDict
 from os import path
 
 log = logging.getLogger(__name__)
+
 
 def flattener(iterable):
     """
@@ -27,7 +29,7 @@ def flattener(iterable):
             yield el
 
 
-def chunker(seq, size, combine_last = None):
+def chunker(seq, size, combine_last=None):
     """
     Break sequence seq into lists of length `size`. If the length of
     the final list is < 'combine_last', it is appended to the end of
@@ -64,7 +66,8 @@ def cast(val):
         except ValueError:
             pass
 
-def mkdir(dirpath, clobber = False):
+
+def mkdir(dirpath, clobber=False):
     """
     Create a (potentially existing) directory without errors. Raise
     OSError if directory can't be created. If clobber is True, remove
@@ -72,7 +75,7 @@ def mkdir(dirpath, clobber = False):
     """
 
     if clobber:
-        shutil.rmtree(dirpath, ignore_errors = True)
+        shutil.rmtree(dirpath, ignore_errors=True)
 
     try:
         os.mkdir(dirpath)
@@ -85,7 +88,7 @@ def mkdir(dirpath, clobber = False):
     return dirpath
 
 
-def parse_extras(s, numeric = True):
+def parse_extras(s, numeric=True):
     """
     Return an OrderedDict parsed from a string in the format
     "key1:val1,key2:val2"
@@ -97,10 +100,11 @@ def parse_extras(s, numeric = True):
 
     extras = commas.split(s)[1::2]
     extras = (colons.split(e)[1::2] for e in extras)
-    extras = ((k, cast(v) if numeric else v) for k,v in extras)
+    extras = ((k, cast(v) if numeric else v) for k, v in extras)
     extras = OrderedDict(extras)
 
     return extras
+
 
 class Opener(object):
     """Factory for creating file objects
@@ -182,3 +186,25 @@ def groupbyl(li, key=None, as_dict=False):
         return(dict(groups))
     else:
         return groups
+
+
+def _exit_on_signal(sig, status=None, message=None):
+    def exit(sig, frame):
+        if message:
+            print >> sys.stderr, message
+        raise SystemExit(status)
+    signal.signal(sig, exit)
+
+
+def exit_on_sigint(status=1, message="Canceled."):
+    """
+    Set program to exit on SIGINT, with provided status and message.
+    """
+    _exit_on_signal(signal.SIGINT, status, message)
+
+
+def exit_on_sigpipe(status=None):
+    """
+    Set program to exit on SIGPIPE
+    """
+    _exit_on_signal(signal.SIGPIPE, status)
