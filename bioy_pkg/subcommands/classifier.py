@@ -1,61 +1,222 @@
+# This file is part of Bioy
+#
+#    Bioy is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Bioy is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+
 """Classify sequences by grouping blast output by matching taxonomic names
 
 Optional grouping by specimen and query sequences
 
 TODO: describe the algorithm here...
 
- Input details
-===============
+Positional arguments
+--------------------
 
-rank_thresholds
----------------
+blast_file
+++++++++++
+
+A csv file with columns **qseqid**, **sseqid**, **pident**,
+**qstart**, **qend** and **qlen**.
+
+.. note:: The actual header is optional and if
+          present make sure to use the `has-header`_ switch
+
+seq_info
+++++++++
+
+A csv file with minimum columns **seqname** and **tax_id**.  Additional
+columns will be included in the details output.
+
+taxonomy
+++++++++
+
+A csv file with columns **tax_id**, **rank** and **tax_name**, plus at least
+one additional rank column(s) creating a taxonomic tree such as **species**,
+**genus**, **family**, **class**, **pylum**, **kingdom** and/or **root**.
+The rank columns also give an order of specificity from right to left,
+least specific to most specific respectively.
+
+Optional input
+--------------
+
+rank-thresholds
++++++++++++++++
 
 This table defines the similarity thresholds at rank. The structure is
-as follows::
+as follows:
 
-  +--------+-----+--------------|
-  | tax_id | low | target_rank  |
-  +--------+-----+--------------|
-  | 1      | 99  | species      |
-  | 1      | 97  | genus        |
-  | 1      | 95  | family       |
-  +--------+-----+--------------|
+    ====== === ===========
+    tax_id low target_rank
+    ====== === ===========
+    1      99  species
+    1      97  genus
+    1      95  family
+    ====== === ===========
 
-The `tax_id` column identifies the subtree of the taxonomy to which
-the threshold defined in `low` should be applied. In the example
-above, the threshold of 99 applies to all tax_ids with an ancestor of
-tax_id=1 (ie, the entire taxonomy). A more useful example might be this::
+The **tax_id** column identifies the subtree of the taxonomy to which
+the threshold defined in **low** should be applied. The example
+above is preloaded into the Classifier.  The threshold of 99 applies to all
+tax_ids with an ancestor of tax_id=1 (ie, the entire taxonomy).
 
- |--------+-----+-------------|
- | tax_id | low | target_rank |
- |--------+-----+-------------|
- |   2049 |  97 | species     |
- |   2049 |  95 | genus       |
- |   2049 |  93 | family      |
- |--------+-----+-------------|
+A custom example that can be specified by the user on top of the above example
+more useful example might be this:
+
+    ====== === ===========
+    tax_id low target_rank
+    ====== === ===========
+    2049   97  species
+    2049   95  genus
+    2049   93  family
+    ====== === ===========
 
 Here, all organisms belonging to family Actinomycetaceae (tax_id 2049)
 will be classified to the species level using a threshold of 97%
 instead of 99% in the first example, because we know that there is
-more species-level heterogeneity within this family.
+more specific, species-level heterogeneity within this family.
 
-seq_info
---------
+copy-numbers
+++++++++++++
 
-A csv file with columns "seqname","tax_id" and an optional column
-"accession", which gets passed through into the details output.
+Below is an *example* copy numbers csv with the required columns:
 
+    ====== ==================== ======
+    tax_id tax_name             median
+    ====== ==================== ======
+    155977 Acaryochloris        2.00
+    155978 Acaryochloris marina 2.00
+    434    Acetobacter          5.00
+    433    Acetobacteraceae     3.60
+    ====== ==================== ======
+
+weights
++++++++
+
+Headerless file containing two columns specifying the seqname (clustername) and
+weight (or number of sequences in the cluster).
 
 Output
-======
+------
 
-* `--out` is a table containing the following columns:
+out
++++
 
-specimen, max_percent, min_percent, max_coverage, min_coverage,
-assignment_id, assignment, clusters, reads, pct_read, corrected,
-pct_corrected, target_rank, low, tax_ids
+A csv with columns and headers as in the example below:
 
+    =========== =============== ======================================
+     specimen    assignment_id   assignment
+    =========== =============== ======================================
+      039_3      0               Pseudomonas mendocina;Pseudonocardia
+      039_3      1               Rhizobiales
+      039_3      2               Alcaligenes faecalis*
+      039_3      3               [no blast result]
+    =========== =============== ======================================
 
+    ======= ============= =============
+     low     max_percent   min_percent
+    ======= ============= =============
+     95.00   99.02         95.74
+     95.00   98.91         95.31
+     99.00   100.00        99.00
+
+    ======= ============= =============
+
+    ============= ======= =========== ===========
+     target_rank   reads   pct_reads   clusters
+    ============= ======= =========== ===========
+     species       6       35.29       1
+     genus         5       29.41       1
+     species       5       29.41       1
+                   1       5.88        1
+    ============= ======= =========== ===========
+
+details-out
++++++++++++
+
+A csv that is basically a blast results breakdown of the `out`_ output.
+
+Switches
+------------------
+
+group-def
++++++++++
+
+Define a group threshold for a particular rank. example: genus:2
+
+.. warning:: not implememented yet
+
+has-header
+++++++++++
+
+If a header is included in the blast_input then you **must** specify this
+switch.  Defaults to False.
+
+min-identity
+++++++++++++
+
+Minimum identity threshold for accepting matches.
+
+max-identity
+++++++++++++
+
+Maximum identity threshold for accepting matches.
+
+min-cluster-size
+++++++++++++++++
+
+Minimum cluster size to include in classification output.
+
+.. warning:: not implememented yet
+
+min-coverage
+++++++++++++
+
+Percent of alignment coverage of blast result.
+
+specimen
+++++++++
+
+Single group label for reads.  If not specified each sequence will be
+considered as its own specimen.
+
+starred
++++++++
+
+Threshold for appending an asterisk to assignment names where the pairwise
+alignment identity score is higher or equal to.
+
+target-max-group-size
++++++++++++++++++++++
+
+Group multiple target-rank assignments that
+excede a threshold to a higher rank.  Defaults to 3.
+
+target-rank
++++++++++++
+
+Rank at which to classify. Default is species.
+
+.. note:: If the species column is not specified then the next *less* specific
+          rank will be used.
+
+threads
++++++++
+
+Specify the number of threads available. Defaults to all available cpus.
+
+.. warning:: Only one thread will be used
+
+Internal functions
+------------------
 
 """
 
@@ -74,16 +235,15 @@ log = logging.getLogger(__name__)
 
 
 def freq(df):
-    """calculate pct_reads
+    """Calculate pct_reads column.
     """
     df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
     return df
 
 
 def read_csv(filename, compression=None, **kwargs):
-    """read a csv file using pandas.read_csv with compression defined by
+    """Read a csv file using pandas.read_csv with compression defined by
     the file suffix unless provided.
-
     """
 
     suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
@@ -100,7 +260,7 @@ def focus_results_by_specificity(df):
        target hit then it will be dropped in favor
        of the more specific target hit(s).
 
-       ex - Given a group of blast hits (by qseqid), if a hit matches a
+       Example: Given a group of blast hits (by qseqid), if a hit matches a
        Helicobacter pylori species sequence and also matches
        a Helicobacter genus sequence the H. pylori sequence will be accepted
        while the genus level hit will be dropped from the
@@ -124,7 +284,7 @@ def focus_results_by_specificity(df):
 
 def star(df, starred):
     """Assign boolean if any items in the
-    dataframe are above the star threshold
+    dataframe are above the star threshold.
     """
 
     df['starred'] = df.pident.apply(lambda x: x >= starred).any()
@@ -133,7 +293,7 @@ def star(df, starred):
 
 def condense_ids(df, tax_dict, ranks, max_group_size):
     """Create mapping from tax_id to its
-    condensed id and set assignment hash
+    condensed id and set assignment hash.
     """
 
     condensed = sequtils.condense_ids(
@@ -150,7 +310,7 @@ def condense_ids(df, tax_dict, ranks, max_group_size):
 
 
 def assign(df, tax_dict):
-    """Create str assignment based on tax_ids str and starred boolean
+    """Create str assignment based on tax_ids str and starred boolean.
     """
     ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
     df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
@@ -158,7 +318,7 @@ def assign(df, tax_dict):
 
 
 def agg_columns(df):
-    """Create aggregate columns for assignments
+    """Create aggregate columns for assignments.
     """
     agg = {}
     agg['low'] = df['low'].min()
@@ -177,13 +337,16 @@ def agg_columns(df):
 
 
 def pct_corrected(df):
-    """Calculate pct_corrected values
+    """Calculate pct_corrected values.
     """
     df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
     return df
 
 
 def assignment_id(df):
+    """Resets and drops the current dataframe's
+    index and sets it to the assignment_hash
+    """
     df = df.reset_index(drop=True)  # specimen is retained in the group key
     df.index.name = 'assignment_id'
     return df
@@ -191,6 +354,9 @@ def assignment_id(df):
 
 def load_rank_thresholds(
         path=path.join(datadir, 'rank_threshold_defaults.csv')):
+    """Load a rank-thresholds file.  If no argument is specified the default
+    rank_threshold_defaults.csv file will be loaded.
+    """
     return read_csv(
         path,
         usecols=['tax_id', 'low', 'target_rank'],
@@ -366,51 +532,6 @@ def action(args):
 
     #  tax_id will be later set from the target_rank
     blast_results = blast_results.drop('tax_id', axis=1)
-
-    """
-    Notes from ngh2:
-
-    # Each tax_id T in the tax_id column of rank_thresholds
-    # identifies a subtree of the taxonomy. The value in "low"
-    # provides the threshold for tax_id T; all child tax_ids in
-    # this subtree should be given a value of NULL.
-
-    # create a data_frame with columns tax_id, low defining the
-    # classification threshold for each tax_id using
-    # rank_thresholds.
-
-#    thresholds =
-    # tax_id, low
-    # '543', 95
-    # '570', NA
-    # '571', NA
-
-#    # iterate over target_ranks, most specific first
-#    hitlist = []
-#    for target_rank in [rank for rank in sequtils.RANKS
-#                        if rank in rank_thresholds.target_rank]:
-#        # define the threshold "low" for each tax_id at this target rank
-#
-#        # use the tax_ids for this target_rank to define the
-#        # classification threshold for this iteration by joining
-#        # thresholds on thresholds.tax_id =
-#        # blast_results.<target_rank>
-#        # lows is a series with length = the number of rows in blast_results
-#        lows = <threshold defined in thresholds for the column in
-#        blast_results corresponding to the current target_rank>
-#        hits = blast_results[blast_results['pident'] >= lows]
-#        hits['target_rank'] = target_rank
-#        hitlist.append(hits)
-#
-#        blast_results = (all rows in blast_results not in hits, but not
-#        including any qseqs represented in hits)
-
-    # any qsesqs remaining in blast_results
-    # should be classified as [no blast result]
-
-    # concatenate hitlist, group by qseq, and create assignments based on
-    # remaining reference sequences for each qseq
-    """
 
     # load the default rank thresholds
     rank_thresholds = load_rank_thresholds()
