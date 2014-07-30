@@ -197,6 +197,4 @@ license
 
 Copyright (c) 2012 Noah Hoffman
 
-Released under the GPLv3 License:
-
-TODO: include license text
+Released under the `GPLv3 <http://www.gnu.org/copyleft/gpl.html>`_ License
