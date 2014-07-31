@@ -1,0 +1,817 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>bioy_pkg.subcommands.classifier &mdash; bioy v1.8.2-105-gc91ebb0 documentation</title>
+    
+    <link rel="stylesheet" href="../../../_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../',
+        VERSION:     'v1.8.2-105-gc91ebb0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <link rel="top" title="bioy v1.8.2-105-gc91ebb0 documentation" href="../../../index.html" />
+    <link rel="up" title="Module code" href="../../index.html" /> 
+  </head>
+  <body>
+      <div class="header"><h1 class="heading"><a href="../../../index.html">
+          <span>bioy v1.8.2-105-gc91ebb0 documentation</span></a></h1>
+        <h2 class="heading"><span>bioy_pkg.subcommands.classifier</span></h2>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        <a class="uplink" href="../../../index.html">Contents</a>
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <h1>Source code for bioy_pkg.subcommands.classifier</h1><div class="highlight"><pre>
+<span class="c"># This file is part of Bioy</span>
+<span class="c">#</span>
+<span class="c">#    Bioy is free software: you can redistribute it and/or modify</span>
+<span class="c">#    it under the terms of the GNU General Public License as published by</span>
+<span class="c">#    the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c">#    (at your option) any later version.</span>
+<span class="c">#</span>
+<span class="c">#    Bioy is distributed in the hope that it will be useful,</span>
+<span class="c">#    but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c">#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</span>
+<span class="c">#    GNU General Public License for more details.</span>
+<span class="c">#</span>
+<span class="c">#    You should have received a copy of the GNU General Public License</span>
+<span class="c">#    along with Bioy.  If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Classify sequences by grouping blast output by matching taxonomic names</span>
+
+<span class="sd">Optional grouping by specimen and query sequences</span>
+
+<span class="sd">TODO: describe the algorithm here...</span>
+
+<span class="sd">Positional arguments</span>
+<span class="sd">--------------------</span>
+
+<span class="sd">blast_file</span>
+<span class="sd">++++++++++</span>
+
+<span class="sd">A csv file with columns **qseqid**, **sseqid**, **pident**,</span>
+<span class="sd">**qstart**, **qend** and **qlen**.</span>
+
+<span class="sd">.. note:: The actual header is optional and if</span>
+<span class="sd">          present make sure to use the `has-header`_ switch</span>
+
+<span class="sd">seq_info</span>
+<span class="sd">++++++++</span>
+
+<span class="sd">A csv file with minimum columns **seqname** and **tax_id**.  Additional</span>
+<span class="sd">columns will be included in the details output.</span>
+
+<span class="sd">taxonomy</span>
+<span class="sd">++++++++</span>
+
+<span class="sd">A csv file with columns **tax_id**, **rank** and **tax_name**, plus at least</span>
+<span class="sd">one additional rank column(s) creating a taxonomic tree such as **species**,</span>
+<span class="sd">**genus**, **family**, **class**, **pylum**, **kingdom** and/or **root**.</span>
+<span class="sd">The rank columns also give an order of specificity from right to left,</span>
+<span class="sd">least specific to most specific respectively.</span>
+
+<span class="sd">Optional input</span>
+<span class="sd">--------------</span>
+
+<span class="sd">rank-thresholds</span>
+<span class="sd">+++++++++++++++</span>
+
+<span class="sd">This table defines the similarity thresholds at rank. The structure is</span>
+<span class="sd">as follows:</span>
+
+<span class="sd">    ====== === ===========</span>
+<span class="sd">    tax_id low target_rank</span>
+<span class="sd">    ====== === ===========</span>
+<span class="sd">    1      99  species</span>
+<span class="sd">    1      97  genus</span>
+<span class="sd">    1      95  family</span>
+<span class="sd">    ====== === ===========</span>
+
+<span class="sd">The **tax_id** column identifies the subtree of the taxonomy to which</span>
+<span class="sd">the threshold defined in **low** should be applied. The example</span>
+<span class="sd">above is preloaded into the Classifier.  The threshold of 99 applies to all</span>
+<span class="sd">tax_ids with an ancestor of tax_id=1 (ie, the entire taxonomy).</span>
+
+<span class="sd">A custom example that can be specified by the user on top of the above example</span>
+<span class="sd">more useful example might be this:</span>
+
+<span class="sd">    ====== === ===========</span>
+<span class="sd">    tax_id low target_rank</span>
+<span class="sd">    ====== === ===========</span>
+<span class="sd">    2049   97  species</span>
+<span class="sd">    2049   95  genus</span>
+<span class="sd">    2049   93  family</span>
+<span class="sd">    ====== === ===========</span>
+
+<span class="sd">Here, all organisms belonging to family Actinomycetaceae (tax_id 2049)</span>
+<span class="sd">will be classified to the species level using a threshold of 97%</span>
+<span class="sd">instead of 99% in the first example, because we know that there is</span>
+<span class="sd">more specific, species-level heterogeneity within this family.</span>
+
+<span class="sd">copy-numbers</span>
+<span class="sd">++++++++++++</span>
+
+<span class="sd">Below is an *example* copy numbers csv with the required columns:</span>
+
+<span class="sd">    ====== ==================== ======</span>
+<span class="sd">    tax_id tax_name             median</span>
+<span class="sd">    ====== ==================== ======</span>
+<span class="sd">    155977 Acaryochloris        2.00</span>
+<span class="sd">    155978 Acaryochloris marina 2.00</span>
+<span class="sd">    434    Acetobacter          5.00</span>
+<span class="sd">    433    Acetobacteraceae     3.60</span>
+<span class="sd">    ====== ==================== ======</span>
+
+<span class="sd">weights</span>
+<span class="sd">+++++++</span>
+
+<span class="sd">Headerless file containing two columns specifying the seqname (clustername) and</span>
+<span class="sd">weight (or number of sequences in the cluster).</span>
+
+<span class="sd">Output</span>
+<span class="sd">------</span>
+
+<span class="sd">out</span>
+<span class="sd">+++</span>
+
+<span class="sd">A csv with columns and headers as in the example below:</span>
+
+<span class="sd">    =========== =============== ======================================</span>
+<span class="sd">     specimen    assignment_id   assignment</span>
+<span class="sd">    =========== =============== ======================================</span>
+<span class="sd">      039_3      0               Pseudomonas mendocina;Pseudonocardia</span>
+<span class="sd">      039_3      1               Rhizobiales</span>
+<span class="sd">      039_3      2               Alcaligenes faecalis*</span>
+<span class="sd">      039_3      3               [no blast result]</span>
+<span class="sd">    =========== =============== ======================================</span>
+
+<span class="sd">    ======= ============= =============</span>
+<span class="sd">     low     max_percent   min_percent</span>
+<span class="sd">    ======= ============= =============</span>
+<span class="sd">     95.00   99.02         95.74</span>
+<span class="sd">     95.00   98.91         95.31</span>
+<span class="sd">     99.00   100.00        99.00</span>
+
+<span class="sd">    ======= ============= =============</span>
+
+<span class="sd">    ============= ======= =========== ===========</span>
+<span class="sd">     target_rank   reads   pct_reads   clusters</span>
+<span class="sd">    ============= ======= =========== ===========</span>
+<span class="sd">     species       6       35.29       1</span>
+<span class="sd">     genus         5       29.41       1</span>
+<span class="sd">     species       5       29.41       1</span>
+<span class="sd">                   1       5.88        1</span>
+<span class="sd">    ============= ======= =========== ===========</span>
+
+<span class="sd">details-out</span>
+<span class="sd">+++++++++++</span>
+
+<span class="sd">A csv that is basically a blast results breakdown of the `out`_ output.</span>
+
+<span class="sd">Switches</span>
+<span class="sd">------------------</span>
+
+<span class="sd">group-def</span>
+<span class="sd">+++++++++</span>
+
+<span class="sd">Define a group threshold for a particular rank. example: genus:2</span>
+
+<span class="sd">.. warning:: not implememented yet</span>
+
+<span class="sd">has-header</span>
+<span class="sd">++++++++++</span>
+
+<span class="sd">If a header is included in the blast_input then you **must** specify this</span>
+<span class="sd">switch.  Defaults to False.</span>
+
+<span class="sd">min-identity</span>
+<span class="sd">++++++++++++</span>
+
+<span class="sd">Minimum identity threshold for accepting matches.</span>
+
+<span class="sd">max-identity</span>
+<span class="sd">++++++++++++</span>
+
+<span class="sd">Maximum identity threshold for accepting matches.</span>
+
+<span class="sd">min-cluster-size</span>
+<span class="sd">++++++++++++++++</span>
+
+<span class="sd">Minimum cluster size to include in classification output.</span>
+
+<span class="sd">.. warning:: not implememented yet</span>
+
+<span class="sd">min-coverage</span>
+<span class="sd">++++++++++++</span>
+
+<span class="sd">Percent of alignment coverage of blast result.</span>
+
+<span class="sd">specimen</span>
+<span class="sd">++++++++</span>
+
+<span class="sd">Single group label for reads.  If not specified each sequence will be</span>
+<span class="sd">considered as its own specimen.</span>
+
+<span class="sd">starred</span>
+<span class="sd">+++++++</span>
+
+<span class="sd">Threshold for appending an asterisk to assignment names where the pairwise</span>
+<span class="sd">alignment identity score is higher or equal to.</span>
+
+<span class="sd">target-max-group-size</span>
+<span class="sd">+++++++++++++++++++++</span>
+
+<span class="sd">Group multiple target-rank assignments that</span>
+<span class="sd">excede a threshold to a higher rank.  Defaults to 3.</span>
+
+<span class="sd">target-rank</span>
+<span class="sd">+++++++++++</span>
+
+<span class="sd">Rank at which to classify. Default is species.</span>
+
+<span class="sd">.. note:: If the species column is not specified then the next *less* specific</span>
+<span class="sd">          rank will be used.</span>
+
+<span class="sd">threads</span>
+<span class="sd">+++++++</span>
+
+<span class="sd">Specify the number of threads available. Defaults to all available cpus.</span>
+
+<span class="sd">.. warning:: Only one thread will be used</span>
+
+<span class="sd">Internal functions</span>
+<span class="sd">------------------</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">path</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="kn">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">math</span>
+
+<span class="kn">from</span> <span class="nn">bioy_pkg</span> <span class="kn">import</span> <span class="n">sequtils</span><span class="p">,</span> <span class="n">_data</span> <span class="k">as</span> <span class="n">datadir</span>
+<span class="kn">from</span> <span class="nn">bioy_pkg.utils</span> <span class="kn">import</span> <span class="n">Opener</span>
+
+<span class="n">log</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="freq"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.freq">[docs]</a><span class="k">def</span> <span class="nf">freq</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculate pct_reads column.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span><span class="p">[</span><span class="s">&#39;pct_reads&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;reads&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;reads&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+</div>
+<div class="viewcode-block" id="read_csv"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.read_csv">[docs]</a><span class="k">def</span> <span class="nf">read_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">compression</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Read a csv file using pandas.read_csv with compression defined by</span>
+<span class="sd">    the file suffix unless provided.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">suffixes</span> <span class="o">=</span> <span class="p">{</span><span class="s">&#39;.bz2&#39;</span><span class="p">:</span> <span class="s">&#39;bz2&#39;</span><span class="p">,</span> <span class="s">&#39;.gz&#39;</span><span class="p">:</span> <span class="s">&#39;gzip&#39;</span><span class="p">}</span>
+    <span class="n">compression</span> <span class="o">=</span> <span class="n">compression</span> <span class="ow">or</span> <span class="n">suffixes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">filename</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">kwargs</span><span class="p">[</span><span class="s">&#39;compression&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">compression</span>
+
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="focus_results_by_specificity"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.focus_results_by_specificity">[docs]</a><span class="k">def</span> <span class="nf">focus_results_by_specificity</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Remove less specific target_rank hits.</span>
+
+<span class="sd">       If a hit&#39;s target rank shares taxonomy with a more specific</span>
+<span class="sd">       target hit then it will be dropped in favor</span>
+<span class="sd">       of the more specific target hit(s).</span>
+
+<span class="sd">       Example: Given a group of blast hits (by qseqid), if a hit matches a</span>
+<span class="sd">       Helicobacter pylori species sequence and also matches</span>
+<span class="sd">       a Helicobacter genus sequence the H. pylori sequence will be accepted</span>
+<span class="sd">       while the genus level hit will be dropped from the</span>
+<span class="sd">       group.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+    <span class="c"># Items are already sorted by priority</span>
+    <span class="c"># from the rank_threshold assignment</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;priority&#39;</span><span class="p">,</span> <span class="s">&#39;target_rank&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">target_rank</span><span class="p">),</span> <span class="n">vals</span> <span class="ow">in</span> <span class="n">df</span><span class="p">:</span>
+        <span class="c"># 1) create a set of pruned tax_ids by target_rank</span>
+        <span class="n">more_specific</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="n">target_rank</span><span class="p">]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+        <span class="c"># 2) filter out sequences that are already included in the pruned</span>
+        <span class="c"># results at the target_rank</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="o">~</span><span class="n">vals</span><span class="p">[</span><span class="n">target_rank</span><span class="p">]</span><span class="o">.</span><span class="n">isin</span><span class="p">(</span><span class="n">more_specific</span><span class="p">)]</span>
+        <span class="c"># 3) append the unique hits at the current target_rank</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">vals</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">results</span>
+
+</div>
+<div class="viewcode-block" id="star"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.star">[docs]</a><span class="k">def</span> <span class="nf">star</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">starred</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Assign boolean if any items in the</span>
+<span class="sd">    dataframe are above the star threshold.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s">&#39;starred&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">pident</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">&gt;=</span> <span class="n">starred</span><span class="p">)</span><span class="o">.</span><span class="n">any</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+</div>
+<div class="viewcode-block" id="condense_ids"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.condense_ids">[docs]</a><span class="k">def</span> <span class="nf">condense_ids</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">tax_dict</span><span class="p">,</span> <span class="n">ranks</span><span class="p">,</span> <span class="n">max_group_size</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create mapping from tax_id to its</span>
+<span class="sd">    condensed id and set assignment hash.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">condensed</span> <span class="o">=</span> <span class="n">sequtils</span><span class="o">.</span><span class="n">condense_ids</span><span class="p">(</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">tax_id</span><span class="o">.</span><span class="n">unique</span><span class="p">(),</span>
+        <span class="n">tax_dict</span><span class="p">,</span>
+        <span class="n">ranks</span><span class="o">=</span><span class="n">ranks</span><span class="p">,</span>
+        <span class="n">max_size</span><span class="o">=</span><span class="n">max_group_size</span><span class="p">)</span>
+    <span class="n">condensed</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+        <span class="n">condensed</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="s">&#39;condensed_id&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+    <span class="n">assignment_hash</span> <span class="o">=</span> <span class="nb">hash</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">condensed</span><span class="o">.</span><span class="n">condensed_id</span><span class="o">.</span><span class="n">unique</span><span class="p">()))</span>
+    <span class="n">condensed</span><span class="p">[</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">assignment_hash</span>
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">condensed</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="assign"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.assign">[docs]</a><span class="k">def</span> <span class="nf">assign</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">tax_dict</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create str assignment based on tax_ids str and starred boolean.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ids_stars</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;condensed_id&#39;</span><span class="p">,</span> <span class="s">&#39;starred&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">groups</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="n">df</span><span class="p">[</span><span class="s">&#39;assignment&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sequtils</span><span class="o">.</span><span class="n">compound_assignment</span><span class="p">(</span><span class="n">ids_stars</span><span class="p">,</span> <span class="n">tax_dict</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+</div>
+<div class="viewcode-block" id="agg_columns"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.agg_columns">[docs]</a><span class="k">def</span> <span class="nf">agg_columns</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create aggregate columns for assignments.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">agg</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">agg</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">agg</span><span class="p">[</span><span class="s">&#39;max_percent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;pident&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+    <span class="n">agg</span><span class="p">[</span><span class="s">&#39;min_percent&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;pident&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">target_rank</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">target_rank</span><span class="o">.</span><span class="n">empty</span><span class="p">:</span>
+        <span class="n">target_rank</span> <span class="o">=</span> <span class="bp">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">specificity</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">sequtils</span><span class="o">.</span><span class="n">RANKS</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">target_rank</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">target_rank</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">specificity</span><span class="p">)</span>
+        <span class="n">target_rank</span> <span class="o">=</span> <span class="n">target_rank</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+        <span class="n">target_rank</span> <span class="o">=</span> <span class="n">target_rank</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">agg</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_rank</span>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">agg</span><span class="p">)</span>
+
+</div>
+<div class="viewcode-block" id="pct_corrected"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.pct_corrected">[docs]</a><span class="k">def</span> <span class="nf">pct_corrected</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Calculate pct_corrected values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span><span class="p">[</span><span class="s">&#39;pct_corrected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">df</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+</div>
+<div class="viewcode-block" id="assignment_id"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.assignment_id">[docs]</a><span class="k">def</span> <span class="nf">assignment_id</span><span class="p">(</span><span class="n">df</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Resets and drops the current dataframe&#39;s</span>
+<span class="sd">    index and sets it to the assignment_hash</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>  <span class="c"># specimen is retained in the group key</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">&#39;assignment_id&#39;</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+</div>
+<div class="viewcode-block" id="load_rank_thresholds"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.load_rank_thresholds">[docs]</a><span class="k">def</span> <span class="nf">load_rank_thresholds</span><span class="p">(</span>
+        <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">datadir</span><span class="p">,</span> <span class="s">&#39;rank_threshold_defaults.csv&#39;</span><span class="p">)):</span>
+    <span class="sd">&quot;&quot;&quot;Load a rank-thresholds file.  If no argument is specified the default</span>
+<span class="sd">    rank_threshold_defaults.csv file will be loaded.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">path</span><span class="p">,</span>
+        <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="s">&#39;low&#39;</span><span class="p">,</span> <span class="s">&#39;target_rank&#39;</span><span class="p">],</span>
+        <span class="n">comment</span><span class="o">=</span><span class="s">&#39;#&#39;</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">tax_id</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">low</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">target_rank</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">comment</span><span class="o">=</span><span class="nb">str</span><span class="p">))</span>
+
+</div>
+<div class="viewcode-block" id="most_specific"><a class="viewcode-back" href="../../../classifier.html#bioy_pkg.subcommands.classifier.most_specific">[docs]</a><span class="k">def</span> <span class="nf">most_specific</span><span class="p">(</span><span class="n">series</span><span class="p">,</span> <span class="n">cols</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Return the most taxonomic specific tax_id available for the given</span>
+<span class="sd">    Series.</span>
+
+<span class="sd">    For most given Series the given target_rank is available and returned.</span>
+<span class="sd">    If the target_rank is NAN then return a less specific tax_id</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">target_rank</span> <span class="o">=</span> <span class="n">series</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span>
+    <span class="n">target_id</span> <span class="o">=</span> <span class="n">series</span><span class="p">[</span><span class="n">target_rank</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isnull</span><span class="p">(</span><span class="n">target_id</span><span class="p">):</span>
+        <span class="c"># get root -&gt; target_rank columns</span>
+        <span class="n">target_rank_index</span> <span class="o">=</span> <span class="n">cols</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">target_rank</span><span class="p">)</span>
+        <span class="n">series</span> <span class="o">=</span> <span class="n">series</span><span class="p">[</span><span class="n">cols</span><span class="p">[:</span><span class="n">target_rank_index</span><span class="p">]]</span>
+        <span class="c"># remove offending null values</span>
+        <span class="n">series</span> <span class="o">=</span> <span class="n">series</span><span class="p">[</span><span class="o">~</span><span class="n">series</span><span class="o">.</span><span class="n">isnull</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="n">series</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c"># the most specific, non-null value</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">target_id</span>
+
+</div>
+<span class="k">def</span> <span class="nf">build_parser</span><span class="p">(</span><span class="n">parser</span><span class="p">):</span>
+    <span class="c"># required inputs</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;blast_file&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;CSV tabular blast file of query and subject hits.&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;seq_info&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;File mapping reference seq name to tax_id&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;taxonomy&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Table defining the taxonomy for each tax_id&quot;&quot;&quot;</span><span class="p">)</span>
+
+    <span class="c"># optional inputs</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--copy-numbers&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;CSV&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Estimated 16s rRNA gene copy number for each tax_ids</span>
+<span class="s">        (CSV file with columns: tax_id, median)&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--rank-thresholds&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;CSV&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Columns [tax_rank,tax_id,low,rank]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--specimen-map&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;CSV&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;CSV file with columns (name, specimen) assigning sequences to</span>
+<span class="s">        groups. The default behavior is to treat all query sequences</span>
+<span class="s">        as belonging to one specimen.&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;-w&#39;</span><span class="p">,</span> <span class="s">&#39;--weights&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;CSV&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Optional headless csv file with columns &#39;seqname&#39;,</span>
+<span class="s">        &#39;count&#39; providing weights for each query sequence described in</span>
+<span class="s">        the blast input (used, for example, to describe cluster sizes</span>
+<span class="s">        for corresponding cluster centroids).&quot;&quot;&quot;</span><span class="p">)</span>
+
+    <span class="c"># common outputs</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;-o&#39;</span><span class="p">,</span> <span class="s">&#39;--out&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Opener</span><span class="p">(</span><span class="s">&#39;w&#39;</span><span class="p">),</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;FILE&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;Classification results.&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;-O&#39;</span><span class="p">,</span> <span class="s">&#39;--details-out&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Opener</span><span class="p">(</span><span class="s">&#39;w&#39;</span><span class="p">),</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;FILE&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Optional details of taxonomic assignments.&quot;&quot;&quot;</span><span class="p">)</span>
+
+    <span class="c"># switches and options</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--details-full&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&#39;store_true&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;do not limit out_details to only larget cluster per assignment&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--group-def&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;INTEGER&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&#39;append&#39;</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="p">[],</span> <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;define a group threshold for a</span>
+<span class="s">        particular rank overriding --target-max-group-size. example:</span>
+<span class="s">        genus:2 (NOT IMPLEMENTED)&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--has-header&#39;</span><span class="p">,</span> <span class="n">action</span><span class="o">=</span><span class="s">&#39;store_true&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;specify this if blast data has a header&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--min-identity&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;PERCENT&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;minimum identity threshold</span>
+<span class="s">        for accepting matches [&gt;= </span><span class="si">%(default)s</span><span class="s">]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--max-identity&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;PERCENT&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;maximum identity threshold for</span>
+<span class="s">        accepting matches [&lt;= </span><span class="si">%(default)s</span><span class="s">]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--min-cluster-size&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;INTEGER&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;minimum cluster size to include in</span>
+<span class="s">        classification output [</span><span class="si">%(default)s</span><span class="s">]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--min-coverage&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;PERCENT&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;percent of alignment coverage of blast result [</span><span class="si">%(default)s</span><span class="s">]&#39;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--specimen&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;LABEL&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Single group label for reads&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--starred&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;PERCENT&#39;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;Names of organisms for which at least one reference</span>
+<span class="s">        sequence has pairwise identity with a query sequence of at</span>
+<span class="s">        least PERCENT will be marked with an asterisk [</span><span class="si">%(default)s</span><span class="s">]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--target-max-group-size&#39;</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">&#39;INTEGER&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&quot;&quot;&quot;group multiple target-rank assignments that excede a</span>
+<span class="s">        threshold to a higher rank [</span><span class="si">%(default)s</span><span class="s">]&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s">&#39;--target-rank&#39;</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s">&#39;species&#39;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s">&#39;Rank at which to classify. Default: &quot;</span><span class="si">%(default)s</span><span class="s">&quot;&#39;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">action</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+    <span class="c"># for debugging:</span>
+    <span class="n">pd</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="s">&#39;display.max_columns&#39;</span><span class="p">,</span> <span class="bp">None</span><span class="p">)</span>
+    <span class="c"># pd.set_option(&#39;display.max_rows&#39;, None)</span>
+
+    <span class="c"># format blast data and add additional available information</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="bp">None</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">has_header</span> <span class="k">else</span> <span class="n">sequtils</span><span class="o">.</span><span class="n">BLAST_HEADER</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">has_header</span> <span class="k">else</span> <span class="bp">None</span>
+    <span class="n">usecols</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;qseqid&#39;</span><span class="p">,</span> <span class="s">&#39;sseqid&#39;</span><span class="p">,</span> <span class="s">&#39;pident&#39;</span><span class="p">,</span> <span class="s">&#39;coverage&#39;</span><span class="p">]</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">blast_file</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">qseqid</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">sseqid</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">pident</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">coverage</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+        <span class="n">names</span><span class="o">=</span><span class="n">names</span><span class="p">,</span>
+        <span class="n">na_filter</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span>  <span class="c"># False is faster</span>
+        <span class="n">header</span><span class="o">=</span><span class="n">header</span><span class="p">,</span>
+        <span class="n">usecols</span><span class="o">=</span><span class="n">usecols</span><span class="p">)</span>
+
+    <span class="c"># get a set of qseqids for identifying [no blast hits] after filtering</span>
+    <span class="n">qseqids</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[[</span><span class="s">&#39;qseqid&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+
+    <span class="c"># run raw hi, low and coverage filters</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span>
+        <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;coverage&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">args</span><span class="o">.</span><span class="n">min_coverage</span><span class="p">]</span>
+
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span>
+        <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;pident&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">args</span><span class="o">.</span><span class="n">max_identity</span><span class="p">]</span>
+
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span>
+        <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;pident&#39;</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">args</span><span class="o">.</span><span class="n">min_identity</span><span class="p">]</span>
+
+    <span class="c"># load seq_info as a bridge to the sequence taxonomy.  Additional</span>
+    <span class="c"># columns can be specified to be included in the details-out file</span>
+    <span class="c"># such as accession number</span>
+    <span class="n">seq_info</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span>
+        <span class="n">args</span><span class="o">.</span><span class="n">seq_info</span><span class="p">,</span>
+        <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;seqname&#39;</span><span class="p">,</span> <span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="s">&#39;accession&#39;</span><span class="p">],</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">seqname</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">tax_id</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">accession</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span>
+        <span class="n">index_col</span><span class="o">=</span><span class="s">&#39;seqname&#39;</span><span class="p">)</span>
+    <span class="c"># rename index to match blast results column name</span>
+    <span class="n">seq_info</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s">&#39;sseqid&#39;</span>
+
+    <span class="c"># merge blast results with seq_info - do this early so that</span>
+    <span class="c"># refseqs not represented in the blast results are discarded in</span>
+    <span class="c"># the merge.</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">seq_info</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;sseqid&#39;</span><span class="p">)</span>
+
+    <span class="c"># load the full taxonomy table.  Rank specificity as ordered from</span>
+    <span class="c"># left (less specific) to right (more specific)</span>
+    <span class="n">taxonomy</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">taxonomy</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+    <span class="c"># set index after assigning dtype</span>
+    <span class="n">taxonomy</span> <span class="o">=</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+
+    <span class="c"># get the a list of rank columns ordered by specificity (see above)</span>
+    <span class="c"># NOTE: we are assuming the rank columns</span>
+    <span class="c">#       are last N columns staring with &#39;root&#39;</span>
+    <span class="n">rank_cols</span> <span class="o">=</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="n">rank_cols</span> <span class="o">=</span> <span class="n">rank_cols</span><span class="p">[</span><span class="n">rank_cols</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s">&#39;root&#39;</span><span class="p">):]</span>
+
+    <span class="c"># now combine just the rank columns to the blast results</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">taxonomy</span><span class="p">[</span><span class="n">rank_cols</span><span class="p">],</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+
+    <span class="c">#  tax_id will be later set from the target_rank</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c"># load the default rank thresholds</span>
+    <span class="n">rank_thresholds</span> <span class="o">=</span> <span class="n">load_rank_thresholds</span><span class="p">()</span>
+
+    <span class="c"># and any additional thresholds specified by the user</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">rank_thresholds</span><span class="p">:</span>
+        <span class="n">rank_thresholds</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="n">load_rank_thresholds</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">rank_thresholds</span><span class="p">))</span>
+
+    <span class="c"># select valid rows that are not commented out (NULL)</span>
+    <span class="c"># and whos target_rank exist in the taxonomy</span>
+    <span class="n">valid_taxonomy</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
+    <span class="n">rank_thresholds</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="p">[</span><span class="n">valid_taxonomy</span><span class="p">]</span>
+
+    <span class="c"># for each tax_id find the corresponding rank using the taxonomy above</span>
+    <span class="c"># TODO: should we do something about accidental duplicate tax_id entries?</span>
+    <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;tax_rank&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="s">&#39;rank&#39;</span><span class="p">])</span>
+
+    <span class="c"># assign a priority index for taxonomic subtrees by specificity</span>
+    <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;tax_priority&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;tax_rank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+
+    <span class="c"># assign a priority index for the target_rank by specificity</span>
+    <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;target_priority&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">get_loc</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+
+    <span class="c"># sort by tax_priority(s) and target_priority(s)</span>
+    <span class="n">rank_thresholds</span> <span class="o">=</span> <span class="n">rank_thresholds</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span>
+        <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;tax_priority&#39;</span><span class="p">,</span> <span class="s">&#39;target_priority&#39;</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+    <span class="c"># assign target ranks by tax_priority(s) and target_priorty(s)</span>
+    <span class="n">targeted</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">threshold</span> <span class="ow">in</span> <span class="n">rank_thresholds</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="c"># pull out blast hits that meet the threshold parameters</span>
+        <span class="n">matches</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span>
+            <span class="p">(</span><span class="n">threshold</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">blast_results</span><span class="p">[</span><span class="n">threshold</span><span class="p">[</span><span class="s">&#39;tax_rank&#39;</span><span class="p">]])</span> <span class="o">&amp;</span>
+            <span class="p">(</span><span class="n">threshold</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;pident&#39;</span><span class="p">])]</span>
+
+        <span class="c"># Set the target_rank and low values.</span>
+        <span class="c"># Also set the priority for identifying</span>
+        <span class="c"># most specific blast results by qseqid later.</span>
+        <span class="n">matches</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">threshold</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span>
+        <span class="n">matches</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">threshold</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span>
+        <span class="n">matches</span><span class="p">[</span><span class="s">&#39;priority&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+
+        <span class="c"># remove matches from blast_results, append and continue</span>
+        <span class="n">not_matches</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">matches</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+        <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">not_matches</span><span class="p">]</span>
+        <span class="n">targeted</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span>
+
+    <span class="c"># remaings blast_results (if any) get default low and target_rank</span>
+    <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;low&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">min_identity</span>
+    <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;target_rank&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">target_rank</span>
+
+    <span class="c"># reconstruct the newly targeted blast_results</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">targeted</span> <span class="o">+</span> <span class="p">[</span><span class="n">blast_results</span><span class="p">])</span>
+
+    <span class="c"># Keep most specific hits.  This step is required so taxonomic</span>
+    <span class="c"># assignments are not masked in the results by hits to their</span>
+    <span class="c"># more generic taxonomic parents</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+        <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;qseqid&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">group_keys</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+            <span class="n">focus_results_by_specificity</span><span class="p">)</span>
+
+    <span class="c"># set tax_id as the target_rank id</span>
+    <span class="n">blast_results</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+        <span class="n">most_specific</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">rank_cols</span><span class="p">,),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c"># join with taxonomy for tax_name and rank</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+        <span class="n">taxonomy</span><span class="p">[[</span><span class="s">&#39;tax_name&#39;</span><span class="p">,</span> <span class="s">&#39;rank&#39;</span><span class="p">]],</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+
+    <span class="c"># merge qseqids that have no hits back into blast_results</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">qseqids</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;qseqid&#39;</span><span class="p">,</span> <span class="n">how</span><span class="o">=</span><span class="s">&#39;outer&#39;</span><span class="p">)</span>
+
+    <span class="c"># assign specimen groups</span>
+    <span class="n">specimens</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[[</span><span class="s">&#39;qseqid&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+
+    <span class="c"># load specimen-map and assign specimen names</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">specimen_map</span><span class="p">:</span>
+        <span class="c"># if a specimen_map is defined and a qseqid is not included in the map</span>
+        <span class="c"># hits to that qseqid will be dropped</span>
+        <span class="n">spec_map</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">specimen_map</span><span class="p">,</span>
+            <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;qseqid&#39;</span><span class="p">,</span> <span class="s">&#39;specimen&#39;</span><span class="p">],</span>
+            <span class="n">index_col</span><span class="o">=</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+        <span class="n">specimens</span> <span class="o">=</span> <span class="n">specimens</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">spec_map</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">specimen</span><span class="p">:</span>
+        <span class="n">specimens</span><span class="p">[</span><span class="s">&#39;specimen&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">specimen</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">specimens</span><span class="p">[</span><span class="s">&#39;specimen&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specimens</span><span class="o">.</span><span class="n">index</span>  <span class="c"># qseqid</span>
+
+    <span class="c"># join specimen labels onto blast_results</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">specimens</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+
+    <span class="c"># assign seqs that had no results to [no blast_result]</span>
+    <span class="n">no_hits</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span><span class="n">blast_results</span><span class="o">.</span><span class="n">sseqid</span><span class="o">.</span><span class="n">isnull</span><span class="p">()]</span>
+    <span class="n">no_hits</span><span class="p">[</span><span class="s">&#39;assignment&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;[no blast result]&#39;</span>
+    <span class="n">no_hits</span><span class="p">[</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c"># move on to seqs that have blast hits</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[</span><span class="n">blast_results</span><span class="o">.</span><span class="n">sseqid</span><span class="o">.</span><span class="n">notnull</span><span class="p">()]</span>
+
+    <span class="c"># TODO: this is relatively slow, need to integrate</span>
+    <span class="c"># pandas into sequtils.condense_ids</span>
+    <span class="n">tax_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">t</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">taxonomy</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="s">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">iterrows</span><span class="p">()}</span>
+
+    <span class="c"># create condensed assignment hashes by qseqid</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+        <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;qseqid&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span>
+            <span class="n">condense_ids</span><span class="p">,</span> <span class="n">tax_dict</span><span class="p">,</span> <span class="n">rank_cols</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">target_max_group_size</span><span class="p">)</span>
+
+    <span class="c"># star condensed ids if one hit meets star threshold</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+        <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">,</span> <span class="s">&#39;condensed_id&#39;</span><span class="p">],</span>
+        <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">star</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">starred</span><span class="p">)</span>
+
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+        <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">assign</span><span class="p">,</span> <span class="n">tax_dict</span><span class="p">)</span>
+
+    <span class="c"># put assignments and no assignments back together</span>
+    <span class="n">blast_results</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">blast_results</span><span class="p">,</span> <span class="n">no_hits</span><span class="p">])</span>
+
+    <span class="c"># concludes our blast details, on to output summary</span>
+
+    <span class="n">output</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+        <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;specimen&#39;</span><span class="p">,</span> <span class="s">&#39;assignment_hash&#39;</span><span class="p">,</span> <span class="s">&#39;assignment&#39;</span><span class="p">])</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">agg_columns</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;assignment&#39;</span><span class="p">)</span>
+
+    <span class="c"># qseqid cluster stats</span>
+    <span class="n">clusters</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[[</span><span class="s">&#39;qseqid&#39;</span><span class="p">,</span> <span class="s">&#39;specimen&#39;</span><span class="p">,</span> <span class="s">&#39;assignment_hash&#39;</span><span class="p">]]</span>
+    <span class="n">clusters</span> <span class="o">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">weights</span><span class="p">:</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">weights</span><span class="p">,</span>
+            <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;qseqid&#39;</span><span class="p">,</span> <span class="s">&#39;weight&#39;</span><span class="p">],</span>
+            <span class="n">index_col</span><span class="o">=</span><span class="s">&#39;qseqid&#39;</span><span class="p">)</span>
+        <span class="n">clusters</span> <span class="o">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>
+        <span class="c"># enforce weight dtype as int and unlisted qseq&#39;s to weight of 1</span>
+        <span class="n">clusters</span><span class="p">[</span><span class="s">&#39;weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">clusters</span><span class="p">[</span><span class="s">&#39;weight&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">clusters</span><span class="p">[</span><span class="s">&#39;weight&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="n">clusters</span> <span class="o">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;specimen&#39;</span><span class="p">,</span> <span class="s">&#39;assignment_hash&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+
+    <span class="n">output</span><span class="p">[</span><span class="s">&#39;reads&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">clusters</span><span class="p">[</span><span class="s">&#39;weight&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;specimen&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">freq</span><span class="p">)</span>
+
+    <span class="n">output</span><span class="p">[</span><span class="s">&#39;clusters&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+
+    <span class="c"># copy number corrections</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">copy_numbers</span><span class="p">:</span>
+        <span class="n">copy_numbers</span> <span class="o">=</span> <span class="n">read_csv</span><span class="p">(</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">copy_numbers</span><span class="p">,</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">tax_id</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span>
+            <span class="n">usecols</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="s">&#39;median&#39;</span><span class="p">])</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+
+        <span class="c"># get root out (taxid: 1) and set it as the</span>
+        <span class="c"># default correction value with index nan</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="n">copy_numbers</span><span class="o">.</span><span class="n">get_value</span><span class="p">(</span><span class="s">&#39;1&#39;</span><span class="p">,</span> <span class="s">&#39;median&#39;</span><span class="p">)</span>
+        <span class="n">default</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">default</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="bp">None</span><span class="p">],</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;median&#39;</span><span class="p">])</span>
+        <span class="n">copy_numbers</span> <span class="o">=</span> <span class="n">copy_numbers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">default</span><span class="p">)</span>
+
+        <span class="c"># do our copy number correction math</span>
+        <span class="n">corrections</span> <span class="o">=</span> <span class="n">blast_results</span><span class="p">[[</span><span class="s">&#39;tax_id&#39;</span><span class="p">,</span> <span class="s">&#39;specimen&#39;</span><span class="p">,</span> <span class="s">&#39;assignment_hash&#39;</span><span class="p">]]</span>
+        <span class="n">corrections</span> <span class="o">=</span> <span class="n">corrections</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">()</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s">&#39;tax_id&#39;</span><span class="p">)</span>
+        <span class="n">corrections</span> <span class="o">=</span> <span class="n">corrections</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">copy_numbers</span><span class="p">)</span>
+        <span class="n">corrections</span> <span class="o">=</span> <span class="n">corrections</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span>
+            <span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s">&#39;specimen&#39;</span><span class="p">,</span> <span class="s">&#39;assignment_hash&#39;</span><span class="p">],</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+        <span class="n">corrections</span> <span class="o">=</span> <span class="n">corrections</span><span class="p">[</span><span class="s">&#39;median&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+        <span class="n">output</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s">&#39;reads&#39;</span><span class="p">]</span> <span class="o">/</span> <span class="n">corrections</span>
+
+        <span class="c"># reset corrected counts to int before calculating pct_corrected</span>
+        <span class="n">output</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">)</span>
+        <span class="n">output</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;specimen&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">pct_corrected</span><span class="p">)</span>
+
+    <span class="c"># round up any pct &lt; 0.01 for before sorting</span>
+    <span class="n">round_up</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.01</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+    <span class="n">output</span><span class="p">[</span><span class="s">&#39;pct_reads&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s">&#39;pct_reads&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">round_up</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">copy_numbers</span><span class="p">:</span>
+        <span class="n">output</span><span class="p">[</span><span class="s">&#39;pct_corrected&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">output</span><span class="p">[</span><span class="s">&#39;pct_corrected&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">round_up</span><span class="p">)</span>
+
+    <span class="c"># sort by:</span>
+    <span class="c"># 1) specimen</span>
+    <span class="c"># 2) read/corrected count</span>
+    <span class="c"># 3) cluster count</span>
+    <span class="c"># 4) alpha assignment</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="s">&#39;corrected&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">copy_numbers</span> <span class="k">else</span> <span class="p">[</span><span class="s">&#39;reads&#39;</span><span class="p">]</span>
+    <span class="n">columns</span> <span class="o">+=</span> <span class="p">[</span><span class="s">&#39;clusters&#39;</span><span class="p">,</span> <span class="s">&#39;assignment&#39;</span><span class="p">]</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="c"># nobody cares about assignment_hash</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">sort_index</span><span class="p">()</span>
+
+    <span class="c"># create assignment ids by specimen</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="s">&quot;specimen&quot;</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">assignment_id</span><span class="p">)</span>
+
+    <span class="c"># output results</span>
+    <span class="k">with</span> <span class="n">args</span><span class="o">.</span><span class="n">out</span> <span class="k">as</span> <span class="n">out</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">float_format</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%.2f</span><span class="s">&#39;</span><span class="p">)</span>
+
+    <span class="c"># output to details.csv.bz2</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">details_out</span><span class="p">:</span>
+        <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">output</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(),</span> <span class="n">how</span><span class="o">=</span><span class="s">&#39;left&#39;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="o">.</span><span class="n">details_full</span><span class="p">:</span>
+            <span class="n">largest</span> <span class="o">=</span> <span class="n">clusters</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="s">&#39;weight&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">nlargest</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+            <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">largest</span><span class="o">.</span><span class="n">reset_index</span><span class="p">())</span>
+
+        <span class="c"># nobody cares about assignment_hash</span>
+        <span class="n">blast_results</span> <span class="o">=</span> <span class="n">blast_results</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="s">&#39;assignment_hash&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">args</span><span class="o">.</span><span class="n">details_out</span> <span class="k">as</span> <span class="n">out_details</span><span class="p">:</span>
+            <span class="n">blast_results</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span>
+                <span class="n">out_details</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="bp">True</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">float_format</span><span class="o">=</span><span class="s">&#39;</span><span class="si">%.2f</span><span class="s">&#39;</span><span class="p">)</span>
+</pre></div>
+
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        <a class="uplink" href="../../../index.html">Contents</a>
+        </p>
+
+      </div>
+
+    <div class="footer">
+        &copy; Copyright 2012-2014, Noah Hoffman, Chris Rosenthal, Tyler Land.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
+    </div>
+  </body>
+</html>

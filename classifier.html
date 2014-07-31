@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
@@ -8,16 +6,15 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Classifier &mdash; bioy v1.8.2-3-ga8a0924 documentation</title>
+    <title>Classifier &mdash; bioy v1.8.2-105-gc91ebb0 documentation</title>
     
     <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <link rel="stylesheet" href="_static/print.css" type="text/css" />
     
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
-        URL_ROOT:    '',
-        VERSION:     'v1.8.2-3-ga8a0924',
+        URL_ROOT:    './',
+        VERSION:     'v1.8.2-105-gc91ebb0',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -26,13 +23,12 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <script type="text/javascript" src="_static/theme_extras.js"></script>
-    <link rel="top" title="bioy v1.8.2-3-ga8a0924 documentation" href="index.html" />
+    <link rel="top" title="bioy v1.8.2-105-gc91ebb0 documentation" href="index.html" />
     <link rel="prev" title="Welcome to the bioy’s documentation page" href="index.html" /> 
   </head>
   <body>
       <div class="header"><h1 class="heading"><a href="index.html">
-          <span>bioy v1.8.2-3-ga8a0924 documentation</span></a></h1>
+          <span>bioy v1.8.2-105-gc91ebb0 documentation</span></a></h1>
         <h2 class="heading"><span>Classifier</span></h2>
       </div>
       <div class="topnav">
@@ -47,8 +43,414 @@
       <div class="content">
         
         
-  <div class="section" id="classifier">
-<h1>Classifier<a class="headerlink" href="#classifier" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="module-bioy_pkg.subcommands.classifier">
+<span id="classifier"></span><h1>Classifier<a class="headerlink" href="#module-bioy_pkg.subcommands.classifier" title="Permalink to this headline">¶</a></h1>
+<p>Classify sequences by grouping blast output by matching taxonomic names</p>
+<p>Optional grouping by specimen and query sequences</p>
+<p>TODO: describe the algorithm here...</p>
+<div class="section" id="positional-arguments">
+<h2>Positional arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="blast-file">
+<h3>blast_file<a class="headerlink" href="#blast-file" title="Permalink to this headline">¶</a></h3>
+<p>A csv file with columns <strong>qseqid</strong>, <strong>sseqid</strong>, <strong>pident</strong>,
+<strong>qstart</strong>, <strong>qend</strong> and <strong>qlen</strong>.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">The actual header is optional and if
+present make sure to use the <a class="reference internal" href="#has-header">has-header</a> switch</p>
+</div>
+</div>
+<div class="section" id="seq-info">
+<h3>seq_info<a class="headerlink" href="#seq-info" title="Permalink to this headline">¶</a></h3>
+<p>A csv file with minimum columns <strong>seqname</strong> and <strong>tax_id</strong>.  Additional
+columns will be included in the details output.</p>
+</div>
+<div class="section" id="taxonomy">
+<h3>taxonomy<a class="headerlink" href="#taxonomy" title="Permalink to this headline">¶</a></h3>
+<p>A csv file with columns <strong>tax_id</strong>, <strong>rank</strong> and <strong>tax_name</strong>, plus at least
+one additional rank column(s) creating a taxonomic tree such as <strong>species</strong>,
+<strong>genus</strong>, <strong>family</strong>, <strong>class</strong>, <strong>pylum</strong>, <strong>kingdom</strong> and/or <strong>root</strong>.
+The rank columns also give an order of specificity from right to left,
+least specific to most specific respectively.</p>
+</div>
+</div>
+<div class="section" id="optional-input">
+<h2>Optional input<a class="headerlink" href="#optional-input" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="rank-thresholds">
+<h3>rank-thresholds<a class="headerlink" href="#rank-thresholds" title="Permalink to this headline">¶</a></h3>
+<p>This table defines the similarity thresholds at rank. The structure is
+as follows:</p>
+<blockquote>
+<div><table border="1" class="docutils">
+<colgroup>
+<col width="30%" />
+<col width="15%" />
+<col width="55%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">tax_id</th>
+<th class="head">low</th>
+<th class="head">target_rank</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>1</td>
+<td>99</td>
+<td>species</td>
+</tr>
+<tr class="row-odd"><td>1</td>
+<td>97</td>
+<td>genus</td>
+</tr>
+<tr class="row-even"><td>1</td>
+<td>95</td>
+<td>family</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+<p>The <strong>tax_id</strong> column identifies the subtree of the taxonomy to which
+the threshold defined in <strong>low</strong> should be applied. The example
+above is preloaded into the Classifier.  The threshold of 99 applies to all
+tax_ids with an ancestor of tax_id=1 (ie, the entire taxonomy).</p>
+<p>A custom example that can be specified by the user on top of the above example
+more useful example might be this:</p>
+<blockquote>
+<div><table border="1" class="docutils">
+<colgroup>
+<col width="30%" />
+<col width="15%" />
+<col width="55%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">tax_id</th>
+<th class="head">low</th>
+<th class="head">target_rank</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>2049</td>
+<td>97</td>
+<td>species</td>
+</tr>
+<tr class="row-odd"><td>2049</td>
+<td>95</td>
+<td>genus</td>
+</tr>
+<tr class="row-even"><td>2049</td>
+<td>93</td>
+<td>family</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+<p>Here, all organisms belonging to family Actinomycetaceae (tax_id 2049)
+will be classified to the species level using a threshold of 97%
+instead of 99% in the first example, because we know that there is
+more specific, species-level heterogeneity within this family.</p>
+</div>
+<div class="section" id="copy-numbers">
+<h3>copy-numbers<a class="headerlink" href="#copy-numbers" title="Permalink to this headline">¶</a></h3>
+<p>Below is an <em>example</em> copy numbers csv with the required columns:</p>
+<blockquote>
+<div><table border="1" class="docutils">
+<colgroup>
+<col width="19%" />
+<col width="63%" />
+<col width="19%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">tax_id</th>
+<th class="head">tax_name</th>
+<th class="head">median</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>155977</td>
+<td>Acaryochloris</td>
+<td>2.00</td>
+</tr>
+<tr class="row-odd"><td>155978</td>
+<td>Acaryochloris marina</td>
+<td>2.00</td>
+</tr>
+<tr class="row-even"><td>434</td>
+<td>Acetobacter</td>
+<td>5.00</td>
+</tr>
+<tr class="row-odd"><td>433</td>
+<td>Acetobacteraceae</td>
+<td>3.60</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</div>
+<div class="section" id="weights">
+<h3>weights<a class="headerlink" href="#weights" title="Permalink to this headline">¶</a></h3>
+<p>Headerless file containing two columns specifying the seqname (clustername) and
+weight (or number of sequences in the cluster).</p>
+</div>
+</div>
+<div class="section" id="output">
+<h2>Output<a class="headerlink" href="#output" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="out">
+<h3>out<a class="headerlink" href="#out" title="Permalink to this headline">¶</a></h3>
+<p>A csv with columns and headers as in the example below:</p>
+<blockquote>
+<div><table border="1" class="docutils">
+<colgroup>
+<col width="17%" />
+<col width="23%" />
+<col width="59%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">specimen</th>
+<th class="head">assignment_id</th>
+<th class="head">assignment</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>039_3</td>
+<td>0</td>
+<td>Pseudomonas mendocina;Pseudonocardia</td>
+</tr>
+<tr class="row-odd"><td>039_3</td>
+<td>1</td>
+<td>Rhizobiales</td>
+</tr>
+<tr class="row-even"><td>039_3</td>
+<td>2</td>
+<td>Alcaligenes faecalis*</td>
+</tr>
+<tr class="row-odd"><td>039_3</td>
+<td>3</td>
+<td>[no blast result]</td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="21%" />
+<col width="39%" />
+<col width="39%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">low</th>
+<th class="head">max_percent</th>
+<th class="head">min_percent</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>95.00</td>
+<td>99.02</td>
+<td>95.74</td>
+</tr>
+<tr class="row-odd"><td>95.00</td>
+<td>98.91</td>
+<td>95.31</td>
+</tr>
+<tr class="row-even"><td>99.00</td>
+<td>100.00</td>
+<td>99.00</td>
+</tr>
+</tbody>
+</table>
+<table border="1" class="docutils">
+<colgroup>
+<col width="31%" />
+<col width="17%" />
+<col width="26%" />
+<col width="26%" />
+</colgroup>
+<thead valign="bottom">
+<tr class="row-odd"><th class="head">target_rank</th>
+<th class="head">reads</th>
+<th class="head">pct_reads</th>
+<th class="head">clusters</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr class="row-even"><td>species</td>
+<td>6</td>
+<td>35.29</td>
+<td>1</td>
+</tr>
+<tr class="row-odd"><td>genus</td>
+<td>5</td>
+<td>29.41</td>
+<td>1</td>
+</tr>
+<tr class="row-even"><td>species</td>
+<td>5
+1</td>
+<td>29.41
+5.88</td>
+<td>1
+1</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</div>
+<div class="section" id="details-out">
+<h3>details-out<a class="headerlink" href="#details-out" title="Permalink to this headline">¶</a></h3>
+<p>A csv that is basically a blast results breakdown of the <a class="reference internal" href="#out">out</a> output.</p>
+</div>
+</div>
+<div class="section" id="switches">
+<h2>Switches<a class="headerlink" href="#switches" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="group-def">
+<h3>group-def<a class="headerlink" href="#group-def" title="Permalink to this headline">¶</a></h3>
+<p>Define a group threshold for a particular rank. example: genus:2</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">not implememented yet</p>
+</div>
+</div>
+<div class="section" id="has-header">
+<h3>has-header<a class="headerlink" href="#has-header" title="Permalink to this headline">¶</a></h3>
+<p>If a header is included in the blast_input then you <strong>must</strong> specify this
+switch.  Defaults to False.</p>
+</div>
+<div class="section" id="min-identity">
+<h3>min-identity<a class="headerlink" href="#min-identity" title="Permalink to this headline">¶</a></h3>
+<p>Minimum identity threshold for accepting matches.</p>
+</div>
+<div class="section" id="max-identity">
+<h3>max-identity<a class="headerlink" href="#max-identity" title="Permalink to this headline">¶</a></h3>
+<p>Maximum identity threshold for accepting matches.</p>
+</div>
+<div class="section" id="min-cluster-size">
+<h3>min-cluster-size<a class="headerlink" href="#min-cluster-size" title="Permalink to this headline">¶</a></h3>
+<p>Minimum cluster size to include in classification output.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">not implememented yet</p>
+</div>
+</div>
+<div class="section" id="min-coverage">
+<h3>min-coverage<a class="headerlink" href="#min-coverage" title="Permalink to this headline">¶</a></h3>
+<p>Percent of alignment coverage of blast result.</p>
+</div>
+<div class="section" id="specimen">
+<h3>specimen<a class="headerlink" href="#specimen" title="Permalink to this headline">¶</a></h3>
+<p>Single group label for reads.  If not specified each sequence will be
+considered as its own specimen.</p>
+</div>
+<div class="section" id="starred">
+<h3>starred<a class="headerlink" href="#starred" title="Permalink to this headline">¶</a></h3>
+<p>Threshold for appending an asterisk to assignment names where the pairwise
+alignment identity score is higher or equal to.</p>
+</div>
+<div class="section" id="target-max-group-size">
+<h3>target-max-group-size<a class="headerlink" href="#target-max-group-size" title="Permalink to this headline">¶</a></h3>
+<p>Group multiple target-rank assignments that
+excede a threshold to a higher rank.  Defaults to 3.</p>
+</div>
+<div class="section" id="target-rank">
+<h3>target-rank<a class="headerlink" href="#target-rank" title="Permalink to this headline">¶</a></h3>
+<p>Rank at which to classify. Default is species.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">If the species column is not specified then the next <em>less</em> specific
+rank will be used.</p>
+</div>
+</div>
+<div class="section" id="threads">
+<h3>threads<a class="headerlink" href="#threads" title="Permalink to this headline">¶</a></h3>
+<p>Specify the number of threads available. Defaults to all available cpus.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Only one thread will be used</p>
+</div>
+</div>
+</div>
+<div class="section" id="internal-functions">
+<h2>Internal functions<a class="headerlink" href="#internal-functions" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.agg_columns">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">agg_columns</tt><big>(</big><em>df</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#agg_columns"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.agg_columns" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create aggregate columns for assignments.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.assign">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">assign</tt><big>(</big><em>df</em>, <em>tax_dict</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#assign"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.assign" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create str assignment based on tax_ids str and starred boolean.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.assignment_id">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">assignment_id</tt><big>(</big><em>df</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#assignment_id"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.assignment_id" title="Permalink to this definition">¶</a></dt>
+<dd><p>Resets and drops the current dataframe&#8217;s
+index and sets it to the assignment_hash</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.condense_ids">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">condense_ids</tt><big>(</big><em>df</em>, <em>tax_dict</em>, <em>ranks</em>, <em>max_group_size</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#condense_ids"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.condense_ids" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create mapping from tax_id to its
+condensed id and set assignment hash.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.focus_results_by_specificity">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">focus_results_by_specificity</tt><big>(</big><em>df</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#focus_results_by_specificity"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.focus_results_by_specificity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove less specific target_rank hits.</p>
+<p>If a hit&#8217;s target rank shares taxonomy with a more specific
+target hit then it will be dropped in favor
+of the more specific target hit(s).</p>
+<p>Example: Given a group of blast hits (by qseqid), if a hit matches a
+Helicobacter pylori species sequence and also matches
+a Helicobacter genus sequence the H. pylori sequence will be accepted
+while the genus level hit will be dropped from the
+group.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.freq">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">freq</tt><big>(</big><em>df</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#freq"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.freq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate pct_reads column.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.load_rank_thresholds">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">load_rank_thresholds</tt><big>(</big><em>path='/home/local/AMC/ngh2/src/bioy/bioy_pkg/data/rank_threshold_defaults.csv'</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#load_rank_thresholds"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.load_rank_thresholds" title="Permalink to this definition">¶</a></dt>
+<dd><p>Load a rank-thresholds file.  If no argument is specified the default
+rank_threshold_defaults.csv file will be loaded.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.most_specific">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">most_specific</tt><big>(</big><em>series</em>, <em>cols</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#most_specific"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.most_specific" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the most taxonomic specific tax_id available for the given
+Series.</p>
+<p>For most given Series the given target_rank is available and returned.
+If the target_rank is NAN then return a less specific tax_id</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.pct_corrected">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">pct_corrected</tt><big>(</big><em>df</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#pct_corrected"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.pct_corrected" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate pct_corrected values.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.read_csv">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">read_csv</tt><big>(</big><em>filename</em>, <em>compression=None</em>, <em>**kwargs</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#read_csv"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.read_csv" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read a csv file using pandas.read_csv with compression defined by
+the file suffix unless provided.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="bioy_pkg.subcommands.classifier.star">
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">star</tt><big>(</big><em>df</em>, <em>starred</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#star"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.star" title="Permalink to this definition">¶</a></dt>
+<dd><p>Assign boolean if any items in the
+dataframe are above the star threshold.</p>
+</dd></dl>
+
+</div>
 </div>
 
 
@@ -65,7 +467,7 @@
 
     <div class="footer">
         &copy; Copyright 2012-2014, Noah Hoffman, Chris Rosenthal, Tyler Land.
-      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
     </div>
   </body>
 </html>
