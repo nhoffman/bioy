@@ -20,6 +20,10 @@ Optional grouping by specimen and query sequences
 Assigning rank thresholds
 -------------------------
 
+Below are two strategies for managing rank thresholds.  The iteration counts
+are a made up counts based on the average observed number of qseqids per
+specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
+iterations (`for` loops) and fast iterations as Pandas iterations (`groupby`).
 
 **ng2 strategy:**
 
@@ -31,11 +35,12 @@ Assigning rank thresholds
 
 4. Group by blast_results by qseqid. ~ 1000 qseqids
 
-5. Iterate by qseqid and rank.  Do a filter for sequences that match a tax_id
-   and who's pident is >= than the specified threshold.  Stop when any of
-   the blast_results pass the threshold. average: ~ 2.5 ranks
+5. Groupby qseqid and iterate by rank.  Do a filter for sequences that match
+   a tax_id and who's pident is >= than the specified threshold.  Stop when
+   any of the blast_results pass the threshold. On average we will iterate
+   through ~ 2.0 ranks.
 
-   ~ 1000 qseqids * ~ 2.5 ranks (on average) = 2,500 iterations
+   ~ 1000 qseqids * ~ 2.0 ranks (on average) = 2,000 slow iterations
 
 6. Assign threshold, tax_id and rank to blast_hits.
 
@@ -44,32 +49,35 @@ Assigning rank thresholds
 8. Continue iterating to include all results up to all the available
    target_rank thresholds **(Optional)**
 
-   ~ 1000 qseqids * 20 ranks (on average) = 20,000 iterations (with
-   optimization ~ 2,500 iterations)
+   ~ 1000 qseqids * ~ 20 ranks = 20,000 slow iterations
 
-9. Run focus_results_by_specificity() to remove results of less specificity.
-   **(Optional continued)**
+   (with optimization we could probably get that to 2.5 ranks or
+   2,500 slow iterations)
+
+9. Run focus_results_by_specificity() to remove redundant results of less
+   specificity. **(Optional continued)**
 
    ~ 20 unique groups of qseqids by tax_ids (assignments) with 20 ranks to
-   iterate through: 10 * 20 = 200 iterations
+   iterate: 10 * 20 = 200 slow iterations
 
 Totals:
 
-**Min** = 2,500 iterations
+2,000 slow iterations
 
-**Max** (2,500 - 20,000) + 200 = 2,700 - 20,200 iterations
+With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations
 
 **crosenth strategy:**
 
 1. Get a set of the target_ids from the blast_results.
 
-2. Filter the rank_thresholds by tax_id plus *available* ancestors and append
-   default root values. ~ 250 tax_ids
+2. Filter the rank_thresholds by tax_id plus available ancestors and append
+   default root values. On average we will find ~ 200 different tax_ids plus
+   ~ 50 more ancestor ids = 250 tax_ids
 
 3. Iterate through rank_thresholds and filter blast_hits by tax_id and
    threshold.
 
-   ~ 250 iterations
+   ~ 250 slow iterations
 
 4. Assign threshold, tax_id and rank to blast_hits.
 
@@ -78,18 +86,18 @@ Totals:
 6. **(Option 1)** Group by qseqid and select hits of the highest available rank
    (and/or threshold) per group.
 
-   ~ 1000 iterations
+   ~ 1000 fast iterations
 
    **(Option 2)** Select all hits and run focus_results_by_specificity() to
-   remove less rank specific hits.
+   remove reduntant, less rank specific hits.
 
-   ~ 10 * 20 = 200 iterations
+   ~ 10 * 20 = 200 slow iterations
 
 Totals:
 
-**Min** 250 + 1,000 = 1,250 iterations
+Option 1: 250 slow iterations + 1,000 fast iterations
 
-**Max** 1,250 + 200 = 1,450 iterations
+Option 2: 250 + 200 = 450 slow iterations
 
 Running the program
 -------------------
