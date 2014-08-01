@@ -192,6 +192,20 @@ class, or method within the ``tests`` package using dot notation::
 
     % ./testone -v tests.test_utils
 
+documentation
+=============
+
+To build the Sphinx docs::
+
+  (cd docs && make html)
+
+And to publish to GitHub pages::
+
+  ghp-import -p docs/_build/html
+
+(ghp-import and Sphinx are both included in the requirements.txt)
+
+
 license
 =======
 
