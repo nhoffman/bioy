@@ -6,15 +6,15 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>Classifier &mdash; bioy v1.8.2-105-gc91ebb0 documentation</title>
+    <title>Classifier &mdash; bioy  documentation</title>
     
-    <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="_static/default.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    './',
-        VERSION:     'v1.8.2-105-gc91ebb0',
+        VERSION:     '',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -23,50 +23,173 @@
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
-    <link rel="top" title="bioy v1.8.2-105-gc91ebb0 documentation" href="index.html" />
+    <link rel="top" title="bioy  documentation" href="index.html" />
     <link rel="prev" title="Welcome to the bioy’s documentation page" href="index.html" /> 
   </head>
   <body>
-      <div class="header"><h1 class="heading"><a href="index.html">
-          <span>bioy v1.8.2-105-gc91ebb0 documentation</span></a></h1>
-        <h2 class="heading"><span>Classifier</span></h2>
-      </div>
-      <div class="topnav">
-      
-        <p>
-        «&#160;&#160;<a href="index.html">Welcome to the bioy&#8217;s documentation page</a>
-        &#160;&#160;::&#160;&#160;
-        <a class="uplink" href="index.html">Contents</a>
-        </p>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to the bioy’s documentation page"
+             accesskey="P">previous</a> |</li>
+        <li><a href="index.html">bioy  documentation</a> &raquo;</li> 
+      </ul>
+    </div>  
 
-      </div>
-      <div class="content">
-        
-        
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body">
+            
   <div class="section" id="module-bioy_pkg.subcommands.classifier">
 <span id="classifier"></span><h1>Classifier<a class="headerlink" href="#module-bioy_pkg.subcommands.classifier" title="Permalink to this headline">¶</a></h1>
 <p>Classify sequences by grouping blast output by matching taxonomic names</p>
 <p>Optional grouping by specimen and query sequences</p>
-<p>TODO: describe the algorithm here...</p>
+<div class="section" id="assigning-rank-thresholds">
+<h2>Assigning rank thresholds<a class="headerlink" href="#assigning-rank-thresholds" title="Permalink to this headline">¶</a></h2>
+<p><strong>ng2 strategy:</strong></p>
+<ol class="arabic">
+<li><p class="first">Get a set of the target_ids from the blast_results.</p>
+</li>
+<li><p class="first">Filter the rank_thresholds by tax_id plus available ancestors.</p>
+</li>
+<li><p class="first">Fill in the missing ancestor ranks with default root values.</p>
+</li>
+<li><p class="first">Group by blast_results by qseqid. ~ 1000 qseqids</p>
+</li>
+<li><p class="first">Iterate by qseqid and rank.  Do a filter for sequences that match a tax_id
+and who&#8217;s pident is &gt;= than the specified threshold.  Stop when any of
+the blast_results pass the threshold. average: ~ 2.5 ranks</p>
+<p>~ 1000 qseqids * ~ 2.5 ranks (on average) = 2,500 iterations</p>
+</li>
+<li><p class="first">Assign threshold, tax_id and rank to blast_hits.</p>
+</li>
+<li><p class="first">Add an additional column for target_rank if available. <strong>(Optional)</strong></p>
+</li>
+<li><p class="first">Continue iterating to include all results up to all the available
+target_rank thresholds <strong>(Optional)</strong></p>
+<p>~ 1000 qseqids * 20 ranks (on average) = 20,000 iterations (with
+optimization ~ 2,500 iterations)</p>
+</li>
+<li><p class="first">Run focus_results_by_specificity() to remove results of less specificity.
+<strong>(Optional continued)</strong></p>
+<p>~ 20 unique groups of qseqids by tax_ids (assignments) with 20 ranks to
+iterate through: 10 * 20 = 200 iterations</p>
+</li>
+</ol>
+<p>Totals:</p>
+<p><strong>Min</strong> = 2,500 iterations</p>
+<p><strong>Max</strong> (2,500 - 20,000) + 200 = 2,700 - 20,200 iterations</p>
+<p><strong>crosenth strategy:</strong></p>
+<ol class="arabic">
+<li><p class="first">Get a set of the target_ids from the blast_results.</p>
+</li>
+<li><p class="first">Filter the rank_thresholds by tax_id plus <em>available</em> ancestors and append
+default root values. ~ 250 tax_ids</p>
+</li>
+<li><p class="first">Iterate through rank_thresholds and filter blast_hits by tax_id and
+threshold.</p>
+<p>~ 250 iterations</p>
+</li>
+<li><p class="first">Assign threshold, tax_id and rank to blast_hits.</p>
+</li>
+<li><p class="first">Add an additional column for target_rank if available. <strong>(Optional)</strong></p>
+</li>
+<li><p class="first"><strong>(Option 1)</strong> Group by qseqid and select hits of the highest available rank
+(and/or threshold) per group.</p>
+<p>~ 1000 iterations</p>
+<p><strong>(Option 2)</strong> Select all hits and run focus_results_by_specificity() to
+remove less rank specific hits.</p>
+<p>~ 10 * 20 = 200 iterations</p>
+</li>
+</ol>
+<p>Totals:</p>
+<p><strong>Min</strong> 250 + 1,000 = 1,250 iterations</p>
+<p><strong>Max</strong> 1,250 + 200 = 1,450 iterations</p>
+</div>
+<div class="section" id="running-the-program">
+<h2>Running the program<a class="headerlink" href="#running-the-program" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python"><div class="highlight"><pre>positional arguments:
+  blast_file            CSV tabular blast file of query and subject hits.
+  seq_info              File mapping reference seq name to tax_id
+  taxonomy              Table defining the taxonomy for each tax_id
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --threads NUM         Number of threads (CPUs). Can also specify with
+                        environment variable THREADS_ALLOC. [32]
+  --copy-numbers CSV    Estimated 16s rRNA gene copy number for each
+                        tax_ids (CSV file with columns: tax_id, median)
+  --rank-thresholds CSV
+                        Columns [tax_rank,tax_id,low,rank]
+  --specimen-map CSV    CSV file with columns (name, specimen) assigning
+                        sequences to groups. The default behavior is to
+                        treat all query sequences as
+                        belonging to one specimen.
+  -w CSV, --weights CSV
+                        Optional headless csv file with columns &#39;seqname&#39;,
+                        &#39;count&#39; providing weights for each query sequence
+                        described in the blast input (used, for example, to
+                        describe cluster sizes for corresponding cluster
+                        centroids).
+  -o FILE, --out FILE   Classification results.
+  -O FILE, --details-out FILE
+                        Optional details of taxonomic assignments.
+  --details-full        do not limit out_details to only larget cluster per
+                        assignment
+  --group-def INTEGER   define a group threshold for a particular rank
+                        overriding --target-max-group-size. example:
+                        genus:2 (NOT IMPLEMENTED)
+  --has-header          specify this if blast data has a header
+  --min-identity PERCENT
+                        minimum identity threshold for accepting matches
+                        [&gt;= 0.0]
+  --max-identity PERCENT
+                        maximum identity threshold for accepting matches
+                        [&lt;= 100.0]
+  --min-cluster-size INTEGER
+                        minimum cluster size to include in classification
+                        output [1]
+  --min-coverage PERCENT
+                        percent of alignment coverage of blast result [0.0]
+  --specimen LABEL      Single group label for reads
+  --starred PERCENT     Names of organisms for which at least one reference
+                        sequence has pairwise identity with a query
+                        sequence of at least PERCENT will be marked with an
+                        asterisk[100.0]
+  --target-max-group-size INTEGER
+                        group multiple target-rank assignments that excede
+                        a threshold to a higher rank [3]
+  --target-rank TARGET_RANK
+                        Rank at which to classify. Default: &quot;species&quot;
+</pre></div>
+</div>
 <div class="section" id="positional-arguments">
-<h2>Positional arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this headline">¶</a></h2>
+<h3>Positional arguments<a class="headerlink" href="#positional-arguments" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="blast-file">
-<h3>blast_file<a class="headerlink" href="#blast-file" title="Permalink to this headline">¶</a></h3>
+<h4>blast_file<a class="headerlink" href="#blast-file" title="Permalink to this headline">¶</a></h4>
 <p>A csv file with columns <strong>qseqid</strong>, <strong>sseqid</strong>, <strong>pident</strong>,
 <strong>qstart</strong>, <strong>qend</strong> and <strong>qlen</strong>.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">The actual header is optional and if
-present make sure to use the <a class="reference internal" href="#has-header">has-header</a> switch</p>
+present make sure to use the &#8211;has-header switch</p>
 </div>
 </div>
 <div class="section" id="seq-info">
-<h3>seq_info<a class="headerlink" href="#seq-info" title="Permalink to this headline">¶</a></h3>
+<h4>seq_info<a class="headerlink" href="#seq-info" title="Permalink to this headline">¶</a></h4>
 <p>A csv file with minimum columns <strong>seqname</strong> and <strong>tax_id</strong>.  Additional
 columns will be included in the details output.</p>
 </div>
 <div class="section" id="taxonomy">
-<h3>taxonomy<a class="headerlink" href="#taxonomy" title="Permalink to this headline">¶</a></h3>
+<h4>taxonomy<a class="headerlink" href="#taxonomy" title="Permalink to this headline">¶</a></h4>
 <p>A csv file with columns <strong>tax_id</strong>, <strong>rank</strong> and <strong>tax_name</strong>, plus at least
 one additional rank column(s) creating a taxonomic tree such as <strong>species</strong>,
 <strong>genus</strong>, <strong>family</strong>, <strong>class</strong>, <strong>pylum</strong>, <strong>kingdom</strong> and/or <strong>root</strong>.
@@ -75,9 +198,9 @@ least specific to most specific respectively.</p>
 </div>
 </div>
 <div class="section" id="optional-input">
-<h2>Optional input<a class="headerlink" href="#optional-input" title="Permalink to this headline">¶</a></h2>
+<h3>Optional input<a class="headerlink" href="#optional-input" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="rank-thresholds">
-<h3>rank-thresholds<a class="headerlink" href="#rank-thresholds" title="Permalink to this headline">¶</a></h3>
+<h4>rank-thresholds<a class="headerlink" href="#rank-thresholds" title="Permalink to this headline">¶</a></h4>
 <p>This table defines the similarity thresholds at rank. The structure is
 as follows:</p>
 <blockquote>
@@ -150,7 +273,7 @@ instead of 99% in the first example, because we know that there is
 more specific, species-level heterogeneity within this family.</p>
 </div>
 <div class="section" id="copy-numbers">
-<h3>copy-numbers<a class="headerlink" href="#copy-numbers" title="Permalink to this headline">¶</a></h3>
+<h4>copy-numbers<a class="headerlink" href="#copy-numbers" title="Permalink to this headline">¶</a></h4>
 <p>Below is an <em>example</em> copy numbers csv with the required columns:</p>
 <blockquote>
 <div><table border="1" class="docutils">
@@ -187,15 +310,15 @@ more specific, species-level heterogeneity within this family.</p>
 </div></blockquote>
 </div>
 <div class="section" id="weights">
-<h3>weights<a class="headerlink" href="#weights" title="Permalink to this headline">¶</a></h3>
+<h4>weights<a class="headerlink" href="#weights" title="Permalink to this headline">¶</a></h4>
 <p>Headerless file containing two columns specifying the seqname (clustername) and
 weight (or number of sequences in the cluster).</p>
 </div>
 </div>
 <div class="section" id="output">
-<h2>Output<a class="headerlink" href="#output" title="Permalink to this headline">¶</a></h2>
+<h3>Output<a class="headerlink" href="#output" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="out">
-<h3>out<a class="headerlink" href="#out" title="Permalink to this headline">¶</a></h3>
+<h4>out<a class="headerlink" href="#out" title="Permalink to this headline">¶</a></h4>
 <p>A csv with columns and headers as in the example below:</p>
 <blockquote>
 <div><table border="1" class="docutils">
@@ -294,75 +417,8 @@ weight (or number of sequences in the cluster).</p>
 </div></blockquote>
 </div>
 <div class="section" id="details-out">
-<h3>details-out<a class="headerlink" href="#details-out" title="Permalink to this headline">¶</a></h3>
+<h4>details-out<a class="headerlink" href="#details-out" title="Permalink to this headline">¶</a></h4>
 <p>A csv that is basically a blast results breakdown of the <a class="reference internal" href="#out">out</a> output.</p>
-</div>
-</div>
-<div class="section" id="switches">
-<h2>Switches<a class="headerlink" href="#switches" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="group-def">
-<h3>group-def<a class="headerlink" href="#group-def" title="Permalink to this headline">¶</a></h3>
-<p>Define a group threshold for a particular rank. example: genus:2</p>
-<div class="admonition warning">
-<p class="first admonition-title">Warning</p>
-<p class="last">not implememented yet</p>
-</div>
-</div>
-<div class="section" id="has-header">
-<h3>has-header<a class="headerlink" href="#has-header" title="Permalink to this headline">¶</a></h3>
-<p>If a header is included in the blast_input then you <strong>must</strong> specify this
-switch.  Defaults to False.</p>
-</div>
-<div class="section" id="min-identity">
-<h3>min-identity<a class="headerlink" href="#min-identity" title="Permalink to this headline">¶</a></h3>
-<p>Minimum identity threshold for accepting matches.</p>
-</div>
-<div class="section" id="max-identity">
-<h3>max-identity<a class="headerlink" href="#max-identity" title="Permalink to this headline">¶</a></h3>
-<p>Maximum identity threshold for accepting matches.</p>
-</div>
-<div class="section" id="min-cluster-size">
-<h3>min-cluster-size<a class="headerlink" href="#min-cluster-size" title="Permalink to this headline">¶</a></h3>
-<p>Minimum cluster size to include in classification output.</p>
-<div class="admonition warning">
-<p class="first admonition-title">Warning</p>
-<p class="last">not implememented yet</p>
-</div>
-</div>
-<div class="section" id="min-coverage">
-<h3>min-coverage<a class="headerlink" href="#min-coverage" title="Permalink to this headline">¶</a></h3>
-<p>Percent of alignment coverage of blast result.</p>
-</div>
-<div class="section" id="specimen">
-<h3>specimen<a class="headerlink" href="#specimen" title="Permalink to this headline">¶</a></h3>
-<p>Single group label for reads.  If not specified each sequence will be
-considered as its own specimen.</p>
-</div>
-<div class="section" id="starred">
-<h3>starred<a class="headerlink" href="#starred" title="Permalink to this headline">¶</a></h3>
-<p>Threshold for appending an asterisk to assignment names where the pairwise
-alignment identity score is higher or equal to.</p>
-</div>
-<div class="section" id="target-max-group-size">
-<h3>target-max-group-size<a class="headerlink" href="#target-max-group-size" title="Permalink to this headline">¶</a></h3>
-<p>Group multiple target-rank assignments that
-excede a threshold to a higher rank.  Defaults to 3.</p>
-</div>
-<div class="section" id="target-rank">
-<h3>target-rank<a class="headerlink" href="#target-rank" title="Permalink to this headline">¶</a></h3>
-<p>Rank at which to classify. Default is species.</p>
-<div class="admonition note">
-<p class="first admonition-title">Note</p>
-<p class="last">If the species column is not specified then the next <em>less</em> specific
-rank will be used.</p>
-</div>
-</div>
-<div class="section" id="threads">
-<h3>threads<a class="headerlink" href="#threads" title="Permalink to this headline">¶</a></h3>
-<p>Specify the number of threads available. Defaults to all available cpus.</p>
-<div class="admonition warning">
-<p class="first admonition-title">Warning</p>
-<p class="last">Only one thread will be used</p>
 </div>
 </div>
 </div>
@@ -416,7 +472,7 @@ group.</p>
 
 <dl class="function">
 <dt id="bioy_pkg.subcommands.classifier.load_rank_thresholds">
-<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">load_rank_thresholds</tt><big>(</big><em>path='/home/local/AMC/ngh2/src/bioy/bioy_pkg/data/rank_threshold_defaults.csv'</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#load_rank_thresholds"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.load_rank_thresholds" title="Permalink to this definition">¶</a></dt>
+<tt class="descclassname">bioy_pkg.subcommands.classifier.</tt><tt class="descname">load_rank_thresholds</tt><big>(</big><em>path='/home/local/AMC/crosenth/src/bioy/bioy_pkg/data/rank_threshold_defaults.csv'</em><big>)</big><a class="reference internal" href="_modules/bioy_pkg/subcommands/classifier.html#load_rank_thresholds"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#bioy_pkg.subcommands.classifier.load_rank_thresholds" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load a rank-thresholds file.  If no argument is specified the default
 rank_threshold_defaults.csv file will be loaded.</p>
 </dd></dl>
@@ -454,17 +510,80 @@ dataframe are above the star threshold.</p>
 </div>
 
 
+          </div>
+        </div>
       </div>
-      <div class="bottomnav">
-      
-        <p>
-        «&#160;&#160;<a href="index.html">Welcome to the bioy&#8217;s documentation page</a>
-        &#160;&#160;::&#160;&#160;
-        <a class="uplink" href="index.html">Contents</a>
-        </p>
+      <div class="sphinxsidebar">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Classifier</a><ul>
+<li><a class="reference internal" href="#assigning-rank-thresholds">Assigning rank thresholds</a></li>
+<li><a class="reference internal" href="#running-the-program">Running the program</a><ul>
+<li><a class="reference internal" href="#positional-arguments">Positional arguments</a><ul>
+<li><a class="reference internal" href="#blast-file">blast_file</a></li>
+<li><a class="reference internal" href="#seq-info">seq_info</a></li>
+<li><a class="reference internal" href="#taxonomy">taxonomy</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#optional-input">Optional input</a><ul>
+<li><a class="reference internal" href="#rank-thresholds">rank-thresholds</a></li>
+<li><a class="reference internal" href="#copy-numbers">copy-numbers</a></li>
+<li><a class="reference internal" href="#weights">weights</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#output">Output</a><ul>
+<li><a class="reference internal" href="#out">out</a></li>
+<li><a class="reference internal" href="#details-out">details-out</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#internal-functions">Internal functions</a></li>
+</ul>
+</li>
+</ul>
 
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="index.html"
+                        title="previous chapter">Welcome to the bioy&#8217;s documentation page</a></p>
+  <h3>This Page</h3>
+  <ul class="this-page-menu">
+    <li><a href="_sources/classifier.txt"
+           rel="nofollow">Show Source</a></li>
+  </ul>
+<div id="searchbox" style="display: none">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    <p class="searchtip" style="font-size: 90%">
+    Enter search terms or a module, class or function name.
+    </p>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
       </div>
-
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to the bioy’s documentation page"
+             >previous</a> |</li>
+        <li><a href="index.html">bioy  documentation</a> &raquo;</li> 
+      </ul>
+    </div>
     <div class="footer">
         &copy; Copyright 2012-2014, Noah Hoffman, Chris Rosenthal, Tyler Land.
       Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.2.2.
