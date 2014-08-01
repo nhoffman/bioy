@@ -17,28 +17,159 @@
 
 Optional grouping by specimen and query sequences
 
-TODO: describe the algorithm here...
+Assigning rank thresholds
+-------------------------
+
+
+**ng2 strategy:**
+
+1. Get a set of the target_ids from the blast_results.
+
+2. Filter the rank_thresholds by tax_id plus available ancestors.
+
+3. Fill in the missing ancestor ranks with default root values.
+
+4. Group by blast_results by qseqid. ~ 1000 qseqids
+
+5. Iterate by qseqid and rank.  Do a filter for sequences that match a tax_id
+   and who's pident is >= than the specified threshold.  Stop when any of
+   the blast_results pass the threshold. average: ~ 2.5 ranks
+
+   ~ 1000 qseqids * ~ 2.5 ranks (on average) = 2,500 iterations
+
+6. Assign threshold, tax_id and rank to blast_hits.
+
+7. Add an additional column for target_rank if available. **(Optional)**
+
+8. Continue iterating to include all results up to all the available
+   target_rank thresholds **(Optional)**
+
+   ~ 1000 qseqids * 20 ranks (on average) = 20,000 iterations (with
+   optimization ~ 2,500 iterations)
+
+9. Run focus_results_by_specificity() to remove results of less specificity.
+   **(Optional continued)**
+
+   ~ 20 unique groups of qseqids by tax_ids (assignments) with 20 ranks to
+   iterate through: 10 * 20 = 200 iterations
+
+Totals:
+
+**Min** = 2,500 iterations
+
+**Max** (2,500 - 20,000) + 200 = 2,700 - 20,200 iterations
+
+**crosenth strategy:**
+
+1. Get a set of the target_ids from the blast_results.
+
+2. Filter the rank_thresholds by tax_id plus *available* ancestors and append
+   default root values. ~ 250 tax_ids
+
+3. Iterate through rank_thresholds and filter blast_hits by tax_id and
+   threshold.
+
+   ~ 250 iterations
+
+4. Assign threshold, tax_id and rank to blast_hits.
+
+5. Add an additional column for target_rank if available. **(Optional)**
+
+6. **(Option 1)** Group by qseqid and select hits of the highest available rank
+   (and/or threshold) per group.
+
+   ~ 1000 iterations
+
+   **(Option 2)** Select all hits and run focus_results_by_specificity() to
+   remove less rank specific hits.
+
+   ~ 10 * 20 = 200 iterations
+
+Totals:
+
+**Min** 250 + 1,000 = 1,250 iterations
+
+**Max** 1,250 + 200 = 1,450 iterations
+
+Running the program
+-------------------
+
+::
+
+    positional arguments:
+      blast_file            CSV tabular blast file of query and subject hits.
+      seq_info              File mapping reference seq name to tax_id
+      taxonomy              Table defining the taxonomy for each tax_id
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --threads NUM         Number of threads (CPUs). Can also specify with
+                            environment variable THREADS_ALLOC. [32]
+      --copy-numbers CSV    Estimated 16s rRNA gene copy number for each
+                            tax_ids (CSV file with columns: tax_id, median)
+      --rank-thresholds CSV
+                            Columns [tax_rank,tax_id,low,rank]
+      --specimen-map CSV    CSV file with columns (name, specimen) assigning
+                            sequences to groups. The default behavior is to
+                            treat all query sequences as
+                            belonging to one specimen.
+      -w CSV, --weights CSV
+                            Optional headless csv file with columns 'seqname',
+                            'count' providing weights for each query sequence
+                            described in the blast input (used, for example, to
+                            describe cluster sizes for corresponding cluster
+                            centroids).
+      -o FILE, --out FILE   Classification results.
+      -O FILE, --details-out FILE
+                            Optional details of taxonomic assignments.
+      --details-full        do not limit out_details to only larget cluster per
+                            assignment
+      --group-def INTEGER   define a group threshold for a particular rank
+                            overriding --target-max-group-size. example:
+                            genus:2 (NOT IMPLEMENTED)
+      --has-header          specify this if blast data has a header
+      --min-identity PERCENT
+                            minimum identity threshold for accepting matches
+                            [>= 0.0]
+      --max-identity PERCENT
+                            maximum identity threshold for accepting matches
+                            [<= 100.0]
+      --min-cluster-size INTEGER
+                            minimum cluster size to include in classification
+                            output [1]
+      --min-coverage PERCENT
+                            percent of alignment coverage of blast result [0.0]
+      --specimen LABEL      Single group label for reads
+      --starred PERCENT     Names of organisms for which at least one reference
+                            sequence has pairwise identity with a query
+                            sequence of at least PERCENT will be marked with an
+                            asterisk[100.0]
+      --target-max-group-size INTEGER
+                            group multiple target-rank assignments that excede
+                            a threshold to a higher rank [3]
+      --target-rank TARGET_RANK
+                            Rank at which to classify. Default: "species"
 
 Positional arguments
---------------------
+++++++++++++++++++++
 
 blast_file
-++++++++++
+==========
 
 A csv file with columns **qseqid**, **sseqid**, **pident**,
 **qstart**, **qend** and **qlen**.
 
 .. note:: The actual header is optional and if
-          present make sure to use the `has-header`_ switch
+          present make sure to use the --has-header switch
 
 seq_info
-++++++++
+========
 
 A csv file with minimum columns **seqname** and **tax_id**.  Additional
 columns will be included in the details output.
 
 taxonomy
-++++++++
+========
 
 A csv file with columns **tax_id**, **rank** and **tax_name**, plus at least
 one additional rank column(s) creating a taxonomic tree such as **species**,
@@ -47,10 +178,10 @@ The rank columns also give an order of specificity from right to left,
 least specific to most specific respectively.
 
 Optional input
---------------
+++++++++++++++
 
 rank-thresholds
-+++++++++++++++
+===============
 
 This table defines the similarity thresholds at rank. The structure is
 as follows:
@@ -85,7 +216,7 @@ instead of 99% in the first example, because we know that there is
 more specific, species-level heterogeneity within this family.
 
 copy-numbers
-++++++++++++
+============
 
 Below is an *example* copy numbers csv with the required columns:
 
@@ -99,16 +230,16 @@ Below is an *example* copy numbers csv with the required columns:
     ====== ==================== ======
 
 weights
-+++++++
+=======
 
 Headerless file containing two columns specifying the seqname (clustername) and
 weight (or number of sequences in the cluster).
 
 Output
-------
+++++++
 
 out
-+++
+===
 
 A csv with columns and headers as in the example below:
 
@@ -140,80 +271,9 @@ A csv with columns and headers as in the example below:
     ============= ======= =========== ===========
 
 details-out
-+++++++++++
+===========
 
 A csv that is basically a blast results breakdown of the `out`_ output.
-
-Switches
-------------------
-
-group-def
-+++++++++
-
-Define a group threshold for a particular rank. example: genus:2
-
-.. warning:: not implememented yet
-
-has-header
-++++++++++
-
-If a header is included in the blast_input then you **must** specify this
-switch.  Defaults to False.
-
-min-identity
-++++++++++++
-
-Minimum identity threshold for accepting matches.
-
-max-identity
-++++++++++++
-
-Maximum identity threshold for accepting matches.
-
-min-cluster-size
-++++++++++++++++
-
-Minimum cluster size to include in classification output.
-
-.. warning:: not implememented yet
-
-min-coverage
-++++++++++++
-
-Percent of alignment coverage of blast result.
-
-specimen
-++++++++
-
-Single group label for reads.  If not specified each sequence will be
-considered as its own specimen.
-
-starred
-+++++++
-
-Threshold for appending an asterisk to assignment names where the pairwise
-alignment identity score is higher or equal to.
-
-target-max-group-size
-+++++++++++++++++++++
-
-Group multiple target-rank assignments that
-excede a threshold to a higher rank.  Defaults to 3.
-
-target-rank
-+++++++++++
-
-Rank at which to classify. Default is species.
-
-.. note:: If the species column is not specified then the next *less* specific
-          rank will be used.
-
-threads
-+++++++
-
-Specify the number of threads available. Defaults to all available cpus.
-
-.. warning:: Only one thread will be used
 
 Internal functions
 ------------------
