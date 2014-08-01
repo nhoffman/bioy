@@ -57,7 +57,7 @@
 <p>Below are two strategies for managing rank thresholds.  The iteration counts
 are a made up counts based on the average observed number of qseqids per
 specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
-iterations (<cite>for</cite> loops) and fast iterations as Pandas iterations (<cite>groupby</cite>).</p>
+<em>for loop</em> iterations and fast iterations as Pandas <em>groupby</em> iterations.</p>
 <p><strong>ng2 strategy:</strong></p>
 <ol class="arabic">
 <li><p class="first">Get a set of the target_ids from the blast_results.</p>
@@ -99,7 +99,7 @@ iterate: 10 * 20 = 200 slow iterations</p>
 </li>
 <li><p class="first">Filter the rank_thresholds by tax_id plus available ancestors and append
 default root values. On average we will find ~ 200 different tax_ids plus
-~ 50 more ancestor ids = 250 tax_ids</p>
+~ 50 more ancestor ids = 250 tax_ids.</p>
 </li>
 <li><p class="first">Iterate through rank_thresholds and filter blast_hits by tax_id and
 threshold.</p>
