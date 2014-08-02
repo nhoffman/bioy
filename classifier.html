@@ -55,10 +55,10 @@
 <div class="section" id="assigning-rank-thresholds">
 <h2>Assigning rank thresholds<a class="headerlink" href="#assigning-rank-thresholds" title="Permalink to this headline">¶</a></h2>
 <p>Below are two strategies for managing rank thresholds.  The iteration counts
-are a made up counts based on the average observed number of qseqids per
-specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
+are made up counts based on the average observed number of qseqids and tax_ids
+per specimen and taxonomic ranks. I designate slow iterations as python
 <em>for loop</em> iterations and fast iterations as Pandas <em>groupby</em> iterations.</p>
-<p><strong>ng2 strategy:</strong></p>
+<p><strong>Strategy One (iterate by rank)</strong></p>
 <ol class="arabic">
 <li><p class="first">Get a set of the target_ids from the blast_results.</p>
 </li>
@@ -66,20 +66,21 @@ specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
 </li>
 <li><p class="first">Fill in the missing ancestor ranks with default root values.</p>
 </li>
-<li><p class="first">Group by blast_results by qseqid. ~ 1000 qseqids</p>
+<li><p class="first">Group by blast_results by qseqid.  ~ 1000 qseqids</p>
 </li>
 <li><p class="first">Groupby qseqid and iterate by rank.  Do a filter for sequences that match
 a tax_id and who&#8217;s pident is &gt;= than the specified threshold.  Stop when
 any of the blast_results pass the threshold. On average we will iterate
 through ~ 2.0 ranks.</p>
-<p>~ 1000 qseqids * ~ 2.0 ranks (on average) = 2,000 slow iterations</p>
+<p>~ 1000 qseqids * ~ 2.0 ranks = 2,000 slow iterations</p>
 </li>
 <li><p class="first">Assign threshold, tax_id and rank to blast_hits.</p>
 </li>
-<li><p class="first">Add an additional column for target_rank if available. <strong>(Optional)</strong></p>
+<li><p class="first">Add an additional column for target_rank (for naming) if available.
+<strong>(Optional)</strong></p>
 </li>
-<li><p class="first">Continue iterating to include all results up to all the available
-target_rank thresholds <strong>(Optional)</strong></p>
+<li><p class="first">Continue iterating through all ranks to include all results with
+thresholds <strong>(Optional)</strong></p>
 <p>~ 1000 qseqids * ~ 20 ranks = 20,000 slow iterations</p>
 <p>(with optimization we could probably get that to 2.5 ranks or
 2,500 slow iterations)</p>
@@ -93,13 +94,13 @@ iterate: 10 * 20 = 200 slow iterations</p>
 <p>Totals:</p>
 <p>2,000 slow iterations</p>
 <p>With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations</p>
-<p><strong>crosenth strategy:</strong></p>
+<p><strong>Strategy two (iterate by available rank thresholds):</strong></p>
 <ol class="arabic">
 <li><p class="first">Get a set of the target_ids from the blast_results.</p>
 </li>
 <li><p class="first">Filter the rank_thresholds by tax_id plus available ancestors and append
 default root values. On average we will find ~ 200 different tax_ids plus
-~ 50 more ancestor ids = 250 tax_ids.</p>
+~ 50 more ancestor ids totalling 250 tax_ids.</p>
 </li>
 <li><p class="first">Iterate through rank_thresholds and filter blast_hits by tax_id and
 threshold.</p>
@@ -118,7 +119,7 @@ remove reduntant, less rank specific hits.</p>
 </li>
 </ol>
 <p>Totals:</p>
-<p>Option 1: 250 slow iterations + 1,000 fast iterations</p>
+<p>Option 1: 250 slow iterations</p>
 <p>Option 2: 250 + 200 = 450 slow iterations</p>
 </div>
 <div class="section" id="running-the-program">
