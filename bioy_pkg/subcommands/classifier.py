@@ -21,11 +21,11 @@ Assigning rank thresholds
 -------------------------
 
 Below are two strategies for managing rank thresholds.  The iteration counts
-are a made up counts based on the average observed number of qseqids per
-specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
+are made up counts based on the average observed number of qseqids and tax_ids
+per specimen and taxonomic ranks. I designate slow iterations as python
 *for loop* iterations and fast iterations as Pandas *groupby* iterations.
 
-**ng2 strategy:**
+**Strategy One (iterate by rank)**
 
 1. Get a set of the target_ids from the blast_results.
 
@@ -33,21 +33,22 @@ specimen, tax_ids and taxonomic ranks. I designate slow iterations as python
 
 3. Fill in the missing ancestor ranks with default root values.
 
-4. Group by blast_results by qseqid. ~ 1000 qseqids
+4. Group by blast_results by qseqid.  ~ 1000 qseqids
 
 5. Groupby qseqid and iterate by rank.  Do a filter for sequences that match
    a tax_id and who's pident is >= than the specified threshold.  Stop when
    any of the blast_results pass the threshold. On average we will iterate
    through ~ 2.0 ranks.
 
-   ~ 1000 qseqids * ~ 2.0 ranks (on average) = 2,000 slow iterations
+   ~ 1000 qseqids * ~ 2.0 ranks = 2,000 slow iterations
 
 6. Assign threshold, tax_id and rank to blast_hits.
 
-7. Add an additional column for target_rank if available. **(Optional)**
+7. Add an additional column for target_rank (for naming) if available.
+   **(Optional)**
 
-8. Continue iterating to include all results up to all the available
-   target_rank thresholds **(Optional)**
+8. Continue iterating through all ranks to include all results with
+   thresholds **(Optional)**
 
    ~ 1000 qseqids * ~ 20 ranks = 20,000 slow iterations
 
@@ -66,13 +67,13 @@ Totals:
 
 With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations
 
-**crosenth strategy:**
+**Strategy two (iterate by available rank thresholds)**
 
 1. Get a set of the target_ids from the blast_results.
 
 2. Filter the rank_thresholds by tax_id plus available ancestors and append
    default root values. On average we will find ~ 200 different tax_ids plus
-   ~ 50 more ancestor ids = 250 tax_ids.
+   ~ 50 more ancestor ids totalling 250 tax_ids.
 
 3. Iterate through rank_thresholds and filter blast_hits by tax_id and
    threshold.
@@ -95,7 +96,7 @@ With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations
 
 Totals:
 
-Option 1: 250 slow iterations + 1,000 fast iterations
+Option 1: 250 slow iterations
 
 Option 2: 250 + 200 = 450 slow iterations
 
