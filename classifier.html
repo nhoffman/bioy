@@ -94,6 +94,10 @@ iterate: 10 * 20 = 200 slow iterations</p>
 <p>Totals:</p>
 <p>2,000 slow iterations</p>
 <p>With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations</p>
+<div class="section" id="summary">
+<h3>Summary<a class="headerlink" href="#summary" title="Permalink to this headline">¶</a></h3>
+<p>Blast_results are grouped by qseqid and assigned rank_thresholds by
+iterating through most specific to least specific rank.</p>
 <p><strong>Strategy two (iterate by available rank thresholds)</strong></p>
 <ol class="arabic">
 <li><p class="first">Get a set of the target_ids from the blast_results.</p>
@@ -121,6 +125,12 @@ remove reduntant, less rank specific hits.</p>
 <p>Totals:</p>
 <p>Option 1: 250 slow iterations</p>
 <p>Option 2: 250 + 200 = 450 slow iterations</p>
+</div>
+<div class="section" id="id1">
+<h3>Summary<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>Blast result rank thresholds are assigned by iterating through a set of
+rank thresholds sorted by tax_id rank specificity.</p>
+</div>
 </div>
 <div class="section" id="running-the-program">
 <h2>Running the program<a class="headerlink" href="#running-the-program" title="Permalink to this headline">¶</a></h2>
@@ -526,7 +536,11 @@ dataframe are above the star threshold.</p>
   <h3><a href="index.html">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Classifier</a><ul>
-<li><a class="reference internal" href="#assigning-rank-thresholds">Assigning rank thresholds</a></li>
+<li><a class="reference internal" href="#assigning-rank-thresholds">Assigning rank thresholds</a><ul>
+<li><a class="reference internal" href="#summary">Summary</a></li>
+<li><a class="reference internal" href="#id1">Summary</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#running-the-program">Running the program</a><ul>
 <li><a class="reference internal" href="#positional-arguments">Positional arguments</a><ul>
 <li><a class="reference internal" href="#blast-file">blast_file</a></li>
