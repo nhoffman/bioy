@@ -67,6 +67,11 @@ Totals:
 
 With Options: (2,500 - 20,000) + 200 = 2,700 - 20,200 slow iterations
 
+Summary:
+
+Blast_results are grouped by qseqid and assigned rank_thresholds by
+iterating through most specific to least specific rank.
+
 **Strategy two (iterate by available rank thresholds)**
 
 1. Get a set of the target_ids from the blast_results.
@@ -99,6 +104,11 @@ Totals:
 Option 1: 250 slow iterations
 
 Option 2: 250 + 200 = 450 slow iterations
+
+Summary:
+
+Blast result rank thresholds are assigned by iterating through a set of
+rank thresholds sorted by tax_id rank specificity.
 
 Running the program
 -------------------
