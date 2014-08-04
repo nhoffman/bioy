@@ -28,6 +28,7 @@ Warning: the parse_ssearch36 function does not work with stdin input at this tim
 
 import logging
 import sys
+import os
 
 from itertools import chain, groupby, imap
 from operator import itemgetter
@@ -71,6 +72,7 @@ def build_parser(parser):
                 fieldnames = ['name', 'rle']),
             help = 'Decode alignment')
     parser.add_argument('--fieldnames',
+            default = 'q_name,t_name,sw_zscore,sw_overlap,sw_ident,coverage',
             type = lambda f: f.split(','),
             help = 'comma-delimited list of field names to include in output')
     parser.add_argument('-z', '--statistical-calculation',
@@ -103,8 +105,21 @@ def action(args):
 
     command += [args.query, args.library]
 
-    log.info(' '.join(command))
+    # If query or library file is empty, don't bother executing ssearch.  Just print empty file
+    # with a header and exit
+    if os.stat(args.query).st_size == 0 or os.stat(args.library).st_size == 0:
+        # write empty header
+        if args.fieldnames:
+            fieldnames = args.fieldnames
+        if fieldnames:
+            writer = DictWriter(args.out,
+                    extrasaction = 'ignore',
+                    fieldnames = fieldnames)
+            if args.header:
+                writer.writeheader()
+        return
 
+    log.info(' '.join(command))
     ssearch = Popen(command, stdout = PIPE, stderr = PIPE)
 
     # parse alignments
