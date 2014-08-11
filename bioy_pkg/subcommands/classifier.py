@@ -34,7 +34,7 @@ Running the program
       --copy-numbers CSV    Estimated 16s rRNA gene copy number for each
                             tax_ids (CSV file with columns: tax_id, median)
       --rank-thresholds CSV
-                            Columns [tax_rank,tax_id,low,rank]
+                            Columns [tax_id,ranks...]
       --specimen-map CSV    CSV file with columns (name, specimen) assigning
                             sequences to groups. The default behavior is to
                             treat all query sequences as
@@ -109,37 +109,7 @@ Optional input
 rank-thresholds
 ===============
 
-This table defines the similarity thresholds at rank. The structure is
-as follows:
-
-    ====== === ===========
-    tax_id low target_rank
-    ====== === ===========
-    1      99  species
-    1      97  genus
-    1      95  family
-    ====== === ===========
-
-The **tax_id** column identifies the subtree of the taxonomy to which
-the threshold defined in **low** should be applied. The example
-above is preloaded into the Classifier.  The threshold of 99 applies to all
-tax_ids with an ancestor of tax_id=1 (ie, the entire taxonomy).
-
-A custom example that can be specified by the user on top of the above example
-more useful example might be this:
-
-    ====== === ===========
-    tax_id low target_rank
-    ====== === ===========
-    2049   97  species
-    2049   95  genus
-    2049   93  family
-    ====== === ===========
-
-Here, all organisms belonging to family Actinomycetaceae (tax_id 2049)
-will be classified to the species level using a threshold of 97%
-instead of 99% in the first example, because we know that there is
-more specific, species-level heterogeneity within this family.
+TODO
 
 copy-numbers
 ============
@@ -239,35 +209,6 @@ def read_csv(filename, compression=None, **kwargs):
     return pd.read_csv(filename, **kwargs)
 
 
-def focus_results_by_specificity(df):
-    """Remove less specific target_rank hits.
-
-       If a hit's target rank shares taxonomy with a more specific
-       target hit then it will be dropped in favor
-       of the more specific target hit(s).
-
-       Example: Given a group of blast hits (by qseqid), if a hit matches a
-       Helicobacter pylori species sequence and also matches
-       a Helicobacter genus sequence the H. pylori sequence will be accepted
-       while the genus level hit will be dropped from the
-       group.
-    """
-
-    results = pd.DataFrame(columns=df.columns)
-    # Items are already sorted by priority
-    # from the rank_threshold assignment
-    df = df.groupby(by=['priority', 'target_rank'], sort=False)
-    for (_, target_rank), vals in df:
-        # 1) create a set of pruned tax_ids by target_rank
-        more_specific = results[target_rank].drop_duplicates()
-        # 2) filter out sequences that are already included in the pruned
-        # results at the target_rank
-        vals = vals[~vals[target_rank].isin(more_specific)]
-        # 3) append the unique hits at the current target_rank
-        results = results.append(vals)
-    return results
-
-
 def star(df, starred):
     """Assign boolean if any items in the
     dataframe are above the star threshold.
@@ -307,18 +248,8 @@ def agg_columns(df):
     """Create aggregate columns for assignments.
     """
     agg = {}
-    agg['low'] = df['low'].min()
     agg['max_percent'] = df['pident'].max()
     agg['min_percent'] = df['pident'].min()
-    target_rank = df['target_rank'].dropna().drop_duplicates()
-    if target_rank.empty:
-        target_rank = None
-    else:
-        specificity = lambda x: sequtils.RANKS.index(x)
-        target_rank.index = target_rank.apply(specificity)
-        target_rank = target_rank.sort_index()
-        target_rank = target_rank.iloc[-1]
-    agg['target_rank'] = target_rank
     return pd.Series(agg)
 
 
@@ -339,35 +270,42 @@ def assignment_id(df):
 
 
 def load_rank_thresholds(
-        path=path.join(datadir, 'rank_threshold_defaults.csv')):
+        path=path.join(datadir, 'rank_thresholds.csv'), usecols=None):
     """Load a rank-thresholds file.  If no argument is specified the default
     rank_threshold_defaults.csv file will be loaded.
     """
     return read_csv(
         path,
-        usecols=['tax_id', 'low', 'target_rank'],
         comment='#',
-        dtype=dict(tax_id=str, low=float, target_rank=str, comment=str))
+        usecols=['tax_id'] + usecols,
+        dtype=dict(tax_id=str)).set_index('tax_id')
 
 
-def most_specific(series, cols):
+def find_tax_id(series, ranks, rank):
     """Return the most taxonomic specific tax_id available for the given
     Series.
-
-    For most given Series the given target_rank is available and returned.
-    If the target_rank is NAN then return a less specific tax_id
     """
-    target_rank = series['target_rank']
-    target_id = series[target_rank]
-    if pd.isnull(target_id):
-        # get root -> target_rank columns
-        target_rank_index = cols.index(target_rank)
-        series = series[cols[:target_rank_index]]
-        # remove offending null values
-        series = series[~series.isnull()]
-        return series.iloc[-1]  # the most specific, non-null value
-    else:
-        return target_id
+
+    index = ranks.index(rank)
+    series = series[ranks[index:]]
+    series = series[~series.isnull()]
+    return series.iloc[0]
+
+
+def assign_tax_ids(df, ranks):
+    for r in ranks:
+        valid = df[df['{}_threshold'.format(r)] < df['pident']]
+        if not valid.empty:
+            tax_ids = df[r]
+            na_ids = tax_ids.isnull()
+            if na_ids.any():
+                # bump up missing taxids
+                found_ids = df[na_ids].apply(
+                    find_tax_id, args=(ranks, r), axis=1)
+                have_ids = df[tax_ids.notnull()][r]
+                tax_ids = have_ids.append(found_ids)
+            valid['tax_id'] = tax_ids
+            return valid
 
 
 def build_parser(parser):
@@ -389,7 +327,7 @@ def build_parser(parser):
         (CSV file with columns: tax_id, median)""")
     parser.add_argument(
         '--rank-thresholds', metavar='CSV',
-        help="""Columns [tax_rank,tax_id,low,rank]""")
+        help="""Columns [tax_id,ranks...]""")
     parser.add_argument(
         '--specimen-map', metavar='CSV',
         help="""CSV file with columns (name, specimen) assigning sequences to
@@ -499,7 +437,7 @@ def action(args):
     # merge blast results with seq_info - do this early so that
     # refseqs not represented in the blast results are discarded in
     # the merge.
-    blast_results = blast_results.join(seq_info, on='sseqid')
+    blast_results = blast_results.join(seq_info, on='sseqid', how='inner')
 
     # load the full taxonomy table.  Rank specificity as ordered from
     # left (less specific) to right (more specific)
@@ -516,77 +454,26 @@ def action(args):
     # now combine just the rank columns to the blast results
     blast_results = blast_results.join(taxonomy[rank_cols], on='tax_id')
 
-    #  tax_id will be later set from the target_rank
-    blast_results = blast_results.drop('tax_id', axis=1)
-
     # load the default rank thresholds
-    rank_thresholds = load_rank_thresholds()
+    rank_thresholds = load_rank_thresholds(usecols=rank_cols)
 
     # and any additional thresholds specified by the user
     if args.rank_thresholds:
         rank_thresholds = rank_thresholds.append(
-            load_rank_thresholds(args.rank_thresholds))
+            load_rank_thresholds(path=args.rank_thresholds, usecols=rank_cols))
 
-    # select valid rows that are not commented out (NULL)
-    # and whos target_rank exist in the taxonomy
-    valid_taxonomy = rank_thresholds['target_rank'].apply(
-        lambda x: x in taxonomy.columns)
-    rank_thresholds = rank_thresholds[valid_taxonomy]
+    blast_results = blast_results.join(
+        rank_thresholds, on='tax_id', rsuffix='_threshold')
 
-    # for each tax_id find the corresponding rank using the taxonomy above
-    # TODO: should we do something about accidental duplicate tax_id entries?
-    rank_thresholds['tax_rank'] = rank_thresholds['tax_id'].map(
-        lambda x: taxonomy.loc[x]['rank'])
-
-    # assign a priority index for taxonomic subtrees by specificity
-    rank_thresholds['tax_priority'] = rank_thresholds['tax_rank'].map(
-        lambda x: taxonomy.columns.get_loc(x))
-
-    # assign a priority index for the target_rank by specificity
-    rank_thresholds['target_priority'] = rank_thresholds['target_rank'].map(
-        lambda x: taxonomy.columns.get_loc(x))
-
-    # sort by tax_priority(s) and target_priority(s)
-    rank_thresholds = rank_thresholds.sort(
-        columns=['tax_priority', 'target_priority'], ascending=False)
-
-    # assign target ranks by tax_priority(s) and target_priorty(s)
-    targeted = []
-    for i, threshold in rank_thresholds.iterrows():
-        # pull out blast hits that meet the threshold parameters
-        matches = blast_results[
-            (threshold['tax_id'] == blast_results[threshold['tax_rank']]) &
-            (threshold['low'] <= blast_results['pident'])]
-
-        # Set the target_rank and low values.
-        # Also set the priority for identifying
-        # most specific blast results by qseqid later.
-        matches['target_rank'] = threshold['target_rank']
-        matches['low'] = threshold['low']
-        matches['priority'] = i
-
-        # remove matches from blast_results, append and continue
-        not_matches = blast_results.index.diff(matches.index)
-        blast_results = blast_results.loc[not_matches]
-        targeted.append(matches)
-
-    # remaings blast_results (if any) get default low and target_rank
-    blast_results['low'] = args.min_identity
-    blast_results['target_rank'] = args.target_rank
-
-    # reconstruct the newly targeted blast_results
-    blast_results = pd.concat(targeted + [blast_results])
+    #  tax_id will be later based on pident and thresholds
+    blast_results = blast_results.drop('tax_id', axis=1)
 
     # Keep most specific hits.  This step is required so taxonomic
     # assignments are not masked in the results by hits to their
     # more generic taxonomic parents
     blast_results = blast_results.groupby(
         by=['qseqid'], sort=False, group_keys=False).apply(
-            focus_results_by_specificity)
-
-    # set tax_id as the target_rank id
-    blast_results['tax_id'] = blast_results.apply(
-        most_specific, args=(rank_cols,), axis=1)
+            assign_tax_ids, list(reversed(rank_cols)))
 
     # join with taxonomy for tax_name and rank
     blast_results = blast_results.join(
