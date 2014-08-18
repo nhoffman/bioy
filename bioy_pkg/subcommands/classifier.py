@@ -248,13 +248,6 @@ def round_up(x):
     return max(0.01, x)
 
 
-def freq(df):
-    """Calculate pct_reads column.
-    """
-    df['pct_reads'] = df['reads'] / df['reads'].sum() * 100
-    return df
-
-
 def read_csv(filename, compression=None, **kwargs):
     """Read a csv file using pandas.read_csv with compression defined by
     the file suffix unless provided.
@@ -311,27 +304,6 @@ def assign(df, tax_dict, blast_results_len):
     return df
 
 
-def agg_columns(df, ranks):
-    """Create aggregate columns for assignments.
-    """
-    agg = {}
-    agg['max_percent'] = df['pident'].max()
-    agg['min_percent'] = df['pident'].min()
-    agg['min_threshold'] = df['assignment_threshold'].min()
-    target_ranks = df['rank'].drop_duplicates()
-    target_ranks.index = target_ranks.apply(
-        lambda x: ranks.index(x) if x in ranks else -1)
-    agg['target_rank'] = target_ranks.iloc[0]
-    return pd.Series(agg)
-
-
-def pct_corrected(df):
-    """Calculate pct_corrected values.
-    """
-    df['pct_corrected'] = df['corrected'] / df['corrected'].sum() * 100
-    return df
-
-
 def assignment_id(df):
     """Resets and drops the current dataframe's
     index and sets it to the assignment_hash
@@ -362,6 +334,14 @@ def find_tax_id(series, rank, ranks):
     series = series[ranks[index:]]
     series = series[~series.isnull()]
     return series.iloc[0]
+
+
+def target_rank(s, ranks):
+    """Create aggregate columns for assignments.
+    """
+
+    s.index = s.apply(lambda x: ranks.index(x) if x in ranks else -1)
+    return s.sort_index().iloc[-1]
 
 
 def select_valid_hits(df, ranks, blast_results_len):
@@ -397,7 +377,23 @@ def select_valid_hits(df, ranks, blast_results_len):
             return valid
 
 
-def copy_correction_columns(output, copy_numbers, blast_results):
+def calculate_pct_references(df, pct_reference):
+    reference_count = df[['tax_id']].drop_duplicates()
+    reference_count = reference_count.join(pct_reference, on='tax_id')
+    reference_count = reference_count['count'].sum()
+    sseqid_count = float(len(df['sseqid'].drop_duplicates()))
+    df['pct_reference'] = sseqid_count / reference_count
+    return df
+
+
+def pct(s):
+    """Calculate pct something
+    """
+
+    return s / s.sum() * 100
+
+
+def copy_corrections(copy_numbers, blast_results):
     copy_numbers = read_csv(
         copy_numbers,
         dtype=dict(tax_id=str, median=float),
@@ -411,25 +407,14 @@ def copy_correction_columns(output, copy_numbers, blast_results):
 
     # do our copy number correction math
     corrections = blast_results[
-        [ASSIGNMENT_TAX_ID, 'specimen', 'assignment_hash']]
+        [ASSIGNMENT_TAX_ID, 'specimen']]
     corrections = corrections.drop_duplicates()
     corrections = corrections.set_index(ASSIGNMENT_TAX_ID)
     corrections = corrections.join(copy_numbers)
     corrections = corrections.groupby(
-        by=['specimen', 'assignment_hash'], sort=False)
+        by=['specimen'], sort=False)
     corrections = corrections['median'].mean()
-    output['corrected'] = output['reads'] / corrections
-
-    # reset corrected counts to int before calculating pct_corrected
-    output['corrected'] = output['corrected'].apply(math.ceil)
-    output['corrected'] = output['corrected'].fillna(1).astype(int)
-
-    # create pct_corrected column
-    output = output.groupby(level='specimen').apply(pct_corrected)
-    # round up any pct_corrected < 0.01
-    output['pct_corrected'] = output['pct_corrected'].map(round_up)
-
-    return output
+    return corrections
 
 
 def build_parser(parser):
@@ -515,11 +500,15 @@ def build_parser(parser):
     parser.add_argument(
         '--target-rank', default='species',
         help='Rank at which to classify. Default: "%(default)s"')
+    parser.add_argument(
+        '--pct-reference', action='store_true',
+        help="""include column with percent sseqids per assignment_id
+        (NOT IMPLEMENTED)""")
 
 
 def action(args):
     # for debugging:
-    # pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
@@ -681,9 +670,9 @@ def action(args):
     sys.stderr.write('\n')
 
     # star condensed ids if one hit meets star threshold
+    by = ['assignment_hash', 'condensed_id']
     blast_results = blast_results.groupby(
-        by=['assignment_hash', 'condensed_id'],
-        sort=False).apply(star, args.starred)
+        by=by, sort=False, group_keys=False).apply(star, args.starred)
 
     # assign names to assignment_hashes
     blast_results = blast_results.sort('assignment_hash')
@@ -696,14 +685,20 @@ def action(args):
     # put assignments and no assignments back together
     blast_results = pd.concat([blast_results, no_hits])
 
+    # concludes our blast details, on to output summary
     log.info('summarizing output')
 
-    # concludes our blast details, on to output summary
+    # index by specimen and assignment_hash and add assignment column
+    index = ['specimen', 'assignment_hash']
+    output = blast_results[index + ['assignment']].drop_duplicates()
+    output = output.set_index(index)
 
-    output = blast_results.groupby(
-        by=['specimen', 'assignment_hash', 'assignment'])
-    output = output.apply(agg_columns, ranks)
-    output = output.reset_index(level='assignment')
+    # assignment level stats
+    assignment_stats = blast_results.groupby(by=index, sort=False)
+    output['max_percent'] = assignment_stats['pident'].max()
+    output['min_percent'] = assignment_stats['pident'].min()
+    output['min_threshold'] = assignment_stats['assignment_threshold'].min()
+    output['target_rank'] = assignment_stats['rank'].apply(target_rank, ranks)
 
     # qseqid cluster stats
     clusters = blast_results[['qseqid', 'specimen', 'assignment_hash']]
@@ -724,17 +719,25 @@ def action(args):
     clusters = clusters.groupby(by=['specimen', 'assignment_hash'], sort=False)
 
     output['reads'] = clusters['weight'].sum()
-    output = output.groupby(level='specimen').apply(freq)
     output['clusters'] = clusters.size()
+
+    # specimen level stats
+    specimen_stats = output.groupby(level='specimen', sort=False)
+    output['pct_reads'] = specimen_stats['reads'].apply(pct)
 
     # copy number corrections
     if args.copy_numbers:
-        output = copy_correction_columns(
-            output, args.copy_numbers, blast_results)
+        corrections = copy_corrections(args.copy_numbers, blast_results)
+        output['corrected'] = output['reads'] / corrections
+        # reset corrected counts to int before calculating pct_corrected
+        output['corrected'] = output['corrected'].apply(math.ceil)
+        output['corrected'] = output['corrected'].fillna(1).astype(int)
+        # create pct_corrected column
+        output['pct_corrected'] = specimen_stats['corrected'].apply(pct)
+        output['pct_corrected'] = output['pct_corrected'].map(round_up)
 
     # round reads for output
     output['reads'] = output['reads'].apply(round).astype(int)
-    # round up any pct < 0.01 for before sorting
     output['pct_reads'] = output['pct_reads'].map(round_up)
 
     # sort output by:
@@ -745,11 +748,10 @@ def action(args):
     columns = ['corrected'] if args.copy_numbers else ['reads']
     columns += ['clusters', 'assignment']
     output = output.sort(columns=columns, ascending=False)
-    # nobody cares about assignment_hash
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
 
-    # create assignment ids by specimen
+    # one last grouping on the sorted output plus assignment ids by specimen
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
