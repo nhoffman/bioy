@@ -661,7 +661,7 @@ def action(args):
     # create condensed assignment hashes by qseqid
     blast_results = blast_results.sort('qseqid').reset_index(drop=True)
     blast_results = blast_results.groupby(
-        by=['qseqid'], sort=False, group_keys=False).apply(
+        by=['specimen', 'qseqid'], sort=False, group_keys=False).apply(
             condense_ids,
             tax_dict,
             ranks,
@@ -670,7 +670,7 @@ def action(args):
     sys.stderr.write('\n')
 
     # star condensed ids if one hit meets star threshold
-    by = ['assignment_hash', 'condensed_id']
+    by = ['specimen', 'assignment_hash', 'condensed_id']
     blast_results = blast_results.groupby(
         by=by, sort=False, group_keys=False).apply(star, args.starred)
 
@@ -678,8 +678,9 @@ def action(args):
     blast_results = blast_results.sort('assignment_hash')
     blast_results = blast_results.reset_index(drop=True)
     blast_results = blast_results.groupby(
-        by=['assignment_hash'], sort=False, group_keys=False).apply(
-            assign, tax_dict, float(len(blast_results)))
+        by=['specimen', 'assignment_hash'],
+        sort=False,
+        group_keys=False).apply(assign, tax_dict, float(len(blast_results)))
     sys.stderr.write('\n')
 
     # put assignments and no assignments back together
