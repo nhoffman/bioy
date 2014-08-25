@@ -619,10 +619,6 @@ def action(args):
     blast_results = blast_results.join(
         taxonomy[['tax_name', 'rank']], on=ASSIGNMENT_TAX_ID)
 
-    # rename tax_name to assignment_tax_name
-    blast_results.columns = ['assignment_tax_name' if c == 'tax_name' else c
-                             for c in blast_results.columns]
-
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.join(qseqids, on='qseqid', how='outer')
 
@@ -769,8 +765,7 @@ def action(args):
 
         columns = ['specimen', 'assignment_id', 'qseqid', 'sseqid',
                    'tax_id', 'tax_name', 'accession', 'pident', 'starred',
-                   'rank', 'assignment_threshold', ASSIGNMENT_TAX_ID,
-                   'assignment_tax_name']
+                   'rank', 'assignment_threshold', ASSIGNMENT_TAX_ID]
 
         with args.details_out as out_details:
             blast_results.to_csv(
