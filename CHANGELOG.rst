@@ -8,6 +8,16 @@ next release
 
 (features to be included in the next release)
 
+1.8.3
+=====
+
+ * bioy ssearch checks for empty files before calling ssearch, circumventing a race condition bug
+
+1.8.2
+=====
+
+ * hdf5 support
+
 1.8.0
 =====
 
