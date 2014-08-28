@@ -142,45 +142,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
         self.assertTrue(filecmp.cmp(details_ref, details_out))
 
-    def test04(self):
-        """
-        Include generic rank thresholds
-        """
-
-        this_test = sys._getframe().f_code.co_name
-
-        thisdatadir = self.thisdatadir
-
-        rank_thresholds = path.join(thisdatadir, 'rank_thresholds.csv.bz2')
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
-
-        outdir = self.mkoutdir()
-
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
-
-        classify_ref = path.join(
-            thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
-            thisdatadir, this_test, 'details.csv.bz2')
-
-        args = [
-            '--rank-thresholds', rank_thresholds,
-            '--out', classify_out,
-            '--details-out', details_out,
-            blast,
-            seq_info,
-            taxonomy]
-
-        log.info(self.log_info.format(' '.join(map(str, args))))
-
-        self.main(args)
-
-        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
-        self.assertTrue(filecmp.cmp(details_ref, details_out))
-
     def test05(self):
         """
         min-identity 99, max-identity 100
