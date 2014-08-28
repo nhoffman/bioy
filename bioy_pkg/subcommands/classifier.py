@@ -619,6 +619,9 @@ def action(args):
     blast_results = blast_results.join(
         taxonomy[['tax_name', 'rank']], on=ASSIGNMENT_TAX_ID)
 
+    blast_results = blast_results.rename(
+        columns={'tax_name': 'assignment_tax_name'})
+
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.join(qseqids, on='qseqid', how='outer')
 
@@ -763,9 +766,10 @@ def action(args):
             largest = clusters.apply(lambda x: x['weight'].nlargest(1))
             blast_results = blast_results.merge(largest.reset_index())
 
-        columns = ['specimen', 'assignment_id', 'qseqid', 'sseqid',
-                   'tax_id', 'tax_name', 'accession', 'pident', 'starred',
-                   'rank', 'assignment_threshold', ASSIGNMENT_TAX_ID]
+        columns = ['specimen', 'assignment_id', 'assignment_tax_name',
+                   'pident', 'rank', 'tax_id', ASSIGNMENT_TAX_ID,
+                   'condensed_id', 'accession', 'qseqid', 'sseqid',
+                   'starred', 'assignment_threshold']
 
         with args.details_out as out_details:
             blast_results.to_csv(
