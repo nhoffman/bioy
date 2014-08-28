@@ -467,7 +467,11 @@ class TestCondenseAssignment(TestBase):
 
         for a in self.assignments:
             self.assertRaises(
-                TypeError, sequtils.condense_ids, a, taxonomy, floor_rank='')
+                TypeError,
+                sequtils.condense_ids,
+                a,
+                taxonomy,
+                floor_rank='fake_rank')
 
     def test06(self):
         """
@@ -478,7 +482,11 @@ class TestCondenseAssignment(TestBase):
 
         for a in self.assignments:
             self.assertRaises(
-                TypeError, sequtils.condense_ids, a, taxonomy, ceiling_rank='')
+                TypeError,
+                sequtils.condense_ids,
+                a,
+                taxonomy,
+                ceiling_rank='fake_rank')
 
     def test07(self):
         """
