@@ -325,17 +325,6 @@ def load_rank_thresholds(
         dtype=dict(tax_id=str)).set_index('tax_id')
 
 
-def find_tax_id(series, rank, ranks):
-    """Return the most taxonomic specific tax_id available for the given
-    Series.
-    """
-
-    index = ranks.index(rank)
-    series = series[ranks[index:]]
-    series = series[~series.isnull()]
-    return series.iloc[0]
-
-
 def target_rank(s, ranks):
     """Create aggregate columns for assignments.
     """
@@ -344,8 +333,25 @@ def target_rank(s, ranks):
     return s.sort_index().iloc[-1]
 
 
-def select_valid_hits(df, ranks, blast_results_len):
+def find_tax_id(series, valids, r, ranks):
+    """Return the most taxonomic specific tax_id available for the given
+    Series.  If a tax_id is already present in valids[r] then return None.
     """
+
+    index = ranks.index(r)
+    series = series[ranks[index:]]
+    series = series[~series.isnull()]
+    found = series.head(n=1)
+    key = found.index.values[0]
+    value = found.values[0]
+    return value if value not in valids[key].unique() else None
+
+
+def select_valid_hits(df, ranks, blast_results_len):
+    """Return valid hits of the most specific rank that passed their
+    corresponding rank thresholds.  Hits that pass their rank thresholds
+    but do not have a tax_id at that rank will be bumped to a less specific
+    rank id and varified as a unique tax_id.
     """
 
     sys.stderr.write('\rselecting valid blast hits: {0:.0f}%'.format(
@@ -356,10 +362,10 @@ def select_valid_hits(df, ranks, blast_results_len):
         pidents = df['pident']
         valid = df[thresholds < pidents]
         if not valid.empty:
-            tax_ids = df[r]
+            tax_ids = valid[r]
 
-            # occasionally tax_ids can be missing at a certain rank
-            # when this happens use the next less specific tax_id available
+            # Occasionally tax_ids will be missing at a certain rank.
+            # If so use the next less specific tax_id available
             na_ids = tax_ids.isnull()
 
             if na_ids.all():
@@ -367,14 +373,15 @@ def select_valid_hits(df, ranks, blast_results_len):
 
             if na_ids.any():
                 # bump up missing taxids
-                found_ids = df[na_ids].apply(
-                    find_tax_id, args=(r, ranks), axis=1)
-                have_ids = df[tax_ids.notnull()][r]
-                tax_ids = have_ids.append(found_ids)
+                have_ids = valid[tax_ids.notnull()]
+                found_ids = valid[na_ids].apply(
+                    find_tax_id, args=(have_ids, r, ranks), axis=1)
+                tax_ids = have_ids[r].append(found_ids)
 
             valid[ASSIGNMENT_TAX_ID] = tax_ids
             valid['assignment_threshold'] = thresholds
-            return valid
+            # return notnull() assignment_threshold valid values
+            return valid[valid[ASSIGNMENT_TAX_ID].notnull()]
 
 
 def calculate_pct_references(df, pct_reference):
@@ -591,6 +598,8 @@ def action(args):
     if args.rank_thresholds:
         rank_thresholds = rank_thresholds.append(
             load_rank_thresholds(path=args.rank_thresholds, usecols=ranks))
+        # overwrite with user defined tax_id threshold
+        rank_thresholds = rank_thresholds.groupby(level=0).last()
 
     rank_thresholds_cols = ['{}_threshold'.format(c) if c in ranks else c
                             for c in rank_thresholds.columns]
@@ -631,19 +640,23 @@ def action(args):
     # load specimen-map and assign specimen names
     if args.specimen_map:
         # if a specimen_map is defined and a qseqid is not included in the map
-        # hits to that qseqid will be dropped
+        # hits to that qseqid will be dropped (inner join)
         spec_map = read_csv(
             args.specimen_map,
             names=['qseqid', 'specimen'],
+            usecols=['qseqid', 'specimen'],
+            dtype=str,
             index_col='qseqid')
-        specimens = specimens.join(spec_map)
+        specimens = specimens.join(spec_map, how='inner')
     elif args.specimen:
         specimens['specimen'] = args.specimen
     else:
-        specimens['specimen'] = specimens.index  # qseqid
+        specimens['specimen'] = specimens.index  # by qseqid
 
     # join specimen labels onto blast_results
-    blast_results = blast_results.join(specimens, on='qseqid')
+    # TODO: consider doing this early to avoid messing with
+    # sequences that have no specimen label
+    blast_results = blast_results.join(specimens, on='qseqid', how='inner')
 
     # assign seqs that had no results to [no blast_result]
     no_hits = blast_results[blast_results.sseqid.isnull()]
