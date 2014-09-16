@@ -174,6 +174,12 @@ A csv that is basically a blast results breakdown of the `out`_ output.
 Internal functions
 ------------------
 
+Known bugs
+----------
+
+Tax_ids of valid Blast hits (hits that meet their rank thresholds) may be
+assigned tax_ids of a higher threshold that *could* represent invalid tax_ids
+(tax_ids that may *not* have passed the rank threshold).
 """
 
 import sys
