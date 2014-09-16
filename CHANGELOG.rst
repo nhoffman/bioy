@@ -3,11 +3,14 @@
 ==================
 
 
-next release
+1.8.4-next release
 ============
 
-(features to be included in the next release)
+* classify is now deprecated for the new faster classifier with test cases.  See bioy classifier --help for details.
 
+* Known bugs: Tax_ids of valid Blast hits (hits that meet their rank thresholds) may be assigned 
+              tax_ids of a higher threshold that *could* represent invalid tax_ids (tax_ids that may
+              *not* have passed the rank threshold).
 
 1.8.3
 =====

@@ -1,4 +1,19 @@
-"""
+# This file is part of Bioy
+#
+#    Bioy is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Bioy is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+
+"""DEPRECATED: use the classifier subcommand
 Classify sequences by grouping blast output by matching taxonomic names
 
 Optional grouping by specimen and query sequences
@@ -134,23 +149,6 @@ def build_parser(parser):
     parser.add_argument('--has-header', action = 'store_true',
             help = 'specify this if blast data has a header')
 
-def get_copy_counts(taxids, copy_numbers, taxonomy, ranks):
-    copy_counts = {}
-
-    for t in (taxonomy[i] for i in taxids):
-        tax_id = t['tax_id']
-
-        if tax_id in copy_numbers:
-            copy_counts[tax_id] = float(copy_numbers[tax_id])
-        else:
-            # return the copy_number for the lowest rank tax id available
-            for r in ranks:
-               if t[r] in copy_numbers:
-                    copy_counts[tax_id] = float(copy_numbers[t[r]])
-                    break
-
-    return copy_counts
-
 def coverage(start, end, length):
     return (float(end) - float(start) + 1) / float(length) * 100
 
@@ -248,11 +246,11 @@ def action(args):
         weights = {}
 
     if args.copy_numbers:
-        args.copy_numbers = DictReader(args.copy_numbers)
-        args.copy_numbers = {d['tax_id']:d['median'] for d in args.copy_numbers}
+        copy_numbers = DictReader(args.copy_numbers)
+        copy_numbers = {d['tax_id']:float(d['median']) for d in copy_numbers}
         fieldnames += ['corrected', 'pct_corrected']
     else:
-        args.copy_numbers = {}
+        copy_numbers = {}
 
     # TODO: take out target_rank, hi, low and provide in pipeline using csvmod
     # TODO: option to include tax_ids (default no)
@@ -298,9 +296,6 @@ def action(args):
     rank_thresholds = dict((k, int(v)) for k,v in rank_thresholds)
 
     # rt = {k: int(v) for k, v in (d.split(':') for d in args.group_def)}
-
-    # get reverse order ranks for copy number corrections
-    ranks_rev = list(reversed(sequtils.RANKS))
 
     # group by specimen
     if args.map:
@@ -367,8 +362,6 @@ def action(args):
                 for h in v:
                     taxids.add(h['tax_id'])
 
-        copy_counts = get_copy_counts(taxids, args.copy_numbers, args.taxonomy, ranks_rev)
-
         ### list of assigned ids for count corrections
         assigned_ids = dict()
         for k,v in categories.items():
@@ -379,11 +372,11 @@ def action(args):
         corrected_counts = dict()
         for k,v in categories.items():
             if k is not etc and v:
-                av = mean(copy_counts.get(t, 1) for t in assigned_ids[k])
+                av = mean(copy_numbers.get(t, 1) for t in assigned_ids[k])
                 corrected_counts[k] = ceil(read_counts[k] / av)
 
         # finally take the root value for the etc category
-        corrected_counts[etc] = ceil(read_counts[etc] / float(args.copy_numbers.get('1', 1)))
+        corrected_counts[etc] = ceil(read_counts[etc] / copy_numbers.get('1', 1))
 
         # totals for percent calculations later
         total_reads = sum(v for v in read_counts.values())
