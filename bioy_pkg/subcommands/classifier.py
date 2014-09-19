@@ -591,7 +591,7 @@ def action(args):
     blast_results_len = len(blast_results)
     log.info('joining taxonomy file')
     blast_results = blast_results.join(
-        taxonomy[ranks], on='tax_id', how='inner')
+        taxonomy[['tax_name', 'rank'] + ranks], on='tax_id', how='inner')
     len_diff = blast_results_len - len(blast_results)
     if len_diff:
         log.warn('{} subject sequences dropped without '
@@ -632,10 +632,13 @@ def action(args):
 
     # join with taxonomy for tax_name and rank
     blast_results = blast_results.join(
-        taxonomy[['tax_name', 'rank']], on=ASSIGNMENT_TAX_ID)
+        taxonomy[['tax_name', 'rank']],
+        rsuffix='_assignment',
+        on=ASSIGNMENT_TAX_ID)
 
     blast_results = blast_results.rename(
-        columns={'tax_name': 'assignment_tax_name'})
+        columns={'tax_name_assignment': 'assignment_tax_name',
+                 'rank_assignment': 'assignment_rank'})
 
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.join(qseqids, on='qseqid', how='outer')
@@ -717,7 +720,8 @@ def action(args):
     output['max_percent'] = assignment_stats['pident'].max()
     output['min_percent'] = assignment_stats['pident'].min()
     output['min_threshold'] = assignment_stats['assignment_threshold'].min()
-    output['target_rank'] = assignment_stats['rank'].apply(target_rank, ranks)
+    output['target_rank'] = assignment_stats['assignment_rank'].apply(
+        target_rank, ranks)
 
     # qseqid cluster stats
     clusters = blast_results[['qseqid', 'specimen', 'assignment_hash']]
@@ -785,10 +789,11 @@ def action(args):
             largest = clusters.apply(lambda x: x['weight'].nlargest(1))
             blast_results = blast_results.merge(largest.reset_index())
 
-        columns = ['specimen', 'assignment_id', 'assignment_tax_name',
-                   'pident', 'rank', 'tax_id', ASSIGNMENT_TAX_ID,
-                   'condensed_id', 'accession', 'qseqid', 'sseqid',
-                   'starred', 'assignment_threshold']
+        columns = ['specimen', 'assignment_id', 'tax_name', 'rank',
+                   'assignment_tax_name', 'assignment_rank', 'pident',
+                   'tax_id', ASSIGNMENT_TAX_ID, 'condensed_id',
+                   'accession', 'qseqid', 'sseqid', 'starred',
+                   'assignment_threshold']
 
         with args.details_out as out_details:
             blast_results.to_csv(
