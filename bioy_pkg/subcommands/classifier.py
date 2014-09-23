@@ -319,18 +319,6 @@ def assignment_id(df):
     return df
 
 
-def load_rank_thresholds(
-        path=path.join(datadir, 'rank_thresholds.csv'), usecols=None):
-    """Load a rank-thresholds file.  If no argument is specified the default
-    rank_threshold_defaults.csv file will be loaded.
-    """
-    return read_csv(
-        path,
-        comment='#',
-        usecols=['tax_id'] + usecols,
-        dtype=dict(tax_id=str)).set_index('tax_id')
-
-
 def target_rank(s, ranks):
     """Create aggregate columns for assignments.
     """
@@ -400,32 +388,47 @@ def calculate_pct_references(df, pct_reference):
 
 
 def pct(s):
-    """Calculate pct something
+    """Calculate series pct something
     """
 
     return s / s.sum() * 100
 
 
-def copy_corrections(copy_numbers, blast_results):
+def load_rank_thresholds(
+        path=path.join(datadir, 'rank_thresholds.csv'), usecols=None):
+    """Load a rank-thresholds file.  If no argument is specified the default
+    rank_threshold_defaults.csv file will be loaded.
+    """
+    return read_csv(
+        path,
+        comment='#',
+        usecols=['tax_id'] + usecols,
+        dtype=dict(tax_id=str)).set_index('tax_id')
+
+
+def copy_corrections(copy_numbers, blast_results, user_file=None):
     copy_numbers = read_csv(
         copy_numbers,
         dtype=dict(tax_id=str, median=float),
         usecols=['tax_id', 'median']).set_index('tax_id')
 
-    # get root out (taxid: 1) and set it as the
-    # default correction value with index nan
+    # get root out (taxid: 1) and set it as the default correction value
+
+    # set index nana (no blast result) to the defaul value
     default = copy_numbers.get_value('1', 'median')
-    default = pd.DataFrame(default, index=[None], columns=['median'])
-    copy_numbers = copy_numbers.append(default)
+    default_entry = pd.DataFrame(default, index=[None], columns=['median'])
+    copy_numbers = copy_numbers.append(default_entry)
 
     # do our copy number correction math
     corrections = blast_results[
-        [ASSIGNMENT_TAX_ID, 'specimen']]
+        [ASSIGNMENT_TAX_ID, 'specimen', 'assignment_hash']]
     corrections = corrections.drop_duplicates()
     corrections = corrections.set_index(ASSIGNMENT_TAX_ID)
     corrections = corrections.join(copy_numbers)
+    # any tax_id not present will receive default tax_id
+    corrections['median'] = corrections['median'].fillna(default)
     corrections = corrections.groupby(
-        by=['specimen'], sort=False)
+        by=['specimen', 'assignment_hash'], sort=False)
     corrections = corrections['median'].mean()
     return corrections
 
