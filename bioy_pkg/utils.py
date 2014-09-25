@@ -17,6 +17,7 @@ import os
 import bz2
 import gzip
 import logging
+import pandas
 import re
 import shutil
 import sys
@@ -210,3 +211,15 @@ def groupbyl(li, key=None, as_dict=False):
         return(dict(groups))
     else:
         return groups
+
+
+def read_csv(filename, compression=None, limit=None, **kwargs):
+    """Read a csv file using pandas.read_csv with compression defined by
+    the file suffix unless provided.
+    """
+
+    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
+    compression = compression or suffixes.get(path.splitext(filename)[-1])
+    kwargs['compression'] = compression
+
+    return pandas.read_csv(filename, **kwargs)
