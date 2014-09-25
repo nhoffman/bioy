@@ -77,7 +77,9 @@ def action(args):
             comment='#',
             na_filter=False,
             header=None if args.no_header else 0))
-    df = pandas.concat(df)
+    columns = df[0].columns
+    df = pandas.concat(df, ignore_index=True)
+    df = df[columns]
 
     # must set index after read_csv so the index_col will have dtype as str
     if args.index:
