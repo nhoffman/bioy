@@ -108,14 +108,18 @@ done
 
 # install packages from git repos if necessary
 if [[ ! -z $(grep git+ $REQFILE | grep -v -E '^#') ]]; then
-    pip install -r <(grep git+ $REQFILE | grep -v -E '^#')
+    pip install --requirement <(grep git+ $REQFILE | grep -v -E '^#')
 else
     echo "no packages to install from git repositories"
 fi
 
 # Finally, install editable (-e) packages
 if [[ ! -z $(grep '^-e' $REQFILE) ]]; then
-    pip install -r <(grep '^-e' $REQFILE)
+  if [[ -z $WHEELHOUSE ]]; then
+    pip install --allow-external argparse --requirement <(grep '^-e' $REQFILE)
+  else
+    pip install --allow-external argparse --requirement <(grep '^-e' $REQFILE) --use-wheel --find-links=$WHEELHOUSE
+  fi
 else
   echo "no editable (-e) packages to install"
 fi
