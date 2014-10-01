@@ -83,9 +83,9 @@ source $VENV/bin/activate
 
 # install packages in setup.py from pipy or wheels
 if [[ -z $WHEELHOUSE ]]; then
-  pip install --allow-external argparse $(dirname $SETUPFILE)
+  pip install --allow-external argparse --editable $(dirname $SETUPFILE)
 else
-  pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $(dirname $SETUPFILE)
+  pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE --editable $(dirname $SETUPFILE)
 fi
 
 # ignore commented (#) lines and install python packages from pipy or wheels
