@@ -23,6 +23,7 @@ VENV=$(basename $(pwd))-env
 PYTHON=$(which python)
 PY_VERSION=$($PYTHON -c 'import sys; print "{}.{}.{}".format(*sys.version_info[:3])')
 WHEELSTREET=/usr/local/share/python/wheels
+SETUPFILE=setup.py
 REQFILE=requirements.txt
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
@@ -35,6 +36,7 @@ if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "                    uses WHEELSTREET if defined."
     echo "                    (a suggested alternative location is ~/wheelstreet) [$WHEELSTREET]"
     echo "--requirements    - a file listing python packages to install [$REQFILE]"
+    echo "--setup           - path to setup.py location [$SETUPFILE]"
     exit 0
 fi
 
@@ -44,6 +46,7 @@ while true; do
 	--python ) PYTHON="$2"; shift 2 ;;
 	--wheelstreet ) WHEELSTREET=$(abspath "$2"); shift 2 ;;
 	--requirements ) REQFILE="$2"; shift 2 ;;
+  --setup ) SETUPFILE="$2"; shift 2 ;;
 	* ) break ;;
     esac
 done
@@ -63,66 +66,33 @@ mkdir -p src
 # http://eli.thegreenplace.net/2013/04/20/bootstrapping-virtualenv/
 
 # create virtualenv if necessary
-if [ ! -f ${VENV:?}/bin/activate ]; then
-    # download virtualenv source if necessary
-    if [ ! -f src/virtualenv-${VENV_VERSION}/virtualenv.py ]; then
-	VENV_URL='https://pypi.python.org/packages/source/v/virtualenv'
-	(cd src && \
-	    wget -N ${VENV_URL}/virtualenv-${VENV_VERSION}.tar.gz && \
-	    tar -xf virtualenv-${VENV_VERSION}.tar.gz)
-    fi
-    $PYTHON src/virtualenv-${VENV_VERSION}/virtualenv.py $VENV
-    # $PYTHON src/virtualenv-${VENV_VERSION}/virtualenv.py --relocatable $VENV
+if [ ! -f ${VENV:?}/bin/activate ]; then  
+  # download virtualenv source if necessary
+  if [ ! -f src/virtualenv-${VENV_VERSION}/virtualenv.py ]; then
+    VENV_URL='https://pypi.python.org/packages/source/v/virtualenv'
+    (cd src && \
+      wget -N ${VENV_URL}/virtualenv-${VENV_VERSION}.tar.gz && \
+      tar -xf virtualenv-${VENV_VERSION}.tar.gz)
+  fi
+  $PYTHON src/virtualenv-${VENV_VERSION}/virtualenv.py $VENV
 else
-    echo "found existing virtualenv $VENV"
+  echo "found existing virtualenv $VENV"
 fi
-
-# install required libraries
-# hdf5: tables (PyTables)
-
-# export HDF5_DIR=$(abspath $VENV)
-# dev/install_hdf5.sh --prefix $HDF5_DIR --src $(abspath src)
-
-# # make the above libraries available when the virtualenv is activated
-# if grep -q LD_LIBRARY_PATH $VENV/bin/activate; then
-#     true
-# else
-#     cat >> $VENV/bin/activate <<EOF
-
-# # added by $0
-# LD_LIBRARY_PATH="$VIRTUAL_ENV/lib"
-# export LD_LIBRARY_PATH
-# EOF
-# fi
 
 source $VENV/bin/activate
 
-# install python packages from pipy or wheels (ignore #, git+ and -e lines)
-grep -v -E '^#|git+|^-e' $REQFILE | while read pkg; do
+# install packages in setup.py from pipy or wheels
+if [[ -z $WHEELHOUSE ]]; then
+  pip install --allow-external argparse $(dirname $SETUPFILE)
+else
+  pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $(dirname $SETUPFILE)
+fi
+
+# ignore commented (#) lines and install python packages from pipy or wheels
+grep -v -E '^#' $REQFILE | while read pkg; do
     if [[ -z $WHEELHOUSE ]]; then
       pip install --allow-external argparse $pkg
     else
       pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $pkg
     fi
 done
-
-# install packages from git repos if necessary
-if [[ ! -z $(grep git+ $REQFILE | grep -v -E '^#') ]]; then
-    pip install --requirement <(grep git+ $REQFILE | grep -v -E '^#')
-else
-    echo "no packages to install from git repositories"
-fi
-
-# Finally, install editable (-e) packages
-if [[ ! -z $(grep '^-e' $REQFILE) ]]; then
-  if [[ -z $WHEELHOUSE ]]; then
-    pip install --allow-external argparse --requirement <(grep '^-e' $REQFILE)
-  else
-    pip install --allow-external argparse --requirement <(grep '^-e' $REQFILE) --use-wheel --find-links=$WHEELHOUSE
-  fi
-else
-  echo "no editable (-e) packages to install"
-fi
-
-# correct any more shebang lines
-# virtualenv --relocatable $VENV
