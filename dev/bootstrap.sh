@@ -97,12 +97,12 @@ fi
 
 source $VENV/bin/activate
 
-# install python packages from pipy or wheels
+# install python packages from pipy or wheels (ignore #, git+ and -e lines)
 grep -v -E '^#|git+|^-e' $REQFILE | while read pkg; do
     if [[ -z $WHEELHOUSE ]]; then
-	pip install --allow-external argparse $pkg
+      pip install --allow-external argparse $pkg
     else
-	pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $pkg
+      pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $pkg
     fi
 done
 
@@ -111,6 +111,13 @@ if [[ ! -z $(grep git+ $REQFILE | grep -v -E '^#') ]]; then
     pip install -r <(grep git+ $REQFILE | grep -v -E '^#')
 else
     echo "no packages to install from git repositories"
+fi
+
+# Finally, install editable (-e) packages
+if [[ ! -z $(grep '^-e' $REQFILE) ]]; then
+    pip install -r <(grep '^-e' $REQFILE)
+else
+  echo "no editable (-e) packages to install"
 fi
 
 # correct any more shebang lines
