@@ -12,6 +12,7 @@ if [[ -n $VIRTUAL_ENV ]]; then
 fi
 
 set -e
+set -x
 
 abspath(){
     python -c "import os; print os.path.abspath(\"$1\")"
@@ -25,6 +26,7 @@ PY_VERSION=$($PYTHON -c 'import sys; print "{}.{}.{}".format(*sys.version_info[:
 WHEELSTREET=/usr/local/share/python/wheels
 SETUPFILE=setup.py
 REQFILE=requirements.txt
+EDITABLE=false
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "Create a virtualenv and install all pipeline dependencies"
@@ -42,12 +44,38 @@ fi
 
 while true; do
     case "$1" in
-	--venv ) VENV="$2"; shift 2 ;;
-	--python ) PYTHON="$2"; shift 2 ;;
-	--wheelstreet ) WHEELSTREET=$(abspath "$2"); shift 2 ;;
-	--requirements ) REQFILE="$2"; shift 2 ;;
-  --setup ) SETUPFILE="$2"; shift 2 ;;
-	* ) break ;;
+      --venv)
+        VENV="$2"
+        shift 2
+        ;;
+
+      --python) 
+        PYTHON="$2"
+        shift 2
+        ;;
+
+      --wheelstreet)
+        WHEELSTREET=$(abspath "$2")
+        shift 2 ;;
+
+      --requirements)
+        REQFILE="$2"
+        shift 2
+        ;;
+
+      --setup) 
+        SETUPFILE="$2"
+        shift 2
+        ;;
+
+      --editable) 
+        EDITABLE=true
+        shift 1
+        ;;
+
+      *) # else
+        break
+        ;;
     esac
 done
 
@@ -81,11 +109,18 @@ fi
 
 source $VENV/bin/activate
 
+# if dir is editable
+if $EDITABLE ; then
+  SETUPDIR="--editable $(dirname $SETUPFILE)"
+else
+  SETUPDIR="$(dirname $SETUPFILE)"
+fi
+
 # install packages in setup.py from pipy or wheels
 if [[ -z $WHEELHOUSE ]]; then
-  pip install --allow-external argparse --editable $(dirname $SETUPFILE)
+  pip install --allow-external argparse $SETUPDIR
 else
-  pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE --editable $(dirname $SETUPFILE)
+  pip install --allow-external argparse --use-wheel --find-links=$WHEELHOUSE $SETUPDIR
 fi
 
 # ignore commented (#) lines and install python packages from pipy or wheels
