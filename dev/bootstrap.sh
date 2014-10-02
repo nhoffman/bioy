@@ -12,7 +12,6 @@ if [[ -n $VIRTUAL_ENV ]]; then
 fi
 
 set -e
-set -x
 
 abspath(){
     python -c "import os; print os.path.abspath(\"$1\")"
