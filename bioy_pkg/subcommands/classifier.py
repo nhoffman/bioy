@@ -520,6 +520,8 @@ def build_parser(parser):
         '--pct-reference', action='store_true',
         help="""include column with percent sseqids per assignment_id
         (NOT IMPLEMENTED)""")
+    parser.add_argument(
+        '--limit', type=int, help='limit number of blast results')
 
 
 def action(args):
@@ -538,7 +540,8 @@ def action(args):
         names=names,
         na_filter=True,  # False is faster
         header=header,
-        usecols=usecols)
+        usecols=usecols,
+        nrows=args.limit)
 
     # get a set of qseqids for identifying [no blast hits] after filtering
     qseqids = blast_results[['qseqid']].drop_duplicates().set_index('qseqid')
