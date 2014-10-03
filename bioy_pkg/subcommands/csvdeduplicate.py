@@ -41,10 +41,10 @@ def build_parser(parser):
     parser.add_argument(
         '--limit', type=int, help='Limit number of rows read from each csv.')
     parser.add_argument(
-        '--index',
+        '--columns',
         metavar='COLS',
         help=('Comma delimited list of column '
-              'names or numbers to index before deduplicating.'))
+              'names or numbers to only consider in deduplication.'))
     parser.add_argument(
         '--no-header',
         action='store_true',
@@ -82,8 +82,8 @@ def action(args):
     df = df[columns]
 
     # must set index after read_csv so the index_col will have dtype as str
-    if args.index:
-        index = [get_column(i, df.columns) for i in args.index.split(',')]
+    if args.columns:
+        index = [get_column(i, df.columns) for i in args.columns.split(',')]
         if len(index) == 1:
             index = index[0]
         df = df.set_index(index, drop=True)
@@ -92,4 +92,4 @@ def action(args):
     else:
         df = df.drop_duplicates()
 
-    df.to_csv(args.out, index=args.index)
+    df.to_csv(args.out, index=args.columns)
