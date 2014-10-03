@@ -399,6 +399,7 @@ def load_rank_thresholds(
     """Load a rank-thresholds file.  If no argument is specified the default
     rank_threshold_defaults.csv file will be loaded.
     """
+
     return read_csv(
         path,
         comment='#',
@@ -730,25 +731,30 @@ def action(args):
         target_rank, ranks)
 
     # qseqid cluster stats
-    clusters = blast_results[['qseqid', 'specimen', 'assignment_hash']]
-    clusters = clusters.drop_duplicates().set_index('qseqid')
+    weights = blast_results[
+        ['qseqid', 'specimen', 'assignment_hash', 'assignment_threshold']]
+    weights = weights.drop_duplicates().set_index('qseqid')
 
     if args.weights:
-        weights = read_csv(
+        weights_file = read_csv(
             args.weights,
             names=['qseqid', 'weight'],
             dtype=dict(qseqid=str, weight=float),
             index_col='qseqid')
-        clusters = clusters.join(weights)
+        weights = weights.join(weights_file)
         # enforce weight dtype as float and unlisted qseq's to weight of 1.0
-        clusters['weight'] = clusters['weight'].fillna(1.0).astype(float)
+        weights['weight'] = weights['weight'].fillna(1.0).astype(float)
     else:
-        clusters['weight'] = 1.0
+        weights['weight'] = 1.0
 
-    clusters = clusters.groupby(by=['specimen', 'assignment_hash'], sort=False)
+    cluster_stats = weights[['specimen', 'assignment_hash', 'weight']]
+    cluster_stats = cluster_stats.reset_index()
+    cluster_stats = cluster_stats.drop_duplicates()
+    cluster_stats = cluster_stats.groupby(
+        by=['specimen', 'assignment_hash'], sort=False)
 
-    output['reads'] = clusters['weight'].sum()
-    output['clusters'] = clusters.size()
+    output['reads'] = cluster_stats['weight'].sum()
+    output['clusters'] = cluster_stats.size()
 
     # specimen level stats
     specimen_stats = output.groupby(level='specimen', sort=False)
@@ -792,8 +798,17 @@ def action(args):
         blast_results = blast_results.merge(output.reset_index(), how='left')
 
         if not args.details_full:
-            largest = clusters.apply(lambda x: x['weight'].nlargest(1))
-            blast_results = blast_results.merge(largest.reset_index())
+            # groupby will drop NA values so we must fill them with 0
+            weights['assignment_threshold'] = weights[
+                'assignment_threshold'].fillna(0)
+            largest = weights.groupby(
+                by=['specimen', 'assignment_hash', 'assignment_threshold'],
+                sort=False)
+            largest = largest.apply(lambda x: x['weight'].nlargest(1))
+            largest = largest.reset_index()
+            # assignment_threshold will conflict with blast_results NA values
+            largest = largest.drop('assignment_threshold', axis=1)
+            blast_results = blast_results.merge(largest)
 
         columns = ['specimen', 'assignment_id', 'tax_name', 'rank',
                    'assignment_tax_name', 'assignment_rank', 'pident',
