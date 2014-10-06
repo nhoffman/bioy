@@ -23,39 +23,40 @@ import sys
 from itertools import izip, ifilter, imap
 from subprocess import Popen, PIPE
 from csv import DictWriter
-from cStringIO import StringIO
 
 from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT
 from bioy_pkg.utils import Opener
 
 log = logging.getLogger(__name__)
 
+
 def build_parser(parser):
     parser.add_argument('fasta',
-            default = '-',
-            help = 'input fasta file')
+                        default='-',
+                        help='input fasta file')
     parser.add_argument('-o', '--out',
-            type = Opener('w'),
-            default = sys.stdout,
-            help = 'tabulated BLAST results with the following headers {}'.format(BLAST_FORMAT))
+                        type=Opener('w'),
+                        default=sys.stdout,
+                        help=('tabulated BLAST results with the following headers {}'
+                              ).format(BLAST_FORMAT))
     parser.add_argument('-d', '--database',
-            help = 'a blast database')
+                        help='a blast database')
     parser.add_argument('--header',
-            action = 'store_true',
-            help = 'output header')
+                        action='store_true',
+                        help='output header')
     parser.add_argument('--strand',
-            default = 'plus',
-            choices = ['plus', 'minus', 'both'],
-            help = """query strand(s) to search against database/subject.
+                        default='plus',
+                        choices=['plus', 'minus', 'both'],
+                        help="""query strand(s) to search against database/subject.
                       default = %(default)s""")
     parser.add_argument('--id',
-            default = 0.9,
-            type = float,
-            help = 'minimum identity for accepted values default [%(default)s]')
+                        default=0.9,
+                        type=float,
+                        help='minimum identity for accepted values default [%(default)s]')
     parser.add_argument('--max',
-            help = 'maximum number of alignments to keep default = 1')
-    parser.add_argument('--usearch', default = 'usearch6_64',
-            help = 'name of usearch executable')
+                        help='maximum number of alignments to keep default = 1')
+    parser.add_argument('--usearch', default='usearch6_64',
+                        help='name of usearch executable')
 
 
 def action(args):
@@ -72,15 +73,15 @@ def action(args):
 
     log.debug(' '.join(command))
 
-    usearch = Popen(command, stdout = PIPE, stderr = PIPE)
+    usearch = Popen(command, stdout=PIPE, stderr=PIPE)
 
     lines = imap(lambda l: l.strip().split('\t'), usearch.stdout)
 
     # usearch has strange commenting at the top it's alignment.
     # we just just want the lines seperated by 12 tabs
     lines = ifilter(lambda l: len(l) == 12, lines)
-    lines = imap(lambda l:
-            l[:3] + [l[6], l[7] , (int(l[7]) - int(l[6]) + 1)], lines)
+    lines = imap(lambda l: l[:3] + [l[6], l[7], (int(l[7]) - int(l[6]) + 1)], lines)
+
     lines = imap(lambda l: izip(BLAST_HEADER, l), lines)
     lines = imap(lambda l: dict(l), lines)
 
@@ -88,16 +89,15 @@ def action(args):
 
     if isinstance(args.coverage, float):
         for l in lines:
-            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
-                    / float(l['qlen']) * 100
+            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) / float(l['qlen']) * 100
             l['coverage'] = '{0:.2f}'.format(l['coverage'])
         lines = [l for l in lines if float(l['coverage']) >= args.coverage]
 
         fieldnames += ['coverage']
 
     out = DictWriter(args.out,
-                     fieldnames = BLAST_HEADER,
-                     extrasaction = 'ignore')
+                     fieldnames=BLAST_HEADER,
+                     extrasaction='ignore')
 
     if args.header:
         out.writeheader()
