@@ -108,11 +108,13 @@ def action(args):
 
         usearch_proc = Popen(command, stderr=PIPE, stdout=PIPE)
 
-        if usearch_proc.returncode != 0:
-            log.error(usearch_proc.stderr.read())
-            return usearch_proc.returncode
+        errmsg = usearch_proc.stderr.read()
 
         usearch_proc.communicate()
+        if usearch_proc.returncode != 0:
+            log.error(errmsg)
+            return usearch_proc.returncode
+
         tfile.flush()
         tfile.seek(0)
         results = parse_usearch(tfile)
