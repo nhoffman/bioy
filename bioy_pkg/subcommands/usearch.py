@@ -19,13 +19,13 @@ Run usearch global and produce classify friendly output
 
 import logging
 import sys
+import csv
 
-from itertools import izip, ifilter, imap
+from itertools import ifilter
 from subprocess import Popen, PIPE
-from csv import DictWriter
 
-from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT
-from bioy_pkg.utils import Opener
+from bioy_pkg.sequtils import BLAST_HEADER, BLAST_HEADERS, BLAST_FORMAT
+from bioy_pkg.utils import Opener, named_tempfile
 
 log = logging.getLogger(__name__)
 
@@ -53,57 +53,76 @@ def build_parser(parser):
                         default=0.9,
                         type=float,
                         help='minimum identity for accepted values default [%(default)s]')
+    parser.add_argument('--min-coverage', type=float,
+                        help='minimum percent coverage for each alignment [%(default)s]')
     parser.add_argument('--max',
                         help='maximum number of alignments to keep default = 1')
     parser.add_argument('--usearch', default='usearch6_64',
                         help='name of usearch executable')
 
 
+def parse_usearch(lines):
+    """Return an iterable of dicts from output of 'usearch -blast6out'. See
+    http://drive5.com/usearch/manual/blast6out.html for output format.
+
+    Coverage is calculated relative to the length of the query sequence.
+    """
+
+    fieldnames = BLAST_HEADERS[:]
+    fieldnames[fieldnames.index('length')] = 'qlen'
+    reader = csv.DictReader(lines, fieldnames=fieldnames, delimiter='\t')
+
+    for d in reader:
+        d['coverage'] = 100.0 * (float(d['qend']) - float(d['qstart']) + 1) / float(d['qlen'])
+
+        yield d
+
+
+def test_parse_usearch():
+
+    lines = """Actinomyces|6|IBRIB9O01DNL9H	S003710619	99.1	442	4	0	1	442	1	1501	*	*
+Actinomyces|2|IBRIB9O01B0977	S002449772	98.9	445	3	0	1	443	1	1394	*	*
+Actinomyces|3|IBRIB9O01AV846	S002952986	99.1	447	2	0	1	447	1	1377	*	*""".splitlines()
+
+    result = list(parse_usearch(lines))
+    assert len(result) == 3
+    for k in BLAST_HEADER:
+        assert k in result[0]
+
+
 def action(args):
-    command = [args.usearch]
-    command += ['-usearch_global', args.fasta]
-    command += ['-threads', str(args.threads)]
-    command += ['-id', str(args.id)]
-    command += ['-db', args.database]
-    command += ['-strand', args.strand]
-    command += ['-blast6out', '/dev/stdout']
 
-    if args.max:
-        command += ['-maxaccepts', args.max]
+    with named_tempfile('rw') as tfile:
+        command = [args.usearch,
+                   '-usearch_global', args.fasta,
+                   '-threads', str(args.threads),
+                   '-id', str(args.id),
+                   '-db', args.database,
+                   '-strand', args.strand,
+                   '-blast6out', tfile.name]
 
-    log.debug(' '.join(command))
+        if args.max:
+            command += ['-maxaccepts', args.max]
 
-    usearch = Popen(command, stdout=PIPE, stderr=PIPE)
+        log.info(' '.join(command))
 
-    lines = imap(lambda l: l.strip().split('\t'), usearch.stdout)
+        usearch_proc = Popen(command, stderr=PIPE, stdout=PIPE)
 
-    # usearch has strange commenting at the top it's alignment.
-    # we just just want the lines seperated by 12 tabs
-    lines = ifilter(lambda l: len(l) == 12, lines)
-    lines = imap(lambda l: l[:3] + [l[6], l[7], (int(l[7]) - int(l[6]) + 1)], lines)
+        if usearch_proc.returncode != 0:
+            log.error(usearch_proc.stderr.read())
+            return usearch_proc.returncode
 
-    lines = imap(lambda l: izip(BLAST_HEADER, l), lines)
-    lines = imap(lambda l: dict(l), lines)
+        usearch_proc.communicate()
+        tfile.flush()
+        tfile.seek(0)
+        results = parse_usearch(tfile)
 
-    fieldnames = BLAST_HEADER
+        if args.min_coverage:
+            results = ifilter(lambda d: d['coverage'] >= args.min_coverage, results)
 
-    if isinstance(args.coverage, float):
-        for l in lines:
-            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) / float(l['qlen']) * 100
-            l['coverage'] = '{0:.2f}'.format(l['coverage'])
-        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
+        writer = csv.DictWriter(args.out, fieldnames=BLAST_HEADER, extrasaction='ignore')
 
-        fieldnames += ['coverage']
+        if args.header:
+            writer.writeheader()
 
-    out = DictWriter(args.out,
-                     fieldnames=BLAST_HEADER,
-                     extrasaction='ignore')
-
-    if args.header:
-        out.writeheader()
-
-    out.writerows(lines)
-
-    err = usearch.stderr.read().strip()
-    if err:
-        log.error(err)
+        writer.writerows(results)
