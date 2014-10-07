@@ -21,6 +21,8 @@ import pandas
 import re
 import shutil
 import sys
+import contextlib
+import tempfile
 
 from itertools import takewhile, izip_longest, groupby
 from csv import DictReader
@@ -223,3 +225,19 @@ def read_csv(filename, compression=None, limit=None, **kwargs):
     kwargs['compression'] = compression
 
     return pandas.read_csv(filename, **kwargs)
+
+
+@contextlib.contextmanager
+def named_tempfile(*args, **kwargs):
+    """Near-clone of tempfile.NamedTemporaryFile, but the file is deleted
+    when the context manager exits, rather than when it's closed.
+
+    """
+
+    kwargs['delete'] = False
+    tf = tempfile.NamedTemporaryFile(*args, **kwargs)
+    try:
+        with tf:
+            yield tf
+    finally:
+        os.unlink(tf.name)
