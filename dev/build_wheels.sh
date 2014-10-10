@@ -18,7 +18,7 @@ REQFILE=requirements.txt
 PYTHON=$(which python)
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
-    echo "Create a virtualenv and install all pipeline dependencies"
+    echo "Create a directory and compile some wheels"
     echo "Options:"
     echo "--python          - path to an alternative python interpreter [$PYTHON]"
     echo "--wheelstreet     - path to directory containing python wheels; wheel files will be"
@@ -46,7 +46,7 @@ fi
 TAG=$($PYTHON -c 'import sys; print "{}.{}.{}".format(*sys.version_info[:3])')
 PY_VER="${TAG:0:3}"
 PY_MAJOR="${PY_VER:0:1}"
-VENV_VERSION=1.11.4
+VENV_VERSION=1.11.6
 
 WHEELHOUSE="$WHEELSTREET/$TAG"  # wheels for this python version
 CACHE="$WHEELSTREET/cache/$TAG"
@@ -56,19 +56,26 @@ SRC="$WHEELSTREET/src"
 mkdir -p "$CACHE"
 mkdir -p "$WHEELHOUSE"
 
-# create virtualenv if necessary
-if [ ! -f $VENV/bin/activate ]; then
-    # download virtualenv source if necessary
-    if [ ! -f $CACHE/virtualenv-${VENV_VERSION}/virtualenv.py ]; then
-	VENV_URL='https://pypi.python.org/packages/source/v/virtualenv'
-	(cd $CACHE && \
-	    wget -N ${VENV_URL}/virtualenv-${VENV_VERSION}.tar.gz && \
-	    tar -xf virtualenv-${VENV_VERSION}.tar.gz)
+# create virtualenv if necessary, downloading source if available
+# version is not up to date
+VENV_URL="https://pypi.python.org/packages/source/v/virtualenv"
+if [[ ! -f "${VENV:?}/bin/activate" ]]; then
+    # if the system virtualenv is up to date, use it
+    if check_version virtualenv $VENV_VERSION; then
+	echo "using $(which virtualenv) (version $(virtualenv --version))"
+    	virtualenv "$VENV"
+    else
+	echo "downloading virtualenv version $VENV_VERSION"
+	if [[ ! -f src/virtualenv-${VENV_VERSION}/virtualenv.py ]]; then
+	    mkdir -p src
+	    (cd src && \
+		wget -N ${VENV_URL}/virtualenv-${VENV_VERSION}.tar.gz && \
+		tar -xf virtualenv-${VENV_VERSION}.tar.gz)
+	fi
+	"$PYTHON" src/virtualenv-${VENV_VERSION}/virtualenv.py "$VENV"
     fi
-    $PYTHON $CACHE/virtualenv-${VENV_VERSION}/virtualenv.py $VENV
-    # $PYTHON $CACHE/virtualenv-${VENV_VERSION}/virtualenv.py --relocatable $VENV
 else
-    echo "found existing virtualenv $VENV"
+    echo "virtualenv $VENV already exists"
 fi
 
 source $VENV/bin/activate
