@@ -58,6 +58,15 @@ SRC="$WHEELSTREET/src"
 mkdir -p "$CACHE"
 mkdir -p "$WHEELHOUSE"
 
+check_version(){
+    # usage: check_version module version-string
+    "$PYTHON" <<EOF 2> /dev/null
+import $1
+from distutils.version import LooseVersion
+assert LooseVersion($1.__version__) >= LooseVersion("$2")
+EOF
+}
+
 # create virtualenv if necessary, downloading source if available
 # version is not up to date
 VENV_URL="https://pypi.python.org/packages/source/v/virtualenv"
