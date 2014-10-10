@@ -19,6 +19,8 @@ PYTHON=$(which python)
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "Create a directory and compile some wheels"
+    echo "example usage:"
+    echo "build_wheels.sh --wheelstreet ~/WHEELSTREET --requirements requirements.txt"
     echo "Options:"
     echo "--python          - path to an alternative python interpreter [$PYTHON]"
     echo "--wheelstreet     - path to directory containing python wheels; wheel files will be"
