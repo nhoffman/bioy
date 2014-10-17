@@ -65,11 +65,17 @@ def build_parser(parser):
             help = '')
     parser.add_argument('--coverage', type = float,
             help = 'minimum coverage for accepted values [%(default)s]')
+    parser.add_argument('--remote', action='store_true',
+                        help = 'execute query on remote NCBI server')
 
 def action(args):
+
     command = ['blastn']
     command += ['-query', args.fasta]
-    command += ['-num_threads', str(args.threads)]
+    if args.remote:
+        command += ['-remote']
+    else:
+        command += ['-num_threads', str(args.threads)]
     command += ['-perc_identity', args.id]
     command += ['-outfmt', BLAST_FORMAT]
     command += ['-db', args.database]
