@@ -39,8 +39,8 @@ def build_parser(parser):
             type = Opener('w'),
             default = sys.stdout,
             help = 'tabulated BLAST results with the following headers {}'.format(BLAST_HEADER))
-    parser.add_argument('-d', '--database',
-            help = 'a blast database')
+    parser.add_argument('-d', '--database', required=True,
+            help = 'blast database path for local blasts, or one of "nt" or "nr" if remote')
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
