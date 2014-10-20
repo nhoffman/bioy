@@ -20,19 +20,10 @@ Fetch nucleotide sequences from NCBI using sequence identifiers
 import logging
 import sys
 
-#from csv import DictWriter
-#from cStringIO import StringIO
-#from itertools import chain, groupby
-#from operator import itemgetter
-#from subprocess import Popen, PIPE
-
 from Bio import Entrez
 from Bio import SeqIO
 
-#from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT, fastalite
 from bioy_pkg.utils import opener, Opener
-
-log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('sseqids', nargs='?', type=Opener('r'),
@@ -58,11 +49,8 @@ def action(args):
     
     if args.seqinfo:
         args.seqinfo.write(','.join(['gi','gb','taxid','orgname']) + '\n')
+    # Note: some sequences may actually be proteins and use a larger alphabet than just ACTG
     for record in records:
-        if record['TSeq_seqtype'].attributes['value'] != 'nucleotide':
-            if record['TSeq_seqtype'].attributes['value'] not in ['protein']:
-                print("Skipping {} record".format(record['TSeq_seqtype'].attributes['value']))
-            continue
         gi = record['TSeq_gi']
         gb = record['TSeq_accver']
         taxid = record['TSeq_taxid']
@@ -70,8 +58,8 @@ def action(args):
         fullname = record['TSeq_defline']
         seq = record['TSeq_sequence']
         faheader = '|'.join(['>gi', gi, 'gb', gb, ''])+' '+fullname
-        args.outfasta.write(faheader+'\n')
-        args.outfasta.write(seq+'\n')
+        args.outfasta.write(faheader + '\n')
+        args.outfasta.write(seq + '\n')
         if args.seqinfo:
             row = ','.join([gi, gb, taxid, orgname]) + '\n'
             args.seqinfo.write(row)
