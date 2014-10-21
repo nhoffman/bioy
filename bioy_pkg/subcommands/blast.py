@@ -115,11 +115,11 @@ def action(args):
     # make into dict
     lines = [dict(l) for l in lines]
 
+    for l in lines:
+        l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                / float(l['qlen']) * 100
+        l['coverage'] = '{0:.2f}'.format(l['coverage'])
     if isinstance(args.coverage, float):
-        for l in lines:
-            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
-                    / float(l['qlen']) * 100
-            l['coverage'] = '{0:.2f}'.format(l['coverage'])
         lines = [l for l in lines if float(l['coverage']) >= args.coverage]
 
     if args.nohits:
