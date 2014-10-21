@@ -41,6 +41,7 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
         args = ['--outfasta', fasta_out,
                 '--seqinfo', info_out,
+                '--email', 'ngh2@uw.edu',
                 sseqids]
 
         log.info(self.log_info.format(' '.join(map(str, args))))
@@ -69,6 +70,7 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
         args = ['--outfasta', fasta_out,
                 '--seqinfo', info_out,
+                '--email', 'ngh2@uw.edu',
                 sseqids]
 
         log.info(self.log_info.format(' '.join(map(str, args))))

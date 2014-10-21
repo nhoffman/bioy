@@ -39,8 +39,10 @@ def build_parser(parser):
             type = Opener('w'),
             default = sys.stdout,
             help = 'tabulated BLAST results with the following headers {}'.format(BLAST_HEADER))
-    parser.add_argument('-d', '--database', required=True,
-            help = 'blast database path for local blasts, or one of "nt" or "nr" if remote')
+    parser.add_argument('-d', '--database',
+            help = 'blast database path for local blasts')
+    parser.add_argument('-r', '--remote-database', choices=['nt','nr'],
+            help = 'type of remote database to use, if remote flagged provided')
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
@@ -70,15 +72,23 @@ def build_parser(parser):
 
 def action(args):
 
+    if args.remote and not args.remote_database:
+        log.error("bioy blast: error: please specify a remote database")
+        return
+    elif not args.remote and not args.database:
+        log.error("bioy blast: error: please specify path to local database")
+        return
+
     command = ['blastn']
     command += ['-query', args.fasta]
     if args.remote:
         command += ['-remote']
+        command += ['-db', args.remote_database]
     else:
+        command += ['-db', args.database]
         command += ['-num_threads', str(args.threads)]
     command += ['-perc_identity', args.id]
     command += ['-outfmt', BLAST_FORMAT]
-    command += ['-db', args.database]
     command += ['-strand', args.strand]
 
     if args.max:

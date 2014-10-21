@@ -14,7 +14,8 @@
 #    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-Fetch nucleotide sequences from NCBI using sequence identifiers
+Fetch sequences from NCBI's nucleotide database using sequence identifiers (gi or gb)
+Output is a multi-fasta of retrieved sequences and a corresponding sequence info (csv) file
 """
 
 import logging
@@ -23,23 +24,26 @@ import sys
 from Bio import Entrez
 from Bio import SeqIO
 
+from bioy_pkg.sequtils import FETCH_HEADERS
 from bioy_pkg.utils import opener, Opener
 
 def build_parser(parser):
     parser.add_argument('sseqids', nargs='?', type=Opener('r'),
             default = sys.stdin,
-            help = 'input file, one gi per line')
+            help = 'input file, one identifier (gi or gb number) per line')
     parser.add_argument('-o', '--outfasta',
             type = Opener('w'),
             default = sys.stdout,
-            help = 'Multi-fasta')
+            help = 'multi-fasta, one sequence for each provided identifier')
     parser.add_argument('-i', '--seqinfo',
             type= Opener('w'),
-            help = "Optionally output seqinfo for each sequence")
+            help = "optionally output seqinfo for each sequence with the following headers {}".format(FETCH_HEADERS))
+    parser.add_argument('-e', '--email', required=True,
+            help = "users of NCBI Entrez API should provide email.  if usage is excessive, ncbi may block access to its API")
 
 def action(args):
 
-    Entrez.email = "ngh2@uw.edu"
+    Entrez.email = args.email
 
     # cat bioyblast.out | cut -d, -f2 | cut -d\| -f2 > sseqids
     ids = [gi.strip() for gi in args.sseqids]
@@ -48,7 +52,8 @@ def action(args):
     records = Entrez.read(handle)
     
     if args.seqinfo:
-        args.seqinfo.write(','.join(['gi','gb','taxid','orgname']) + '\n')
+        args.seqinfo.write(','.join(FETCH_HEADERS) + '\n')
+
     # Note: some sequences may actually be proteins and use a larger alphabet than just ACTG
     for record in records:
         gi = record['TSeq_gi']
