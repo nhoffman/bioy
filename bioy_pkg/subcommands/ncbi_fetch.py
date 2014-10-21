@@ -36,8 +36,10 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'multi-fasta, one sequence for each provided identifier')
     parser.add_argument('-i', '--seqinfo',
-            type= Opener('w'),
-            help = "optionally output seqinfo for each sequence with the following headers {}".format(FETCH_HEADERS))
+            type = Opener('w'),
+            help = "optionally output seqinfo for each sequence : {}".format(FETCH_HEADERS))
+    parser.add_argument('-h', '--no-header',
+            help = "suppress seqinfo header")
     parser.add_argument('-e', '--email', required=True,
             help = "users of NCBI Entrez API should provide email.  if usage is excessive, ncbi may block access to its API")
 
@@ -51,7 +53,7 @@ def action(args):
     handle = Entrez.efetch(db="nucleotide", id=','.join(ids), rettype="fasta", retmode="xml")
     records = Entrez.read(handle)
     
-    if args.seqinfo:
+    if args.seqinfo and not args.no_header:
         args.seqinfo.write(','.join(FETCH_HEADERS) + '\n')
 
     # Note: some sequences may actually be proteins and use a larger alphabet than just ACTG
