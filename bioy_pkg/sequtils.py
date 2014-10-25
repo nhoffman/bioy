@@ -873,34 +873,25 @@ def correct_copy_numbers(assignments, copy_numbers):
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 
 
-def _readfasta(handle):
+def fastalite(handle, limit=None):
     """
-    Lightweight fasta parser. Returns iterator of namedtuple instances
-    with fields (id, description, seq) given file-like object `handle`.
+    Return a sequence of namedtupe objects given fasta format open
+    file-like object `handle`. Sequence is a list if `readfile` is
+    True, an iterator otherwise.
     """
-
-    handle = handle.read()
-
-    if handle:
-        for h in handle.lstrip('> ').split('\n>'):
-            part = h.find('\n')
-            idee = h[:part].split()[0]
-            desc = h[:part]
-            seq = ''.join(h[part:].split())
-            yield SeqLite(idee, desc, seq)
-
-
-def _iterfasta(handle):
-    """
-    Lightweight fasta parser. Returns iterator of namedtuple instances
-    with fields (id, description, seq) given file-like object `handle`.
-    """
+    limit = limit or -1
 
     name, seq = '', ''
     for line in handle:
         if line.startswith('>'):
+            if limit != 0:
+                limit -= 1
+            else:
+                break
+
             if name:
                 yield SeqLite(name.split()[0], name, seq)
+
             name, seq = line[1:].strip(), ''
         else:
             seq += line.strip()
@@ -908,14 +899,6 @@ def _iterfasta(handle):
     if name and seq:
         yield SeqLite(name.split()[0], name, seq)
 
-
-def fastalite(handle, readfile=False):
-    """
-    Return a sequence of namedtupe objects given fasta format open
-    file-like object `handle`. Sequence is a list if `readfile` is
-    True, an iterator otherwise.
-    """
-    return _readfasta(handle) if readfile else _iterfasta(handle)
 
 # Taken from Connor McCoy's Deenurp
 
