@@ -25,5 +25,6 @@ setup(author='Noah Hoffman',
       install_requires=[
           'numpy>=1.8.1',
           'pandas>=0.14.1',
-          'biopython>=1.6.3'
+          'biopython>=1.6.3',
+          'matplotlib'
       ])
