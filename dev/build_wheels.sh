@@ -15,18 +15,20 @@ else
 fi
 
 REQFILE=requirements.txt
+PACKAGE=
 PYTHON=$(which python)
 
 if [[ $1 == '-h' || $1 == '--help' ]]; then
     echo "Create a directory and compile some wheels"
     echo "example usage:"
-    echo "build_wheels.sh --wheelstreet ~/WHEELSTREET --requirements requirements.txt"
+    echo "build_wheels.sh --wheelstreet ~/WHEELSTREET --requirements requirements.txt --package name"
     echo "Options:"
     echo "--python          - path to an alternative python interpreter [$PYTHON]"
     echo "--wheelstreet     - path to directory containing python wheels; wheel files will be"
     echo "                    in a subdirectory named according to the python interpreter version"
     echo "                    (eg '2.7.5') [$WHEELSTREET]"
-    echo "--requirements    - an alternative requiremets file [$REQFILE]"
+    echo "--requirements    - an alternative requiremets file [$REQFILE] (optional)"
+    echo "--package         - build wheel from single packag (optional)"
     exit 0
 fi
 
@@ -35,12 +37,13 @@ while true; do
 	--python ) PYTHON="$2"; shift 2 ;;
 	--wheelstreet ) WHEELSTREET=$(abspath "$2"); shift 2 ;;
 	--requirements ) REQFILE="$2"; shift 2 ;;
+  --package ) PACKAGE="$2"; shift 2 ;;
 	* ) break ;;
     esac
 done
 
-if [[ ! -f "$REQFILE" ]]; then
-    echo "Cannot find requirements file named $REQFILE"
+if [ -z "$PACKAGE" ] && [ ! -f "$REQFILE" ]; then
+    echo "Package name not specified and cannot find requirements file named $REQFILE"
     exit 1
 fi
 
@@ -95,7 +98,9 @@ source $VENV/bin/activate
 pip install --download-cache $CACHE wheel
 
 # put the requirements file in the wheelhouse
-cp $REQFILE $WHEELHOUSE
+if [ -f "$REQFILE" ]; then
+  cp $REQFILE $WHEELHOUSE
+fi
 
 # install and build the wheels; if a package is installed from pipy in
 # the form of a wheel, copy it from the cache into the wheelhouse.
@@ -117,26 +122,36 @@ get_wheels_from_cache(){
 # dev/install_hdf5.sh --prefix $VENV --src $SRC
 # export HDF5_DIR=$VENV
 
-grep -v -E '^#|^-e|git\+' $REQFILE | while read pkg; do
+if [ -f "$REQFILE" ]; then
+  grep -v -E '^#|^-e|git\+' $REQFILE | while read pkg; do
+      # --find-links avoids rebuilding existing wheels
+      pip wheel $pkg \
+        --download-cache $CACHE \
+        --use-wheel \
+        --find-links=$WHEELHOUSE \
+        --wheel-dir=$WHEELHOUSE
+
+      get_wheels_from_cache
+
+      # install to provide dependencies for subsequent packages
+      pip install --use-wheel --find-links=$WHEELHOUSE --no-index $pkg
+  done
+fi
+
+# install package if specified
+if [ -n "$PACKAGE"  ]; then
     # --find-links avoids rebuilding existing wheels
-    pip wheel $pkg \
-    	--download-cache $CACHE \
-    	--use-wheel \
-    	--find-links=$WHEELHOUSE \
-    	--wheel-dir=$WHEELHOUSE
+    pip wheel $PACKAGE \
+      --download-cache $CACHE \
+      --use-wheel \
+      --find-links=$WHEELHOUSE \
+      --wheel-dir=$WHEELHOUSE
 
     get_wheels_from_cache
-
-    # install to provide dependencies for subsequent packages
-    pip install --use-wheel --find-links=$WHEELHOUSE --no-index $pkg
-done
-
-get_wheels_from_cache
+fi
 
 echo 'Created wheels:'
 tree -F -L 2 $WHEELSTREET
 
 echo 'install wheels using'
 echo "pip install --use-wheel --find-links=$WHEELHOUSE --no-index -r $REQFILE"
-
-
