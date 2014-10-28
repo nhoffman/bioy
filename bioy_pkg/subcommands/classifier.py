@@ -544,8 +544,24 @@ def action(args):
         usecols=usecols,
         nrows=args.limit)
 
+    # load specimen-map
+    if args.specimen_map:
+        # if a specimen_map is defined and a qseqid is not included in the map
+        # hits to that qseqid will be dropped (inner join)
+        spec_map = read_csv(
+            args.specimen_map,
+            names=['qseqid', 'specimen'],
+            usecols=['qseqid', 'specimen'],
+            dtype=str,
+            index_col='qseqid')
+        blast_results = blast_results.join(spec_map, on='qseqid', how='inner')
+    elif args.specimen:
+        blast_results['specimen'] = args.specimen
+    else:
+        blast_results['specimen'] = blast_results['qseqid']  # by qseqid
+
     # get a set of qseqids for identifying [no blast hits] after filtering
-    qseqids = blast_results[['qseqid']].drop_duplicates().set_index('qseqid')
+    qseqids = blast_results[['specimen', 'qseqid']].drop_duplicates()
 
     blast_results_len = len(blast_results)
 
@@ -625,7 +641,7 @@ def action(args):
     blast_results_len = float(len(blast_results))
     blast_results = blast_results.sort('qseqid').reset_index(drop=True)
     blast_results = blast_results.groupby(
-        by=['qseqid'], group_keys=False).apply(
+        by=['specimen', 'qseqid'], group_keys=False).apply(
             select_valid_hits, list(reversed(ranks)), blast_results_len)
     sys.stderr.write('\n')
     blast_results_post_len = len(blast_results)
@@ -648,31 +664,7 @@ def action(args):
                  'rank_assignment': 'assignment_rank'})
 
     # merge qseqids that have no hits back into blast_results
-    blast_results = blast_results.join(qseqids, on='qseqid', how='outer')
-
-    # assign specimen groups
-    specimens = blast_results[['qseqid']].drop_duplicates().set_index('qseqid')
-
-    # load specimen-map and assign specimen names
-    if args.specimen_map:
-        # if a specimen_map is defined and a qseqid is not included in the map
-        # hits to that qseqid will be dropped (inner join)
-        spec_map = read_csv(
-            args.specimen_map,
-            names=['qseqid', 'specimen'],
-            usecols=['qseqid', 'specimen'],
-            dtype=str,
-            index_col='qseqid')
-        specimens = specimens.join(spec_map, how='inner')
-    elif args.specimen:
-        specimens['specimen'] = args.specimen
-    else:
-        specimens['specimen'] = specimens.index  # by qseqid
-
-    # join specimen labels onto blast_results
-    # TODO: consider doing this early to avoid messing with
-    # sequences that have no specimen label
-    blast_results = blast_results.join(specimens, on='qseqid', how='inner')
+    blast_results = blast_results.merge(qseqids, how='outer')
 
     # assign seqs that had no results to [no blast_result]
     no_hits = blast_results[blast_results.sseqid.isnull()]
