@@ -30,13 +30,12 @@ from subprocess import Popen, PIPE
 
 log = logging.getLogger(__name__)
 
-USEARCH_BLAST6OUT_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 
-                             'mismatch','gapopen', 'qstart', 'qend', 'sstart',
-                             'send', 'evalue', 'bitscore']
+USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch','gapopen',
+                   'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
 
-# use BLAST_FORMAT as input to blastn -outfmt
-BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
-BLAST_HEADER = BLAST_FORMAT.split()[1:] + ['coverage']
+# use BLAST_FORMAT_DEFAULT as input to blastn -outfmt
+BLAST_FORMAT_DEFAULT = "6 qseqid sseqid pident qstart qend qlen"
+BLAST_HEADER_DEFAULT = BLAST_FORMAT_DEFAULT.split()[1:] + ['coverage']
 
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 

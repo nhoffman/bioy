@@ -531,7 +531,7 @@ def action(args):
     # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
-    names = None if args.has_header else sequtils.BLAST_HEADER
+    names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
     header = 0 if args.has_header else None
     usecols = ['qseqid', 'sseqid', 'pident', 'coverage']
     log.info('loading blast results')
