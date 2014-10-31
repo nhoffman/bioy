@@ -30,8 +30,9 @@ from subprocess import Popen, PIPE
 
 log = logging.getLogger(__name__)
 
-BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-                 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+USEARCH_BLAST6OUT_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 
+                             'mismatch','gapopen', 'qstart', 'qend', 'sstart',
+                             'send', 'evalue', 'bitscore']
 
 # use BLAST_FORMAT as input to blastn -outfmt
 BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
@@ -488,13 +489,6 @@ def parse_uc(infile):
             cluster_ids[row['query_label']] = cluster
 
     return cluster_ids, cluster_sizes
-
-
-def parse_blast(blast, extras=[]):
-    for line in blast:
-        if line and not line[0] == '#':
-            yield dict(zip(BLAST_HEADERS + extras, line.split()))
-
 
 def itemize_errors(ref, query):
     """

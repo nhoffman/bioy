@@ -24,7 +24,7 @@ import csv
 from itertools import ifilter
 from subprocess import Popen, PIPE
 
-from bioy_pkg.sequtils import BLAST_HEADER, BLAST_HEADERS, BLAST_FORMAT
+from bioy_pkg.sequtils import BLAST_HEADER, USEARCH_BLAST6OUT_HEADERS, BLAST_FORMAT
 from bioy_pkg.utils import Opener, named_tempfile
 
 log = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ def parse_usearch(lines):
     Coverage is calculated relative to the length of the query sequence.
     """
 
-    fieldnames = BLAST_HEADERS[:]
+    fieldnames = USEARCH_BLAST6OUT_HEADERS[:]
     fieldnames[fieldnames.index('length')] = 'qlen'
     reader = csv.DictReader(lines, fieldnames=fieldnames, delimiter='\t')
 
