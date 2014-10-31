@@ -20,6 +20,7 @@ Output is a multi-fasta of retrieved sequences and a corresponding sequence info
 
 import logging
 import sys
+import csv
 
 from Bio import Entrez
 from Bio import SeqIO
@@ -38,7 +39,7 @@ def build_parser(parser):
     parser.add_argument('-i', '--seqinfo',
             type = Opener('w'),
             help = "optionally output seqinfo for each sequence : {}".format(FETCH_HEADERS))
-    parser.add_argument('-h', '--no-header',
+    parser.add_argument('-n', '--no-header',
             help = "suppress seqinfo header")
     parser.add_argument('-e', '--email', required=True,
             help = "users of NCBI Entrez API should provide email.  if usage is excessive, ncbi may block access to its API")
@@ -53,8 +54,10 @@ def action(args):
     handle = Entrez.efetch(db="nucleotide", id=','.join(ids), rettype="fasta", retmode="xml")
     records = Entrez.read(handle)
     
-    if args.seqinfo and not args.no_header:
-        args.seqinfo.write(','.join(FETCH_HEADERS) + '\n')
+    if args.seqinfo:
+        info = csv.writer(args.seqinfo, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        if not args.no_header:
+            info.writerow(FETCH_HEADERS)
 
     # Note: some sequences may actually be proteins and use a larger alphabet than just ACTG
     for record in records:
@@ -64,9 +67,8 @@ def action(args):
         orgname = record['TSeq_orgname']
         fullname = record['TSeq_defline']
         seq = record['TSeq_sequence']
-        faheader = '|'.join(['>gi', gi, 'gb', gb, ''])+' '+fullname
-        args.outfasta.write(faheader + '\n')
+        seqid = '|'.join(['>gi', gi, 'gb', gb, ''])
+        args.outfasta.write(' '.join([seqid, fullname]) + '\n')
         args.outfasta.write(seq + '\n')
         if args.seqinfo:
-            row = ','.join([gi, gb, taxid, orgname]) + '\n'
-            args.seqinfo.write(row)
+            info.writerow([seqid, gi, gb, taxid, fullname])
