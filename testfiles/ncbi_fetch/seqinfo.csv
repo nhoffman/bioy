@@ -1,6 +1,6 @@
 seqid,gi,gb,taxid,fullname
->gi|6671348|gb|AF210055.1|,6671348,AF210055.1,1280,"Staphylococcus aureus strain CMRSA-1 accessory gene regulator locus, partial sequence"
->gi|310601|gb|L19300.1|,310601,L19300.1,1280,"Staphylococcus aureus DNA sequence encoding three ORFs, complete cds; prophage phi-11 sequence homology, 5' flank"
->gi|5|gb|X60065.1|,5,X60065.1,9913,B.bovis beta-2-gpI mRNA for beta-2-glycoprotein I
->gi|10|gb|CAA48398.1|,10,CAA48398.1,9913,Cyclin A-3 [Bos taurus]
->gi|20|gb|X52703.1|,20,X52703.1,9771,Blue Whale heavy satellite DNA
+gi|6671348|gb|AF210055.1|,6671348,AF210055.1,1280,"Staphylococcus aureus strain CMRSA-1 accessory gene regulator locus, partial sequence"
+gi|310601|gb|L19300.1|,310601,L19300.1,1280,"Staphylococcus aureus DNA sequence encoding three ORFs, complete cds; prophage phi-11 sequence homology, 5' flank"
+gi|5|gb|X60065.1|,5,X60065.1,9913,B.bovis beta-2-gpI mRNA for beta-2-glycoprotein I
+gi|10|gb|CAA48398.1|,10,CAA48398.1,9913,Cyclin A-3 [Bos taurus]
+gi|20|gb|X52703.1|,20,X52703.1,9771,Blue Whale heavy satellite DNA

@@ -67,8 +67,8 @@ def action(args):
         orgname = record['TSeq_orgname']
         fullname = record['TSeq_defline']
         seq = record['TSeq_sequence']
-        seqid = '|'.join(['>gi', gi, 'gb', gb, ''])
-        args.outfasta.write(' '.join([seqid, fullname]) + '\n')
+        seqid = '|'.join(['gi', gi, 'gb', gb, ''])
+        args.outfasta.write(' '.join(['>' + seqid, fullname]) + '\n')
         args.outfasta.write(seq + '\n')
         if args.seqinfo:
             info.writerow([seqid, gi, gb, taxid, fullname])
