@@ -189,7 +189,7 @@ def condense(queries, floor_rank, max_size, ranks, rank_thresholds, target_rank 
 
 def action(args):
     ### format format blast data and add additional available information
-    fieldnames = None if args.has_header else sequtils.BLAST_HEADER
+    fieldnames = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
     blast_results = DictReader(args.blast_file, fieldnames = fieldnames)
     blast_results = list(blast_results)
 
@@ -211,8 +211,8 @@ def action(args):
 
     # coverage
     def cov(b):
-        if b['sseqid'] and b['coverage']:
-            b['coverage'] = float(b['coverage'])
+        if b['sseqid'] and b['qcovs']:
+            b['coverage'] = float(b['qcovs'])
             return b
         elif b['sseqid']:
             c = coverage(b['qstart'], b['qend'], b['qlen'])

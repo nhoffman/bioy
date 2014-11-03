@@ -15,6 +15,53 @@
 
 """
 Run blastn and produce classify friendly output
+
+Optional out format fields:
+
+qseqid means Query Seq-id
+qgi means Query GI
+qacc means Query accesion
+qaccver means Query accesion.version
+qlen means Query sequence length
+sseqid means Subject Seq-id
+sallseqid means All subject Seq-id(s), separated by a ';'
+sgi means Subject GI
+sallgi means All subject GIs
+sacc means Subject accession
+saccver means Subject accession.version
+sallacc means All subject accessions [157/841]
+slen means Subject sequence length
+qstart means Start of alignment in query
+qend means End of alignment in query
+sstart means Start of alignment in subject
+send means End of alignment in subject
+qseq means Aligned part of query sequence
+sseq means Aligned part of subject sequence
+evalue means Expect value
+bitscore means Bit score
+score means Raw score
+length means Alignment length
+pident means Percentage of identical matches
+nident means Number of identical matches
+mismatch means Number of mismatches
+positive means Number of positive-scoring matches [142/841]
+gapopen means Number of gap openings
+gaps means Total number of gaps
+ppos means Percentage of positive-scoring matches
+frames means Query and subject frames separated by a '/'
+qframe means Query frame
+sframe means Subject frame
+btop means Blast traceback operations (BTOP)
+staxids means unique Subject Taxonomy ID(s), separated by a ';' (in numerical order)
+sscinames means unique Subject Scientific Name(s), separated by a ';'
+scomnames means unique Subject Common Name(s), separated by a ';'
+sblastnames means unique Subject Blast Name(s), separated by a ';' (in alphabetical order)
+sskingdoms means unique Subject Super Kingdom(s), separated by a ';' (in alphabetical order)
+stitle means Subject Title
+salltitles means All Subject Title(s), separated by a '<>'
+sstrand means Subject Strand
+qcovs means Query Coverage Per Subject
+qcovhsp means Query Coverage Per HSP
 """
 
 import logging
@@ -26,15 +73,11 @@ from itertools import chain, groupby
 from operator import itemgetter
 from subprocess import Popen, PIPE
 
-#from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT, fastalite
-from bioy_pkg.sequtils import BLAST_HEADER, fastalite
+from bioy_pkg.sequtils import BLAST_HEADER_DEFAULT, BLAST_FORMAT_DEFAULT, fastalite
 from bioy_pkg.utils import opener, Opener
 
 log = logging.getLogger(__name__)
 
-##### Testing ONLY ####
-BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen sstart send sseq evalue sscinames staxids"
-######################
 def build_parser(parser):
     parser.add_argument('fasta',
             default = '-',
@@ -42,7 +85,7 @@ def build_parser(parser):
     parser.add_argument('-o', '--out',
             type = Opener('w'),
             default = sys.stdout,
-            help = 'tabulated BLAST results with the following headers {}'.format(BLAST_HEADER))
+            help = 'tabulated BLAST results with the following default headers {}'.format(BLAST_HEADER_DEFAULT))
     parser.add_argument('-d', '--database',
             help = 'blast database path for local blasts')
     parser.add_argument('-r', '--remote-database', choices=['nt','nr'],
@@ -71,6 +114,9 @@ def build_parser(parser):
             help = '')
     parser.add_argument('--coverage', type = float,
             help = 'minimum coverage for accepted values [%(default)s]')
+    parser.add_argument('--outfmt',
+                        default=BLAST_FORMAT_DEFAULT,
+                        help='A comma delimited list of field names to output')
     parser.add_argument('--remote', action='store_true',
                         help = 'execute query on remote NCBI server')
 
@@ -92,7 +138,7 @@ def action(args):
         command += ['-db', args.database]
         command += ['-num_threads', str(args.threads)]
     command += ['-perc_identity', args.id]
-    command += ['-outfmt', BLAST_FORMAT]
+    command += ['-outfmt', '6 ' + args.outfmt.replace(',', ' ')]
     command += ['-strand', args.strand]
 
     if args.max:
@@ -113,19 +159,15 @@ def action(args):
     # split tab lines
     lines = (r.strip().split('\t') for r in StringIO(results))
 
-    import IPython; IPython.embed()
+    header = args.outfmt.split(',')
     # match with fieldnames
-    lines = (zip(BLAST_HEADER, l) for l in lines)
+    lines = (zip(header, l) for l in lines)
 
     # make into dict
     lines = [dict(l) for l in lines]
 
-    for l in lines:
-        l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
-                / float(l['qlen']) * 100
-        l['coverage'] = '{0:.2f}'.format(l['coverage'])
-    if isinstance(args.coverage, float):
-        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
+    if isinstance(args.coverage, float) and 'qcovs' in args.outfmt.split(','):
+        lines = [l for l in lines if float(l['qcovs']) >= args.coverage]
 
     if args.nohits:
         # to get nohits first we need to know about the hits
@@ -145,7 +187,7 @@ def action(args):
         lines = chain(lines, nohits)
 
     out = DictWriter(args.out,
-                     fieldnames = BLAST_HEADER,
+                     fieldnames = header,
                      extrasaction = 'ignore')
 
     if args.header:

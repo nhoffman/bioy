@@ -208,7 +208,7 @@ def raw_filtering(blast_results, min_coverage=None,
     if min_coverage:
         # run raw hi, low and coverage filters
         blast_results = blast_results[
-            blast_results['coverage'] >= min_coverage]
+            blast_results['qcovs'] >= min_coverage]
 
         blast_results_post_len = len(blast_results)
 
@@ -533,7 +533,7 @@ def action(args):
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
     header = 0 if args.has_header else None
-    usecols = ['qseqid', 'sseqid', 'pident', 'coverage']
+    usecols = ['qseqid', 'sseqid', 'pident', 'qcovs']
     log.info('loading blast results')
     blast_results = read_csv(
         args.blast_file,

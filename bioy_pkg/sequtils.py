@@ -34,8 +34,8 @@ USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch','gapopen',
                    'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
 
 # use BLAST_FORMAT_DEFAULT as input to blastn -outfmt
-BLAST_FORMAT_DEFAULT = "6 qseqid sseqid pident qstart qend qlen"
-BLAST_HEADER_DEFAULT = BLAST_FORMAT_DEFAULT.split()[1:] + ['coverage']
+BLAST_FORMAT_DEFAULT = "qseqid,sseqid,pident,qstart,qend,qlen,qcovs"
+BLAST_HEADER_DEFAULT = BLAST_FORMAT_DEFAULT.split(',')
 
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
@@ -118,7 +118,6 @@ UNCLASSIFIED_REGEX = re.compile(
                                'vector\b',
                                r'vent\b',
                                ])))
-
 
 def homoencode(seq):
     """Run length encode a string
