@@ -83,10 +83,10 @@ blast_file
 ==========
 
 A csv file with columns **qseqid**, **sseqid**, **pident**,
-**qstart**, **qend** and **qlen**.
+**qstart**, **qend**, **qlen** and **qcovs**.
 
-.. note:: The actual header is optional and if
-          present make sure to use the --has-header switch
+.. note:: The actual header is optional if using default blast out format but
+          if present make sure to use the --has-header switch
 
 seq_info
 ========
@@ -438,7 +438,7 @@ def build_parser(parser):
     # required inputs
     parser.add_argument(
         'blast_file',
-        help='CSV tabular blast file of query and subject hits.')
+        help='CSV tabular blast file of query and subject hits, containing at least {}.'.format(sequtils.BLAST_FORMAT_DEFAULT))
     parser.add_argument(
         'seq_info',
         help='File mapping reference seq name to tax_id')
