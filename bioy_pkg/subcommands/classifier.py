@@ -358,10 +358,10 @@ def select_valid_hits(df, ranks, blast_results_len):
         if not valid.empty:
             tax_ids = valid[r]
 
-            # Occasionally tax_ids will be missing at a certain rank.
-            # If so use the next less specific tax_id available
             na_ids = tax_ids.isnull()
 
+            # Occasionally tax_ids will be missing at a certain rank.
+            # If so use the next less specific tax_id available
             if na_ids.all():
                 continue
 
@@ -376,6 +376,12 @@ def select_valid_hits(df, ranks, blast_results_len):
             valid['assignment_threshold'] = thresholds
             # return notnull() assignment_threshold valid values
             return valid[valid[ASSIGNMENT_TAX_ID].notnull()]
+
+    # nothing passed
+    df[ASSIGNMENT_TAX_ID] = None
+    df['assignment_threshold'] = None
+
+    return pd.DataFrame(columns=df.columns)
 
 
 def calculate_pct_references(df, pct_reference):
@@ -544,6 +550,10 @@ def action(args):
         usecols=usecols,
         nrows=args.limit)
 
+    if blast_results.empty:
+        log.info('blast results empty, exiting.')
+        return
+
     # load specimen-map
     if args.specimen_map:
         # if a specimen_map is defined and a qseqid is not included in the map
@@ -641,70 +651,73 @@ def action(args):
     blast_results_len = float(len(blast_results))
     blast_results = blast_results.sort('qseqid').reset_index(drop=True)
     blast_results = blast_results.groupby(
-        by=['specimen', 'qseqid'], group_keys=False).apply(
-            select_valid_hits, list(reversed(ranks)), blast_results_len)
+        by=['specimen', 'qseqid'], group_keys=False)
+    blast_results = blast_results.apply(
+        select_valid_hits, list(reversed(ranks)), blast_results_len)
     sys.stderr.write('\n')
-    blast_results_post_len = len(blast_results)
-    log.info('{} valid hits selected ({:.0f}%)'.format(
-        blast_results_post_len,
-        blast_results_post_len / blast_results_len * 100))
 
-    # drop unneeded tax and threshold columns to free memory
-    for c in ranks + rank_thresholds_cols:
-        blast_results = blast_results.drop(c, axis=1)
+    if blast_results.empty:
+        log.info('all blast results filtered, returning [no blast results]')
+        blast_results['assignment_rank'] = None
+        blast_results['assignment_tax_name'] = None
+        blast_results['condensed_id'] = None
+        blast_results['starred'] = None
+    else:
+        blast_results_post_len = len(blast_results)
+        log.info('{} valid hits selected ({:.0f}%)'.format(
+            blast_results_post_len,
+            blast_results_post_len / blast_results_len * 100))
 
-    # join with taxonomy for tax_name and rank
-    blast_results = blast_results.join(
-        taxonomy[['tax_name', 'rank']],
-        rsuffix='_assignment',
-        on=ASSIGNMENT_TAX_ID)
+        # drop unneeded tax and threshold columns to free memory
+        for c in ranks + rank_thresholds_cols:
+            blast_results = blast_results.drop(c, axis=1)
 
-    blast_results = blast_results.rename(
-        columns={'tax_name_assignment': 'assignment_tax_name',
-                 'rank_assignment': 'assignment_rank'})
+        # join with taxonomy for tax_name and rank
+        blast_results = blast_results.join(
+            taxonomy[['tax_name', 'rank']],
+            rsuffix='_assignment',
+            on=ASSIGNMENT_TAX_ID)
+
+        # no join(rprefix) (yet)
+        blast_results = blast_results.rename(
+            columns={'tax_name_assignment': 'assignment_tax_name',
+                     'rank_assignment': 'assignment_rank'})
+
+        # TODO: this is relatively slow, need to integrate
+        # pandas into sequtils.condense_ids
+        tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
+
+        # create condensed assignment hashes by qseqid
+        blast_results = blast_results.sort('qseqid').reset_index(drop=True)
+        blast_results = blast_results.groupby(
+            by=['specimen', 'qseqid'], sort=False, group_keys=False)
+        blast_results = blast_results.apply(
+            condense_ids, tax_dict, ranks,
+            args.max_group_size, float(len(blast_results)))
+        sys.stderr.write('\n')
+
+        # star condensed ids if one hit meets star threshold
+        by = ['specimen', 'assignment_hash', 'condensed_id']
+        blast_results = blast_results.groupby(
+            by=by, sort=False, group_keys=False)
+        blast_results = blast_results.apply(star, args.starred)
+
+        # assign names to assignment_hashes
+        blast_results = blast_results.sort('assignment_hash')
+        blast_results = blast_results.reset_index(drop=True)
+        blast_results = blast_results.groupby(
+            by=['specimen', 'assignment_hash'], sort=False, group_keys=False)
+        blast_results = blast_results.apply(
+            assign, tax_dict, float(len(blast_results)))
+        sys.stderr.write('\n')
 
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
 
     # assign seqs that had no results to [no blast_result]
-    no_hits = blast_results[blast_results.sseqid.isnull()]
-    no_hits['assignment'] = '[no blast result]'
-    no_hits['assignment_hash'] = 0
-
-    # move on to seqs that have blast hits
-    blast_results = blast_results[blast_results.sseqid.notnull()]
-
-    # TODO: this is relatively slow, need to integrate
-    # pandas into sequtils.condense_ids
-    tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
-
-    # create condensed assignment hashes by qseqid
-    blast_results = blast_results.sort('qseqid').reset_index(drop=True)
-    blast_results = blast_results.groupby(
-        by=['specimen', 'qseqid'], sort=False, group_keys=False).apply(
-            condense_ids,
-            tax_dict,
-            ranks,
-            args.max_group_size,
-            float(len(blast_results)))
-    sys.stderr.write('\n')
-
-    # star condensed ids if one hit meets star threshold
-    by = ['specimen', 'assignment_hash', 'condensed_id']
-    blast_results = blast_results.groupby(
-        by=by, sort=False, group_keys=False).apply(star, args.starred)
-
-    # assign names to assignment_hashes
-    blast_results = blast_results.sort('assignment_hash')
-    blast_results = blast_results.reset_index(drop=True)
-    blast_results = blast_results.groupby(
-        by=['specimen', 'assignment_hash'],
-        sort=False,
-        group_keys=False).apply(assign, tax_dict, float(len(blast_results)))
-    sys.stderr.write('\n')
-
-    # put assignments and no assignments back together
-    blast_results = pd.concat([blast_results, no_hits])
+    no_hits = blast_results['sseqid'].isnull()
+    blast_results.loc[no_hits, 'assignment'] = '[no blast result]'
+    blast_results.loc[no_hits, 'assignment_hash'] = 0
 
     # concludes our blast details, on to output summary
     log.info('summarizing output')
@@ -740,8 +753,7 @@ def action(args):
         weights['weight'] = 1.0
 
     cluster_stats = weights[['specimen', 'assignment_hash', 'weight']]
-    cluster_stats = cluster_stats.reset_index()
-    cluster_stats = cluster_stats.drop_duplicates()
+    cluster_stats = cluster_stats.reset_index().drop_duplicates()
     cluster_stats = cluster_stats.groupby(
         by=['specimen', 'assignment_hash'], sort=False)
 
@@ -802,16 +814,19 @@ def action(args):
             largest = largest.drop('assignment_threshold', axis=1)
             blast_results = blast_results.merge(largest)
 
-        columns = ['specimen', 'assignment_id', 'tax_name', 'rank',
-                   'assignment_tax_name', 'assignment_rank', 'pident',
-                   'tax_id', ASSIGNMENT_TAX_ID, 'condensed_id',
-                   'accession', 'qseqid', 'sseqid', 'starred',
-                   'assignment_threshold']
+        details_columns = ['specimen', 'assignment_id', 'tax_name', 'rank',
+                           'assignment_tax_name', 'assignment_rank', 'pident',
+                           'tax_id', ASSIGNMENT_TAX_ID, 'condensed_id',
+                           'accession', 'qseqid', 'sseqid', 'starred',
+                           'assignment_threshold']
+
+        # sort details for consistency and ease of viewing
+        blast_results = blast_results.sort(columns=details_columns)
 
         with args.details_out as out_details:
             blast_results.to_csv(
                 out_details,
-                columns=columns,
+                columns=details_columns,
                 header=True,
                 index=False,
                 float_format='%.2f')

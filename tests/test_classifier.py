@@ -3,8 +3,7 @@ Test classifier
 """
 
 import logging
-
-from os import path
+import os
 
 import filecmp
 import sys
@@ -23,9 +22,9 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
     log_info = 'bioy classifier {}'
 
-    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2')
+    copy_numbers = os.path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2')
 
-    thisdatadir = path.join(datadir, 'classifier', 'TestClassifier')
+    thisdatadir = os.path.join(datadir, 'classifier', 'TestClassifier')
 
     def test01(self):
         """
@@ -36,18 +35,18 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         thisdatadir = self.thisdatadir
 
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
@@ -73,19 +72,19 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         thisdatadir = self.thisdatadir
 
-        weights = path.join(thisdatadir, 'weights.csv.bz2')
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
+        weights = os.path.join(thisdatadir, 'weights.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
@@ -112,19 +111,19 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         thisdatadir = self.thisdatadir
 
-        specimen_map = path.join(thisdatadir, 'map.csv.bz2')
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
+        specimen_map = os.path.join(thisdatadir, 'map.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
@@ -151,18 +150,18 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         thisdatadir = self.thisdatadir
 
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
@@ -190,20 +189,20 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         thisdatadir = self.thisdatadir
 
-        weights = path.join(thisdatadir, 'weights.csv.bz2')
-        specimen_map = path.join(thisdatadir, 'map.csv.bz2')
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
-        blast = path.join(thisdatadir, 'blast.csv.bz2')
+        weights = os.path.join(thisdatadir, 'weights.csv.bz2')
+        specimen_map = os.path.join(thisdatadir, 'map.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
@@ -234,22 +233,89 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         this_test = sys._getframe().f_code.co_name
 
-        blast = path.join(thisdatadir, this_test, 'blast.csv.bz2')
-        taxonomy = path.join(thisdatadir, this_test, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
-        specimen_map = path.join(thisdatadir, this_test, 'map.csv.bz2')
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, this_test, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
+        specimen_map = os.path.join(thisdatadir, this_test, 'map.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = ['--specimen-map', specimen_map,
+                '--details-out', details_out,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test08(self):
+        """
+        Test empty blast_results file
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv')
+        details_out = os.path.join(outdir, 'details.csv')
+
+        # create blank blast.csv file
+        blast = os.path.join(outdir, 'blast.csv')
+        open(blast, 'w').close()
+        taxonomy = os.path.join(thisdatadir, this_test, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
+
+        args = ['--details-out', details_out,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(os.path.getsize(classify_out) == 0)
+        self.assertTrue(os.path.getsize(details_out) == 0)
+
+    def test09(self):
+        """
+        Test all [no blast results] classification
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        weights = os.path.join(thisdatadir, 'weights.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = os.path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = ['--weights', weights,
                 '--details-out', details_out,
                 '--out', classify_out,
                 blast, seq_info, taxonomy]
