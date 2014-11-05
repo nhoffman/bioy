@@ -24,14 +24,19 @@ import csv
 
 from Bio import Entrez
 from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.Alphabet import NucleotideAlphabet
 
 from bioy_pkg.sequtils import FETCH_HEADERS
 from bioy_pkg.utils import opener, Opener
 
+fieldnames = ['id','seq_start','seq_stop']
+
 def build_parser(parser):
     parser.add_argument('sseqids', nargs='?', type=Opener('r'),
             default = sys.stdin,
-            help = 'input file, one identifier (gi or gb number) per line')
+            help = 'csv input file, each line containing (gi-or-gb),seq_start,seq_stop')
     parser.add_argument('-o', '--outfasta',
             type = Opener('w'),
             default = sys.stdout,
@@ -48,27 +53,53 @@ def action(args):
 
     Entrez.email = args.email
 
-    # cat bioyblast.out | cut -d, -f2 | cut -d\| -f2 > sseqids
-    ids = [gi.strip() for gi in args.sseqids]
+    sseqids = csv.DictReader(args.sseqids, fieldnames=fieldnames)
 
-    handle = Entrez.efetch(db="nucleotide", id=','.join(ids), rettype="fasta", retmode="xml")
-    records = Entrez.read(handle)
-    
     if args.seqinfo:
         info = csv.writer(args.seqinfo, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         if not args.no_header:
             info.writerow(FETCH_HEADERS)
 
-    # Note: some sequences may actually be proteins and use a larger alphabet than just ACTG
-    for record in records:
-        gi = record['TSeq_gi']
-        gb = record['TSeq_accver']
-        taxid = record['TSeq_taxid']
-        orgname = record['TSeq_orgname']
-        fullname = record['TSeq_defline']
-        seq = record['TSeq_sequence']
-        seqid = '|'.join(['gi', gi, 'gb', gb, ''])
-        args.outfasta.write(' '.join(['>' + seqid, fullname]) + '\n')
-        args.outfasta.write(seq + '\n')
+    # For each subject line in the input, fetch the sequence and output to fasta
+    for subject in sseqids:
+#        seq_handle = Entrez.efetch(db="nucleotide", id=subject['id'], 
+#                                   seq_start=int(subject['seq_start']), 
+#                                   seq_stop=int(subject['seq_stop']), 
+#                                   rettype="fasta", retmode="text", strand=1)
+        seq_handle = Entrez.efetch(db="nucleotide", id=subject['id'], 
+                                   seq_start=subject['seq_start'], 
+                                   seq_stop=subject['seq_stop'], 
+                                   retmode="xml")
+
+        sum_handle = Entrez.esummary(db="nucleotide", id=subject['id'])
+
+        seq_records = Entrez.read(seq_handle)
+        sum_records = Entrez.read(sum_handle)
+        if len(seq_records) == 0 or len(sum_records) == 0:
+            continue # No record by that id
+        assert(len(seq_records) == 1 and len(sum_records) == 1)
+            
+        seq_record = seq_records[0]
+        sum_record = sum_records[0]
+
+        # assert sum_record['Gi'] == id between the two handles
+        # assert len(sequence) == seq_stop - seq_start + 1
+
+#        seqtype = seq_record['TSeq_seqtype']
+#        if (seq_record['GBSeq_moltype'] != 'DNA'):
+#            raise Exception("Non-DNA sequence")
+#            continue # NCBI contains some erroneous sequences, e.g. proteins
+        
+        taxid = sum_record['TaxId']
+        description = seq_record['GBSeq_definition']
+        sequence = seq_record['GBSeq_sequence'].upper()
+        assert(len(sequence) <= abs(subject['seq_stop'] - subject['seq_start'])+1)
+        seqids = [seqid for seqid in seq_record['GBSeq_other-seqids'] if 'gi' in seqid or 'gb' in seqid]
+        assert(len(seqids) >= 1)
+        seqid = ''.join(seqids) # Joins genbank, gi numbers, etc, which include '|'
+        outseq = SeqRecord(Seq(sequence, NucleotideAlphabet),
+                           id=seqid,
+                           description=description)
+        SeqIO.write(outseq, args.outfasta, 'fasta')
         if args.seqinfo:
-            info.writerow([seqid, gi, gb, taxid, fullname])
+            info.writerow([seqid, taxid, description])
