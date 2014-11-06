@@ -129,6 +129,8 @@ relative path to the script::
       index               Add simple indices to an sqlite database
       map_clusters        Create a readmap and specimenmap and/or weights file
 			  from a
+      ncbi_fetch          Fetch sequences from NCBI's nucleotide database using
+                          sequence identifiers (gi or gb)
       primer_trim         Parse region between primers from fasta file
       pull_reads          Parse barcode, primer, and read from a fastq file
       repl                Replace strings in one or more files.

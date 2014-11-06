@@ -43,6 +43,7 @@ UCLUST_HEADERS = ['type', 'cluster_number', 'size', 'pct_id', 'strand',
                   'query_start', 'seed_start', 'alignment', 'query_label',
                   'target_label']
 
+FETCH_HEADERS = ['seqid', 'gi', 'gb', 'taxid', 'fullname']
 RANKS = ['root', 'superkingdom', 'phylum', 'class',
          'order', 'family', 'genus', 'species']
 

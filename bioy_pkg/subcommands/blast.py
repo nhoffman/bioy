@@ -40,7 +40,9 @@ def build_parser(parser):
             default = sys.stdout,
             help = 'tabulated BLAST results with the following headers {}'.format(BLAST_HEADER))
     parser.add_argument('-d', '--database',
-            help = 'a blast database')
+            help = 'blast database path for local blasts')
+    parser.add_argument('-r', '--remote-database', choices=['nt','nr'],
+            help = 'type of remote database to use, if remote flagged provided')
     parser.add_argument('--limit',
             type = int,
             help = 'maximum number of query sequences to read from the alignment')
@@ -65,14 +67,28 @@ def build_parser(parser):
             help = '')
     parser.add_argument('--coverage', type = float,
             help = 'minimum coverage for accepted values [%(default)s]')
+    parser.add_argument('--remote', action='store_true',
+                        help = 'execute query on remote NCBI server')
 
 def action(args):
+
+    if args.remote and not args.remote_database:
+        log.error("bioy blast: error: please specify a remote database")
+        return
+    elif not args.remote and not args.database:
+        log.error("bioy blast: error: please specify path to local database")
+        return
+
     command = ['blastn']
     command += ['-query', args.fasta]
-    command += ['-num_threads', str(args.threads)]
+    if args.remote:
+        command += ['-remote']
+        command += ['-db', args.remote_database]
+    else:
+        command += ['-db', args.database]
+        command += ['-num_threads', str(args.threads)]
     command += ['-perc_identity', args.id]
     command += ['-outfmt', BLAST_FORMAT]
-    command += ['-db', args.database]
     command += ['-strand', args.strand]
 
     if args.max:
@@ -99,11 +115,11 @@ def action(args):
     # make into dict
     lines = [dict(l) for l in lines]
 
+    for l in lines:
+        l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                / float(l['qlen']) * 100
+        l['coverage'] = '{0:.2f}'.format(l['coverage'])
     if isinstance(args.coverage, float):
-        for l in lines:
-            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
-                    / float(l['qlen']) * 100
-            l['coverage'] = '{0:.2f}'.format(l['coverage'])
         lines = [l for l in lines if float(l['coverage']) >= args.coverage]
 
     if args.nohits:
