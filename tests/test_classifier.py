@@ -342,24 +342,23 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         classify_out = os.path.join(outdir, 'classifications.csv')
         details_out = os.path.join(outdir, 'details.csv')
 
-        blast = path.join(thisdatadir, 'blast_extrafields.csv.bz2')
-        taxonomy = path.join(thisdatadir, 'taxonomy.csv.bz2')
-        seq_info = path.join(thisdatadir, 'seq_info.csv.bz2')
+        blast = os.path.join(thisdatadir, 'blast_extrafields.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
 
         outdir = self.mkoutdir()
 
-        classify_out = path.join(outdir, 'classifications.csv.bz2')
-        details_out = path.join(outdir, 'details.csv.bz2')
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
 
-        classify_ref = path.join(
+        classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = path.join(
+        details_ref = os.path.join(
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
             '--has-header',
             '--out', classify_out,
-            '--details-out', details_out,
             blast,
             seq_info,
             taxonomy]
@@ -369,4 +368,3 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         self.main(args)
 
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
-        self.assertTrue(filecmp.cmp(details_ref, details_out))
