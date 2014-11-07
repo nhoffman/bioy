@@ -30,12 +30,12 @@ from subprocess import Popen, PIPE
 
 log = logging.getLogger(__name__)
 
-BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-                 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch','gapopen',
+                   'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
 
-# use BLAST_FORMAT as input to blastn -outfmt
-BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
-BLAST_HEADER = BLAST_FORMAT.split()[1:] + ['coverage']
+# use BLAST_FORMAT_DEFAULT as input to blastn -outfmt
+BLAST_FORMAT_DEFAULT = "qseqid,sseqid,pident,qstart,qend,qlen,qcovs"
+BLAST_HEADER_DEFAULT = BLAST_FORMAT_DEFAULT.split(',')
 
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
@@ -118,7 +118,6 @@ UNCLASSIFIED_REGEX = re.compile(
                                'vector\b',
                                r'vent\b',
                                ])))
-
 
 def homoencode(seq):
     """Run length encode a string
@@ -488,13 +487,6 @@ def parse_uc(infile):
             cluster_ids[row['query_label']] = cluster
 
     return cluster_ids, cluster_sizes
-
-
-def parse_blast(blast, extras=[]):
-    for line in blast:
-        if line and not line[0] == '#':
-            yield dict(zip(BLAST_HEADERS + extras, line.split()))
-
 
 def itemize_errors(ref, query):
     """

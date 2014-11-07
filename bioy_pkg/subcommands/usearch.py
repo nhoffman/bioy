@@ -24,7 +24,7 @@ import csv
 from itertools import ifilter
 from subprocess import Popen, PIPE
 
-from bioy_pkg.sequtils import BLAST_HEADER, BLAST_HEADERS, BLAST_FORMAT
+from bioy_pkg.sequtils import BLAST_HEADER_DEFAULT, USEARCH_HEADER
 from bioy_pkg.utils import Opener, named_tempfile
 
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def build_parser(parser):
                         type=Opener('w'),
                         default=sys.stdout,
                         help=('tabulated BLAST results with the following headers {}'
-                              ).format(BLAST_FORMAT))
+                              ).format(BLAST_HEADER_DEFAULT))
     parser.add_argument('-d', '--database',
                         help='a blast database')
     parser.add_argument('--header',
@@ -68,7 +68,7 @@ def parse_usearch(lines):
     Coverage is calculated relative to the length of the query sequence.
     """
 
-    fieldnames = BLAST_HEADERS[:]
+    fieldnames = USEARCH_HEADER[:]
     fieldnames[fieldnames.index('length')] = 'qlen'
     reader = csv.DictReader(lines, fieldnames=fieldnames, delimiter='\t')
 
@@ -86,7 +86,7 @@ Actinomyces|3|IBRIB9O01AV846	S002952986	99.1	447	2	0	1	447	1	1377	*	*""".splitli
 
     result = list(parse_usearch(lines))
     assert len(result) == 3
-    for k in BLAST_HEADER:
+    for k in BLAST_HEADER_DEFAULT:
         assert k in result[0]
 
 
@@ -122,7 +122,7 @@ def action(args):
         if args.min_coverage:
             results = ifilter(lambda d: d['coverage'] >= args.min_coverage, results)
 
-        writer = csv.DictWriter(args.out, fieldnames=BLAST_HEADER, extrasaction='ignore')
+        writer = csv.DictWriter(args.out, fieldnames=BLAST_HEADER_DEFAULT, extrasaction='ignore')
 
         if args.header:
             writer.writeheader()
