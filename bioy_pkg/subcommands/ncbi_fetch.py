@@ -16,6 +16,8 @@
 """
 Fetch sequences from NCBI's nucleotide database using sequence identifiers (gi or gb)
 Output is a multi-fasta of retrieved sequences and a corresponding sequence info (csv) file
+
+Note: If indexed bases are backwards (e.g. seq_stop > seq_stop) then they will be un-reversed
 """
 
 import logging
@@ -32,6 +34,8 @@ from bioy_pkg.sequtils import FETCH_HEADERS
 from bioy_pkg.utils import opener, Opener
 
 fieldnames = ['id','seq_start','seq_stop']
+
+log = logging.getLogger(__name__)
 
 def build_parser(parser):
     parser.add_argument('sseqids', nargs='?', type=Opener('r'),
@@ -62,10 +66,6 @@ def action(args):
 
     # For each subject line in the input, fetch the sequence and output to fasta
     for subject in sseqids:
-#        seq_handle = Entrez.efetch(db="nucleotide", id=subject['id'], 
-#                                   seq_start=int(subject['seq_start']), 
-#                                   seq_stop=int(subject['seq_stop']), 
-#                                   rettype="fasta", retmode="text", strand=1)
         seq_handle = Entrez.efetch(db="nucleotide", id=subject['id'], 
                                    seq_start=subject['seq_start'], 
                                    seq_stop=subject['seq_stop'], 
@@ -73,27 +73,26 @@ def action(args):
 
         sum_handle = Entrez.esummary(db="nucleotide", id=subject['id'])
 
-        seq_records = Entrez.read(seq_handle)
-        sum_records = Entrez.read(sum_handle)
-        if len(seq_records) == 0 or len(sum_records) == 0:
-            continue # No record by that id
+        try:
+            seq_records = Entrez.read(seq_handle)
+            sum_records = Entrez.read(sum_handle)
+        except:
+            log.info("unable to parse seqid '{}'".format(subject['id']))
+            continue
+
         assert(len(seq_records) == 1 and len(sum_records) == 1)
             
         seq_record = seq_records[0]
         sum_record = sum_records[0]
 
-        # assert sum_record['Gi'] == id between the two handles
-        # assert len(sequence) == seq_stop - seq_start + 1
+        # Ideally we would assert that the seqids of the two match, but one uses gi and the other uses gb
 
-#        seqtype = seq_record['TSeq_seqtype']
-#        if (seq_record['GBSeq_moltype'] != 'DNA'):
-#            raise Exception("Non-DNA sequence")
-#            continue # NCBI contains some erroneous sequences, e.g. proteins
-        
         taxid = sum_record['TaxId']
         description = seq_record['GBSeq_definition']
         sequence = seq_record['GBSeq_sequence'].upper()
-        assert(len(sequence) <= abs(subject['seq_stop'] - subject['seq_start'])+1)
+        if subject['seq_start'] and subject['seq_stop']:
+            assert(len(sequence) <= abs(int(subject['seq_stop']) - int(subject['seq_start']))+1)
+
         seqids = [seqid for seqid in seq_record['GBSeq_other-seqids'] if 'gi' in seqid or 'gb' in seqid]
         assert(len(seqids) >= 1)
         seqid = ''.join(seqids) # Joins genbank, gi numbers, etc, which include '|'

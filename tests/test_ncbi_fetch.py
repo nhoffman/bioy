@@ -21,23 +21,28 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
     datadir = path.join(datadir, 'ncbi_fetch')
 
+###
+# 01 - basic; whole sequence, no crop
+# 02 - sequences cropped: from the middle, starting too early, ending too late, both
+# 03 - non-existing sequence
+###
     def test01(self):
         """
-        Test average basic usage
+        Test basic usage
         """
 
-        datadir = self.datadir
+        datadir = path.join(self.datadir)
 
         this_test = sys._getframe().f_code.co_name
-        sseqids = path.join(datadir, 'sseqids')
+        sseqids = path.join(datadir, 'sseqid_basic')
 
         outdir = self.mkoutdir()
 
-        fasta_out = path.join(outdir, 'multi.fasta')
-        info_out = path.join(outdir, 'seqinfo.csv')
+        fasta_out = path.join(outdir, 'out1.fasta')
+        info_out = path.join(outdir, 'out1.csv')
 
-        fasta_ref = path.join(datadir, 'multi.fasta')
-        info_ref = path.join(datadir, 'seqinfo.csv')
+        fasta_ref = path.join(datadir, 'test01', 'ref.fasta')
+        info_ref = path.join(datadir, 'test01', 'ref.csv')
 
         args = ['--outfasta', fasta_out,
                 '--seqinfo', info_out,
@@ -50,26 +55,24 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
         self.assertTrue(filecmp.cmp(fasta_ref, fasta_out))
         self.assertTrue(filecmp.cmp(info_ref, info_out))
+
     def test02(self):
         """
-        Ensure length of seqinfo matches fasta
+        Cropped sequences
         """
 
-        datadir = self.datadir
+        datadir = path.join(self.datadir)
 
         this_test = sys._getframe().f_code.co_name
-        sseqids = path.join(datadir, 'sseqids')
+        sseqids = path.join(datadir, 'sseqids_crops')
 
         outdir = self.mkoutdir()
 
-        fasta_out = path.join(outdir, 'multi.fasta')
-        info_out = path.join(outdir, 'seqinfo.csv')
+        fasta_out = path.join(outdir, 'out.fasta')
 
-        fasta_ref = path.join(datadir, 'multi.fasta')
-        info_ref = path.join(datadir, 'seqinfo.csv')
+        fasta_ref = path.join(datadir, 'test02', 'ref.fasta')
 
         args = ['--outfasta', fasta_out,
-                '--seqinfo', info_out,
                 '--email', 'ngh2@uw.edu',
                 sseqids]
 
@@ -77,7 +80,29 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
         self.main(args)
 
-        fasta_lines = len([line for line in open(fasta_out)])
-        info_lines = len([line for line in open(info_out)])
+        self.assertTrue(filecmp.cmp(fasta_ref, fasta_out))
 
-        self.assertTrue((info_lines-1)*2 == fasta_lines)
+    def test03(self):
+        """
+        ID with no matching sequence
+        """
+
+        datadir = path.join(self.datadir)
+
+        this_test = sys._getframe().f_code.co_name
+        sseqids = path.join(datadir, 'sseqid_missing')
+
+        outdir = self.mkoutdir()
+
+        fasta_out = path.join(outdir, 'out.fasta')
+
+        args = ['--outfasta', fasta_out,
+                '--email', 'ngh2@uw.edu',
+                sseqids]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        # No output file is created.  Successfully passing the test means just 
+        # gracefully handling the error without throwing an error
+
+        self.main(args)
