@@ -21,11 +21,6 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
 
     datadir = path.join(datadir, 'ncbi_fetch')
 
-###
-# 01 - basic; whole sequence, no crop
-# 02 - sequences cropped: from the middle, starting too early, ending too late, both
-# 03 - non-existing sequence
-###
     def test01(self):
         """
         Test basic usage
