@@ -30,12 +30,12 @@ from subprocess import Popen, PIPE
 
 log = logging.getLogger(__name__)
 
-BLAST_HEADERS = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch', 'gapopen',
-                 'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch','gapopen',
+                   'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
 
-# use BLAST_FORMAT as input to blastn -outfmt
-BLAST_FORMAT = "6 qseqid sseqid pident qstart qend qlen"
-BLAST_HEADER = BLAST_FORMAT.split()[1:] + ['coverage']
+# use BLAST_FORMAT_DEFAULT as input to blastn -outfmt
+BLAST_FORMAT_DEFAULT = "qseqid,sseqid,pident,qstart,qend,qlen,qcovs"
+BLAST_HEADER_DEFAULT = BLAST_FORMAT_DEFAULT.split(',')
 
 ERRORS = ['snp', 'indel', 'homoindel', 'compound']
 
@@ -118,7 +118,6 @@ UNCLASSIFIED_REGEX = re.compile(
                                'vector\b',
                                r'vent\b',
                                ])))
-
 
 def homoencode(seq):
     """Run length encode a string
@@ -488,13 +487,6 @@ def parse_uc(infile):
             cluster_ids[row['query_label']] = cluster
 
     return cluster_ids, cluster_sizes
-
-
-def parse_blast(blast, extras=[]):
-    for line in blast:
-        if line and not line[0] == '#':
-            yield dict(zip(BLAST_HEADERS + extras, line.split()))
-
 
 def itemize_errors(ref, query):
     """
@@ -873,34 +865,25 @@ def correct_copy_numbers(assignments, copy_numbers):
 SeqLite = namedtuple('SeqLite', 'id, description, seq')
 
 
-def _readfasta(handle):
+def fastalite(handle, limit=None):
     """
-    Lightweight fasta parser. Returns iterator of namedtuple instances
-    with fields (id, description, seq) given file-like object `handle`.
+    Return a sequence of namedtupe objects given fasta format open
+    file-like object `handle`. Sequence is a list if `readfile` is
+    True, an iterator otherwise.
     """
-
-    handle = handle.read()
-
-    if handle:
-        for h in handle.lstrip('> ').split('\n>'):
-            part = h.find('\n')
-            idee = h[:part].split()[0]
-            desc = h[:part]
-            seq = ''.join(h[part:].split())
-            yield SeqLite(idee, desc, seq)
-
-
-def _iterfasta(handle):
-    """
-    Lightweight fasta parser. Returns iterator of namedtuple instances
-    with fields (id, description, seq) given file-like object `handle`.
-    """
+    limit = limit or -1
 
     name, seq = '', ''
     for line in handle:
         if line.startswith('>'):
+            if limit != 0:
+                limit -= 1
+            else:
+                break
+
             if name:
                 yield SeqLite(name.split()[0], name, seq)
+
             name, seq = line[1:].strip(), ''
         else:
             seq += line.strip()
@@ -908,14 +891,6 @@ def _iterfasta(handle):
     if name and seq:
         yield SeqLite(name.split()[0], name, seq)
 
-
-def fastalite(handle, readfile=False):
-    """
-    Return a sequence of namedtupe objects given fasta format open
-    file-like object `handle`. Sequence is a list if `readfile` is
-    True, an iterator otherwise.
-    """
-    return _readfasta(handle) if readfile else _iterfasta(handle)
 
 # Taken from Connor McCoy's Deenurp
 
