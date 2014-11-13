@@ -91,7 +91,7 @@ def build_parser(parser):
                         help='Decode alignment')
     parser.add_argument('--fieldnames',
                         default=('q_name,t_name,sw_zscore,sw_overlap,'
-                                 'q_al_start,q_al_stop,sw_ident,coverage'),
+                                 'q_al_start,q_al_stop,sw_ident,qcovs'),
                         type=lambda f: f.split(','),
                         help=('comma-delimited list of field '
                               'names to include in output'))
@@ -165,7 +165,7 @@ def action(args):
 
     # calculate coverage for each item and repack into generator
     # coverage = |query alignment| / |query length|
-    aligns = (dict(d, coverage=str(
+    aligns = (dict(d, qcovs=str(
              (float(d['q_al_stop']) - float(d['q_al_start'])) /
         float(d['q_sq_len'])
     )) for d in aligns)
@@ -180,16 +180,15 @@ def action(args):
         if top:
             aligns = chain([top], aligns)
 
-    if fieldnames:
-        writer = DictWriter(args.out,
-                            extrasaction='ignore',
-                            fieldnames=fieldnames)
+    writer = DictWriter(args.out,
+                        extrasaction='ignore',
+                        fieldnames=fieldnames)
 
-        if args.header:
-            writer.writeheader()
+    if args.header:
+        writer.writeheader()
 
-        for a in aligns:
-            writer.writerow(a)
+    for a in aligns:
+        writer.writerow(a)
 
     error = set(e.strip() for e in ssearch.stderr)
     error = ', '.join(error)
