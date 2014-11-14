@@ -25,7 +25,7 @@ import csv
 from subprocess import Popen, PIPE, CalledProcessError
 
 from bioy_pkg.utils import Opener, named_tempfile
-from bioy_pkg.sequtils import BLAST_HEADERS
+from bioy_pkg.sequtils import USEARCH_HEADER
 
 log = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ def action(args):
         if args.fieldnames:
             args_fieldnames = args.fieldnames.split(',')
             fieldnames = []
-            for b in BLAST_HEADERS:
+            for b in USEARCH_HEADER:
                 ssearch = toSsearch[b]
                 if ssearch == 'qcovs':
                     # will calculate later
@@ -112,7 +112,7 @@ def action(args):
                 else:
                     fieldnames.append(b)
         else:
-            fieldnames = BLAST_HEADERS
+            fieldnames = USEARCH_HEADER
 
         if os.stat(args.query).st_size == 0 or \
            os.stat(args.library).st_size == 0:
