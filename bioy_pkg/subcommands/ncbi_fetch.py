@@ -102,3 +102,4 @@ def action(args):
         SeqIO.write(outseq, args.outfasta, 'fasta')
         if args.seqinfo:
             info.writerow([seqid, taxid, description])
+    args.outfasta.close()
