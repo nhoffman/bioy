@@ -110,9 +110,9 @@ def build_parser(parser):
 def action(args):
     # setup ssearch command and communicate
     command = ['ssearch36']
-    command += ['-m', '10']
-    command += ['-3']
-    command += ['-n']
+    command += ['-m', '10'] # output/alignment format; 10 is parseable key:valu
+    command += ['-3']       # forward strand only
+    command += ['-n']       # DNA/RNA query
     command += ['-z', args.statistical_calculation]
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
