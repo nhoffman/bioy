@@ -6,7 +6,7 @@ before_install:
   - sudo apt-get build-dep python-numpy
 
 install:
-  - "dev/bootstrap.sh $VIRTUAL_ENV"
+  - "dev/bootstrap.sh --venv $VIRTUAL_ENV"
 
 script:
   - ./testall
