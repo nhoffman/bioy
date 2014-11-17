@@ -5,9 +5,9 @@ Test sequtils module.
 import cPickle
 import csv
 import logging
-import operator
 import pprint
 import sys
+import unittest
 
 from bz2 import BZ2File
 from collections import Counter
@@ -22,6 +22,8 @@ log = logging.getLogger(__name__)
 sequtilsdir = path.join(datadir, 'sequtils')
 
 
+@unittest.skipIf(not path.isfile(sequtils.SSEARCH_BIN),
+                 '{} does not exist'.format(sequtils.SSEARCH_BIN))
 class TestRunSsearch(TestBase):
 
     def test01(self):
@@ -79,6 +81,8 @@ class TestRunSsearch(TestBase):
             self.assertEqual(len(aligns), 400)
 
 
+@unittest.skipIf(not path.isfile(sequtils.SSEARCH_BIN),
+                 '{} does not exist'.format(sequtils.SSEARCH_BIN))
 class TestAllPairwise(TestBase):
 
     def test01(self):

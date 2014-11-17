@@ -30,8 +30,11 @@ from subprocess import Popen, PIPE
 
 log = logging.getLogger(__name__)
 
-USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length', 'mismatch','gapopen',
-                   'qstart', 'qend', 'sstart', 'send', 'evalue', 'bitscore']
+SSEARCH_BIN = '/usr/local/bin/ssearch36'
+
+USEARCH_HEADER = ['qseqid', 'sseqid', 'pident', 'length',
+                  'mismatch', 'gapopen', 'qstart', 'qend',
+                  'sstart', 'send', 'evalue', 'bitscore']
 
 # use BLAST_FORMAT_DEFAULT as input to blastn -outfmt
 BLAST_FORMAT_DEFAULT = "qseqid,sseqid,pident,qstart,qend,qlen,qcovs"
@@ -342,7 +345,7 @@ def fasta_tempfile(seqs, dir=None):
 
 @contextlib.contextmanager
 def run_ssearch(query, target, outfile=None, cleanup=True,
-                ssearch='ssearch36', max_hits=None,
+                ssearch=SSEARCH_BIN, max_hits=None,
                 full_length=True, m10=True, dna=True,
                 forward_only=True, args=None):
     """Align sequences in fasta-format files ``query`` and ``target``
