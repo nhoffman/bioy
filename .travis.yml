@@ -9,7 +9,7 @@ install:
   - "dev/bootstrap.sh --venv $VIRTUAL_ENV"
 
 script:
-  - ./testall
+  - ./testone -vv tests.test_denoise
 
 notifications:
   email:
