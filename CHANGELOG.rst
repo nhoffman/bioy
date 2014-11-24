@@ -3,7 +3,7 @@
 ==================
 
 
-1.8.4-next release
+1.9-next release
 ============
 
 * classify is now deprecated for the new faster classifier with test cases.  See bioy classifier --help for details.
