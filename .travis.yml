@@ -14,4 +14,6 @@ script:
 
 notifications:
   email:
+    - ngh2@uw.edu
     - crosenth@uw.edu
+    - tland9@uw.edu
