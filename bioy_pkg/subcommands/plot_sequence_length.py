@@ -63,7 +63,7 @@ def action(args):
     # format blast data and add additional available information
     pl = df['length'].plot(kind='kde',
                            title='sequence lengths',
-                           xticks=[0, 600])
+                           xticks=[400, 600])
 
     log.info('printing to {}'.format(args.out))
 

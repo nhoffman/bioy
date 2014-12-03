@@ -4,12 +4,13 @@ python:
 
 before_install:
   - sudo apt-get build-dep python-numpy
+  - sudo apt-get install muscle
 
 install:
   - "dev/bootstrap.sh --venv $VIRTUAL_ENV"
 
 script:
-  - ./testone -vv tests.test_denoise
+  - ./testall
 
 notifications:
   email:
