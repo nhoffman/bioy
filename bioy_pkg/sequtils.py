@@ -589,6 +589,9 @@ def parse_ssearch36(lines, numeric=False):
     prefix = None
     hit = defaultdict()
 
+    # enforce utf-8 encoding
+    lines = (l.decode('iso8859-1').encode('utf-8') for l in lines)
+
     for line in lines:
         line = line.rstrip('\n')
 
@@ -629,6 +632,8 @@ def parse_ssearch36(lines, numeric=False):
                 hit['al_cons'] += line
             else:
                 hit[prefix + 'seq'] += line.strip()
+        else:
+            continue
 
     if hit:
         yield hit
