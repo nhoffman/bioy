@@ -1,0 +1,19 @@
+language: python
+python:
+  - "2.7"
+
+before_install:
+  - sudo apt-get build-dep python-numpy
+  - sudo apt-get install muscle
+
+install:
+  - "dev/bootstrap.sh --venv $VIRTUAL_ENV"
+
+script:
+  - ./testall
+
+notifications:
+  email:
+    - ngh2@uw.edu
+    - crosenth@uw.edu
+    - tland9@uw.edu

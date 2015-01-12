@@ -6,11 +6,6 @@
 # override the default python interpreter using
 # `PYTHON=/path/to/python bin/bootstrap.sh`
 
-if [[ -n $VIRTUAL_ENV ]]; then
-    echo "You can't run this script inside an active virtualenv"
-    exit 1
-fi
-
 set -e
 
 abspath(){
@@ -77,6 +72,11 @@ while true; do
         ;;
     esac
 done
+
+if [[ -n $VIRTUAL_ENV && $VIRTUAL_ENV != $(readlink -e $VENV) ]]; then
+    echo "You can't run this script inside two different virtualenvs"
+    exit 1
+fi
 
 VENV_VERSION=1.11.6
 WHEELHOUSE=

@@ -2,17 +2,21 @@
  Changes for bioy
 ==================
 
+1.9.1-HEAD
+=====
+ * bioy reverse_complement can take a raw dna string now. Fasta file input is specified using --is-file.
+ * new csvjoin, csvconvert and csvdeduplicate that improve on some csvkit commands
 
-1.8.4-next release
+1.9
 ============
 
-* classify is now deprecated for the new faster classifier with test cases.  See bioy classifier --help for details.
+ * classify is now deprecated for the new faster classifier with test cases.  See bioy classifier --help for details.
+ * classifier summary details now selects the largest clusters grouped by assignment_threshold to more closely align with the assignment pct_id range
 
-* classifier summary details now selects the largest clusters grouped by assignment_threshold to more closely align with the assignment pct_id range
-
-* Known bugs: Tax_ids of valid Blast hits (hits that meet their rank thresholds) may be assigned 
+ * Known bugs: Tax_ids of valid Blast hits (hits that meet their rank thresholds) may be assigned 
               tax_ids of a higher threshold that *could* represent invalid tax_ids (tax_ids that may
               *not* have passed the rank threshold).
+              Travis tests are failing even though they pass locally.  The Travis test environment is a work in progress.
 
 1.8.3
 =====

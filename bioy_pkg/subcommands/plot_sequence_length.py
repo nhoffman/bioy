@@ -17,7 +17,6 @@
 """
 
 import logging
-import sys
 
 import matplotlib as plt
 import pandas as pd
@@ -30,9 +29,12 @@ log = logging.getLogger(__name__)
 def build_parser(parser):
     # required inputs
     parser.add_argument(
-        'fasta',
+        'intype',
+        choices=['fasta', 'csv'],
+        help='plot either and fasta or csv file')
+    parser.add_argument(
+        'infile',
         type=Opener(),
-        default=sys.stdin,
         help='CSV tabular blast file of query and subject hits.')
 
     # common outputs
@@ -41,6 +43,15 @@ def build_parser(parser):
         metavar='FILE',
         default='plot.pdf',
         help="Classification results.")
+    parser.add_argument(
+        '--column',
+        help=('if csv is specified select a column to plot'))
+    parser.add_argument(
+        '--xaxis',
+        help='plot x axis')
+    parser.add_argument(
+        '--title',
+        help=('density plot title'))
 
     parser.add_argument(
         '--limit', type=int, help='limit number of rows read')
@@ -48,22 +59,30 @@ def build_parser(parser):
 
 def action(args):
     # for debugging:
-    pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
+
+    if args.intype == 'fasta':
+        fa = fastalite(args.infile, limit=args.limit)
+        df = pd.Series(data={f.id: f.seq for f in fa}, name='seq')
+        df = df.reset_index()
+        df = df.set_index('index')
+        df.index.name = 'id'
+        df['length'] = df['seq'].apply(len)
+        column = 'length'
+    else:  # elif args.intpe == 'csv':
+        df = pd.read_csv(args.infile)
+        column = args.column
+
+    xticks = args.xaxis.split(',') if args.xaxis else None
 
     # do not display plots
     plt.use('Agg')
 
-    fa = fastalite(args.fasta, limit=args.limit)
-    df = pd.Series(data={f.id: f.seq for f in fa}, name='seq').reset_index()
-    df = df.set_index('index')
-    df.index.name = 'id'
-    df['length'] = df['seq'].apply(len)
-
     # format blast data and add additional available information
-    pl = df['length'].plot(kind='kde',
-                           title='sequence lengths',
-                           xticks=[0, 600])
+    pl = df[column].plot(kind='kde',
+                         title=args.title,
+                         xticks=xticks)
 
     log.info('printing to {}'.format(args.out))
 

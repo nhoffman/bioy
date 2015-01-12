@@ -162,7 +162,7 @@ def action(args):
     # are the consensus sequences themselves).
     exemplars = defaultdict(list)
     pool = Pool(processes = args.threads)
-    for cluster, cons in pool.imap_unordered(align_and_consensus, enumerate(chunks, start = 1)):
+    for cluster, cons in map(align_and_consensus, enumerate(chunks, start = 1)):
         exemplars[cons].extend([c.id for c in cluster])
 
     # calculate ratios of reads for the smallest group to each of the
