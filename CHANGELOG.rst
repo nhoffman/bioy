@@ -2,9 +2,10 @@
  Changes for bioy
 ==================
 
-1.9.1
+1.9.1-HEAD
 =====
  * bioy reverse_complement can take a raw dna string now. Fasta file input is specified using --is-file.
+ * new csvjoin, csvconvert and csvdeduplicate that improve on some csvkit commands
 
 1.9
 ============
