@@ -66,7 +66,7 @@ def retrieve_record(seq_id, seq_start, seq_stop):
         sum_records = Entrez.read(sum_handle)
     except:
         log.info("unable to parse seqid '{}'".format(seq_id))
-        return None
+        raise
 
     assert(len(seq_records) == 1 and len(sum_records) == 1)
 

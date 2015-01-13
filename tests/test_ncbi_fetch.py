@@ -76,28 +76,3 @@ class TestNcbiFetch(TestBase, TestCaseSuppressOutput):
         self.main(args)
 
         self.assertTrue(filecmp.cmp(fasta_ref, fasta_out))
-
-    def test03(self):
-        """
-        ID with no matching sequence
-        """
-
-        datadir = path.join(self.datadir)
-
-        this_test = sys._getframe().f_code.co_name
-        sseqids = path.join(datadir, 'sseqid_missing')
-
-        outdir = self.mkoutdir()
-
-        fasta_out = path.join(outdir, 'out.fasta')
-
-        args = ['--outfasta', fasta_out,
-                '--email', 'ngh2@uw.edu',
-                sseqids]
-
-        log.info(self.log_info.format(' '.join(map(str, args))))
-
-        # No output file is created.  Successfully passing the test means just 
-        # gracefully handling the error without throwing an error
-
-        self.main(args)
