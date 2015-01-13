@@ -31,7 +31,7 @@ from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import NucleotideAlphabet
 
 from bioy_pkg.sequtils import FETCH_HEADERS
-from bioy_pkg.utils import opener, Opener
+from bioy_pkg.utils import Opener
 
 fieldnames = ['id','seq_start','seq_stop']
 
@@ -53,6 +53,42 @@ def build_parser(parser):
     parser.add_argument('-e', '--email', required=True,
             help = "users of NCBI Entrez API should provide email.  if usage is excessive, ncbi may block access to its API")
 
+def retrieve_record(seq_id, seq_start, seq_stop):
+    seq_handle = Entrez.efetch(db="nucleotide", id=seq_id,
+                               seq_start=seq_start,
+                               seq_stop=seq_stop,
+                               retmode="xml")
+
+    sum_handle = Entrez.esummary(db="nucleotide", id=seq_id)
+
+    try:
+        seq_records = Entrez.read(seq_handle)
+        sum_records = Entrez.read(sum_handle)
+    except:
+        log.info("unable to parse seqid '{}'".format(seq_id))
+        return None
+
+    assert(len(seq_records) == 1 and len(sum_records) == 1)
+
+    seq_record = seq_records[0]
+    sum_record = sum_records[0]
+
+    # Ideally we would assert that the seqids of the two match, but one uses gi and the other uses gb
+
+    taxid = sum_record['TaxId']
+    description = seq_record['GBSeq_definition']
+    sequence = seq_record['GBSeq_sequence'].upper()
+    if seq_start and seq_stop:
+        assert(len(sequence) <= abs(int(seq_stop) - int(seq_start))+1)
+
+    seqids = [seqid for seqid in seq_record['GBSeq_other-seqids'] if 'gi' in seqid or 'gb' in seqid]
+    assert(len(seqids) >= 1)
+    seqid = ''.join(seqids) # Joins genbank, gi numbers, etc, which include '|'
+    return SeqRecord(Seq(sequence, NucleotideAlphabet),
+                         id=seqid,
+                         description=description,
+                         annotations={'taxid':taxid})
+
 def action(args):
 
     Entrez.email = args.email
@@ -60,46 +96,14 @@ def action(args):
     sseqids = csv.DictReader(args.sseqids, fieldnames=fieldnames)
 
     if args.seqinfo:
-        info = csv.writer(args.seqinfo, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        info = csv.writer(args.seqinfo, delimiter=',', quotechar='"', quoting=csv.QUOTE_ALL)
         if not args.no_header:
             info.writerow(FETCH_HEADERS)
 
     # For each subject line in the input, fetch the sequence and output to fasta
-    for subject in sseqids:
-        seq_handle = Entrez.efetch(db="nucleotide", id=subject['id'], 
-                                   seq_start=subject['seq_start'], 
-                                   seq_stop=subject['seq_stop'], 
-                                   retmode="xml")
-
-        sum_handle = Entrez.esummary(db="nucleotide", id=subject['id'])
-
-        try:
-            seq_records = Entrez.read(seq_handle)
-            sum_records = Entrez.read(sum_handle)
-        except:
-            log.info("unable to parse seqid '{}'".format(subject['id']))
-            continue
-
-        assert(len(seq_records) == 1 and len(sum_records) == 1)
-            
-        seq_record = seq_records[0]
-        sum_record = sum_records[0]
-
-        # Ideally we would assert that the seqids of the two match, but one uses gi and the other uses gb
-
-        taxid = sum_record['TaxId']
-        description = seq_record['GBSeq_definition']
-        sequence = seq_record['GBSeq_sequence'].upper()
-        if subject['seq_start'] and subject['seq_stop']:
-            assert(len(sequence) <= abs(int(subject['seq_stop']) - int(subject['seq_start']))+1)
-
-        seqids = [seqid for seqid in seq_record['GBSeq_other-seqids'] if 'gi' in seqid or 'gb' in seqid]
-        assert(len(seqids) >= 1)
-        seqid = ''.join(seqids) # Joins genbank, gi numbers, etc, which include '|'
-        outseq = SeqRecord(Seq(sequence, NucleotideAlphabet),
-                           id=seqid,
-                           description=description)
-        SeqIO.write(outseq, args.outfasta, 'fasta')
-        if args.seqinfo:
-            info.writerow([seqid, taxid, description])
+    records = [retrieve_record(subject['id'], subject['seq_start'], subject['seq_stop'])
+               for subject in sseqids]
+    SeqIO.write(records, args.outfasta, 'fasta')
+    if args.seqinfo:
+        info.writerows([[seq.id, seq.annotations['taxid'], seq.description] for seq in records])
     args.outfasta.close()
