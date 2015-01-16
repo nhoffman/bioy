@@ -9,7 +9,6 @@ import sys
 
 from importlib import import_module
 
-import globe
 from bioy_pkg import subcommands, __version__ as version, __doc__ as docstring
 
 log = logging
@@ -50,8 +49,8 @@ def parse_arguments(argv):
 
     parser.add_argument('-v', '--verbose',
                         action='count', dest='verbosity', default=1,
-                        help='Increase verbosity of screen output (eg, -v is verbose, '
-                        '-vv more so)')
+                        help='Increase verbosity of screen output '
+                             '(eg, -v is verbose, -vv more so)')
     parser.add_argument('-q', '--quiet',
                         action='store_const', dest='verbosity', const=0,
                         help='Suppress output')
@@ -71,14 +70,14 @@ def parse_arguments(argv):
     # Organize submodules by argv
     modules = [
         name for _, name, _ in pkgutil.iter_modules(subcommands.__path__)]
-    run = [m for m in modules if m in argv]
+    commands = [m for m in modules if m in argv]
 
     actions = {}
 
-    # `run` will contain the module corresponding to a single
+    # `commands` will contain the module corresponding to a single
     # subcommand if provided; otherwise, generate top-level help
     # message from all submodules in `modules`.
-    for name in run or modules:
+    for name in commands or modules:
         # set up subcommand help text. The first line of the dosctring
         # in the module is displayed as the help text in the
         # script-level help message (`script -h`). The entire
@@ -95,10 +94,11 @@ def parse_arguments(argv):
             continue
 
         subparser = subparsers.add_parser(
-            name, help=mod.__doc__.lstrip().split('\n', 1)[0],
+            name,
+            help=mod.__doc__.lstrip().split('\n', 1)[0],
             description=mod.__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
-        subparser = globe.parse_args(subparser)
+        subparser = subcommands.parse_args(subparser)
         mod.build_parser(subparser)
         actions[name] = mod.action
     # Determine we have called ourself (e.g. "help <action>")
@@ -112,6 +112,6 @@ def parse_arguments(argv):
     # Support help <action> by simply having this function call itself and
     # translate the arguments into something that argparse can work with.
     if action == 'help':
-        return parse_arguments([str(arguments.action[0]), '-h'])
-
-    return actions[action], arguments
+        return parse_arguments([str(arguments.action[0]), '-h'])  # loop back
+    else:
+        return actions[action], arguments
