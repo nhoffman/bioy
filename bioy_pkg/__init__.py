@@ -31,12 +31,8 @@ log = logging.getLogger(__name__)
 
 _data = os.path.join(os.path.dirname(__file__), 'data')
 
-try:
-    with open(os.path.join(_data, 'version')) as v:
-        __version__ = v.read().strip()
-except Exception, e:
-    log.warn(e)
-    __version__ = ''
+with open(os.path.join(_data, 'version')) as v:
+    __version__ = v.read().strip()
 
 
 def main(argv):
