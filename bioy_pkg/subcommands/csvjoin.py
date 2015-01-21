@@ -60,32 +60,26 @@ def action(args):
     # pandas.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
+    dfs = []
+
+    for csv in args.csv:
+        dfs.append(utils.read_csv(
+            csv,
+            dtype=str,
+            comment=args.comment,
+            na_filter=False,
+            header=None if args.no_header else 0))
+
     if args.on:
         on = args.on.split(',')
 
         if args.no_header:
             on = map(int, on)
     else:
-        on = [None]
+        on = None
 
-    if len(args.csv) != len(on):
-        on = on * len(args.csv)
+    df = dfs.pop(0)
+    for d in dfs:
+        df = df.merge(d, how=args.how, on=on)
 
-    dfs = []
-
-    for col, csv in enumerate(args.csv):
-        df = utils.read_csv(
-            csv,
-            dtype=str,
-            index_col=on[col],
-            comment=args.comment,
-            na_filter=False,
-            header=None if args.no_header else 0)
-        dfs.append(df)
-
-    df = dfs[0].join(dfs[1:], how=args.how, lsuffix='_x', rsuffix='_y')
-
-    df.to_csv(
-        args.out,
-        header=not args.no_header,
-        index=bool(args.on))
+    df.to_csv(args.out, header=not args.no_header, index=False)

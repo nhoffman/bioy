@@ -23,6 +23,7 @@ import importlib
 import logging
 import os
 import pkgutil
+import utils
 import subcommands
 import sys
 
@@ -39,58 +40,98 @@ except Exception, e:
 
 
 def main(argv):
-    action, arguments = parse_arguments(argv)
+    # add_help after logging is setup or parse_known_args will exit on -h
+    parser = argparse.ArgumentParser(description=__doc__, add_help=False)
+
+    # setup main arguments
+    parser = parse_args(parser)
+
+    # get logging namespace
+    namespace, argv = parser.parse_known_args(argv)
+
+    setup_logging(namespace)
+
+    # add_help=True
+    parser.add_argument('-h', '--help', action='help')
+
+    # setup actions and actions' arguments
+    parser, actions = parse_subcommands(parser, argv)
+
+    # finish building namespace
+    namespace = parser.parse_args(args=argv, namespace=namespace)
+
+    # Determine which subcommand (action) is in play
+    action = namespace.subparser_name
+
+    # execute subcommand (action)
+    if action == 'help':
+        # convert help <action> to <action> -h and loop back
+        return main([str(namespace.action[0]), '-h'])
+    else:
+        return actions[action](namespace)
+
+
+def setup_logging(namespace):
+    """
+    setup global logging
+    """
 
     loglevel = {
         0: logging.ERROR,
         1: logging.WARNING,
         2: logging.INFO,
         3: logging.DEBUG,
-    }.get(arguments.verbosity, logging.DEBUG)
+    }.get(namespace.verbosity, logging.DEBUG)
 
-    if arguments.verbosity > 1:
+    if namespace.verbosity > 1:
         logformat = '%(levelname)s %(module)s %(lineno)s %(message)s'
     else:
         logformat = '%(message)s'
 
-    # set up logging
-    logging.basicConfig(file=sys.stdout, format=logformat, level=loglevel)
-
-    return action(arguments)
+    logging.basicConfig(stream=namespace.log, format=logformat, level=loglevel)
 
 
-def parse_arguments(argv):
-    """
-    Create the argument parser
-    """
-
-    parser = argparse.ArgumentParser(description=__doc__)
-
-    parser.add_argument('-V', '--version', action='version',
+def parse_args(parser):
+    parser.add_argument('-V', '--version',
+                        action='version',
                         version=__version__,
                         help='Print the version number and exit')
 
+    parser.add_argument('-l', '--log',
+                        metavar='FILE',
+                        default=sys.stdout,
+                        type=utils.Opener('a'),  # append
+                        help='Send logging to a file')
+
     parser.add_argument('-v', '--verbose',
-                        action='count', dest='verbosity', default=1,
+                        action='count',
+                        dest='verbosity',
+                        default=1,
                         help='Increase verbosity of screen output '
                              '(eg, -v is verbose, -vv more so)')
+
     parser.add_argument('-q', '--quiet',
-                        action='store_const', dest='verbosity', const=0,
+                        action='store_const',
+                        dest='verbosity',
+                        const=0,
                         help='Suppress output')
 
-    ##########################
-    # Setup all sub-commands #
-    ##########################
+    return parser
+
+
+def parse_subcommands(parser, argv):
+    """
+    Setup all sub-commands
+    """
 
     subparsers = parser.add_subparsers(dest='subparser_name')
 
-    # Begin help sub-command
+    # add help sub-command
     parser_help = subparsers.add_parser(
         'help', help='Detailed help for actions using `help <action>`')
     parser_help.add_argument('action', nargs=1)
-    # End help sub-command
 
-    # Organize submodules by argv
+    # add all other subcommands
     modules = [
         name for _, name, _ in pkgutil.iter_modules(subcommands.__path__)]
     commands = [m for m in modules if m in argv]
@@ -112,7 +153,6 @@ def parse_arguments(argv):
             imp = '{}.{}'.format(subcommands.__name__, name)
             mod = importlib.import_module(imp)
         except Exception, e:
-            log.error('error importing module {}'.format(imp))
             log.error(e)
             continue
 
@@ -124,17 +164,5 @@ def parse_arguments(argv):
         subparser = subcommands.parse_args(subparser)
         mod.build_parser(subparser)
         actions[name] = mod.action
-    # Determine we have called ourself (e.g. "help <action>")
-    # Set arguments to display help if parameter is set
-    #           *or*
-    # Set arguments to perform an action with any specified options.
-    arguments = parser.parse_args(argv)
-    # Determine which action is in play.
-    action = arguments.subparser_name
 
-    # Support help <action> by simply having this function call itself and
-    # translate the arguments into something that argparse can work with.
-    if action == 'help':
-        return parse_arguments([str(arguments.action[0]), '-h'])  # loop back
-    else:
-        return actions[action], arguments
+    return parser, actions
