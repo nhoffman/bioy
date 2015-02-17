@@ -73,8 +73,6 @@ Running the program
       --max-group-size INTEGER
                             group multiple target-rank assignments that excede
                             a threshold to a higher rank [3]
-      --target-rank TARGET_RANK
-                            Rank at which to classify. Default: "species"
 
 Positional arguments
 ++++++++++++++++++++
@@ -157,14 +155,14 @@ A csv with columns and headers as in the example below:
 
     ======= ============= =============
 
-    ============= ======= =========== ===========
-     target_rank   reads   pct_reads   clusters
-    ============= ======= =========== ===========
-     species       6       35.29       1
-     genus         5       29.41       1
-     species       5       29.41       1
-                   1       5.88        1
-    ============= ======= =========== ===========
+    ================= ======= =========== ===========
+     condensed_rank   reads   pct_reads   clusters
+    ================= ======= =========== ===========
+     species          6       35.29       1
+     genus            5       29.41       1
+     species          5       29.41       1
+                      1       5.88        1
+    ================= ======= =========== ===========
 
 details-out
 ===========
@@ -319,12 +317,12 @@ def assignment_id(df):
     return df
 
 
-def target_rank(s, ranks):
+def condensed_rank(s, ranks):
     """Create aggregate columns for assignments.
     """
 
     s.index = s.apply(lambda x: ranks.index(x) if x in ranks else -1)
-    return s.sort_index().iloc[-1]
+    return s.sort_index().iloc[0]
 
 
 def find_tax_id(series, valids, r, ranks):
@@ -444,7 +442,9 @@ def build_parser(parser):
     # required inputs
     parser.add_argument(
         'blast_file',
-        help='CSV tabular blast file of query and subject hits, containing at least {}.'.format(sequtils.BLAST_FORMAT_DEFAULT))
+        help="""CSV tabular blast file of
+                query and subject hits, containing
+                at least {}.""".format(sequtils.BLAST_FORMAT_DEFAULT))
     parser.add_argument(
         'seq_info',
         help='File mapping reference seq name to tax_id')
@@ -521,9 +521,6 @@ def build_parser(parser):
         help="""group multiple target-rank assignments that excede a
         threshold to a higher rank [%(default)s]""")
     parser.add_argument(
-        '--target-rank', default='species',
-        help='Rank at which to classify. Default: "%(default)s"')
-    parser.add_argument(
         '--pct-reference', action='store_true',
         help="""include column with percent sseqids per assignment_id
         (NOT IMPLEMENTED)""")
@@ -534,7 +531,7 @@ def build_parser(parser):
 def action(args):
     # for debugging:
     pd.set_option('display.max_columns', None)
-    # pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
@@ -645,6 +642,7 @@ def action(args):
     rank_thresholds.columns = rank_thresholds_cols
 
     log.info('joining thresholds file')
+
     blast_results = blast_results.join(rank_thresholds, on='tax_id')
 
     # assign assignment tax ids based on pident and thresholds
@@ -732,8 +730,8 @@ def action(args):
     output['max_percent'] = assignment_stats['pident'].max()
     output['min_percent'] = assignment_stats['pident'].min()
     output['min_threshold'] = assignment_stats['assignment_threshold'].min()
-    output['target_rank'] = assignment_stats['assignment_rank'].apply(
-        target_rank, ranks)
+    output['condensed_rank'] = assignment_stats['assignment_rank'].apply(
+        condensed_rank, ranks)
 
     # qseqid cluster stats
     weights = blast_results[
