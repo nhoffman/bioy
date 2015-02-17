@@ -162,7 +162,10 @@ def parse_subcommands(parser, argv):
             help=mod.__doc__.lstrip().split('\n', 1)[0],
             description=mod.__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
+
+        # see subcommands/__init__.py
         subparser = subcommands.parse_args(subparser)
+
         mod.build_parser(subparser)
         actions[name] = mod.action
 
