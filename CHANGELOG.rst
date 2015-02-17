@@ -2,6 +2,10 @@
  Changes for bioy
 ==================
 
+1.9.2-HEAD
+==========
+ * exchanged target_rank with condensed_rank (issue: 31)
+
 1.9.1
 =====
  * bioy reverse_complement can take a raw dna string now. Fasta file input is specified using --is-file.
