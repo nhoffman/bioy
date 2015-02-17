@@ -1,10 +1,8 @@
+import logging
 import os
 from multiprocessing import cpu_count
 
-
-# global actions
-def action(args):
-    return args
+log = logging.getLogger(__name__)
 
 
 # global args
