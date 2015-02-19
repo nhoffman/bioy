@@ -5,6 +5,7 @@
 1.9.2-HEAD
 ==========
  * exchanged target_rank with condensed_rank (issue: 31)
+ * status messages now go to 100% (issue: 26)
 
 1.9.1
 =====

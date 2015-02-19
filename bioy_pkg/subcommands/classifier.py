@@ -287,6 +287,7 @@ def condense_ids(df, tax_dict, ranks, max_group_size, blast_results_len):
         tax_dict,
         ranks=ranks,
         max_size=max_group_size)
+
     condensed = pd.DataFrame(
         condensed.items(),
         columns=[ASSIGNMENT_TAX_ID, 'condensed_id'])
@@ -317,12 +318,30 @@ def assignment_id(df):
     return df
 
 
-def condensed_rank(s, ranks):
+def best_rank(s, ranks):
     """Create aggregate columns for assignments.
+
+    `ranks' are sorted with less specific first for example:
+
+    ['root', 'kingdom', 'phylum', 'order', 'family', 'genus', 'species']
+
+    so when sorting the indexes the most specific
+    rank will be in the iloc[-1] location
     """
 
-    s.index = s.apply(lambda x: ranks.index(x) if x in ranks else -1)
-    return s.sort_index().iloc[0]
+    value_counts = s.value_counts()
+    if len(value_counts) == 0:
+        # [no blast result]
+        return None
+    else:
+        majority_rank = value_counts[value_counts == value_counts.max()]
+        majority_rank.name = 'rank'
+        majority_rank = majority_rank.to_frame()
+        specificity = lambda x: ranks.index(x) if x in ranks else -1
+        majority_rank['specificity'] = majority_rank['rank'].apply(specificity)
+        majority_rank = majority_rank.sort(columns=['specificity'])
+        # most precise rank is at the highest index (-1)
+        return majority_rank.iloc[-1].name
 
 
 def find_tax_id(series, valids, r, ranks):
@@ -660,6 +679,7 @@ def action(args):
         blast_results['assignment_tax_name'] = None
         blast_results['condensed_id'] = None
         blast_results['starred'] = None
+        blast_results['condensed_rank'] = None
     else:
         blast_results_post_len = len(blast_results)
         log.info('{} valid hits selected ({:.0f}%)'.format(
@@ -686,13 +706,20 @@ def action(args):
         tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
 
         # create condensed assignment hashes by qseqid
+        blast_results_len = float(len(blast_results))
         blast_results = blast_results.sort('qseqid').reset_index(drop=True)
         blast_results = blast_results.groupby(
             by=['specimen', 'qseqid'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
             condense_ids, tax_dict, ranks,
-            args.max_group_size, float(len(blast_results)))
+            args.max_group_size, blast_results_len)
         sys.stderr.write('\n')
+
+        blast_results = blast_results.join(
+            taxonomy[['rank']], on='condensed_id', rsuffix='_condensed')
+
+        blast_results = blast_results.rename(
+            columns={'rank_condensed': 'condensed_rank'})
 
         # star condensed ids if one hit meets star threshold
         by = ['specimen', 'assignment_hash', 'condensed_id']
@@ -702,11 +729,12 @@ def action(args):
 
         # assign names to assignment_hashes
         blast_results = blast_results.sort('assignment_hash')
+        blast_results_len = float(len(blast_results))
         blast_results = blast_results.reset_index(drop=True)
         blast_results = blast_results.groupby(
             by=['specimen', 'assignment_hash'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
-            assign, tax_dict, float(len(blast_results)))
+            assign, tax_dict, blast_results_len)
         sys.stderr.write('\n')
 
     # merge qseqids that have no hits back into blast_results
@@ -730,8 +758,8 @@ def action(args):
     output['max_percent'] = assignment_stats['pident'].max()
     output['min_percent'] = assignment_stats['pident'].min()
     output['min_threshold'] = assignment_stats['assignment_threshold'].min()
-    output['condensed_rank'] = assignment_stats['assignment_rank'].apply(
-        condensed_rank, ranks)
+    output['best_rank'] = assignment_stats['condensed_rank'].apply(
+        best_rank, ranks)
 
     # qseqid cluster stats
     weights = blast_results[
