@@ -4,6 +4,8 @@
 
 1.9.2-HEAD
 ==========
+ * dynamically assigning rank thresholds and refreshed the available tax_ids in 
+   data/rank_thresholds.csv (issue: 32)
  * exchanged target_rank with condensed_rank (issue: 31)
  * status messages now go to 100% (issue: 26)
 
