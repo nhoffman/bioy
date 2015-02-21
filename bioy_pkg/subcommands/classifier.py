@@ -457,6 +457,32 @@ def copy_corrections(copy_numbers, blast_results, user_file=None):
     return corrections
 
 
+def join_thresholds(df, thresholds, ranks):
+    """Thresholds are matched to thresholds by rank id.
+
+    If a rank id is not present in the thresholds then the next specific
+    rank id is used all the way up to `root'.  If the root id still does
+    not match then a warning is issued with the taxname and the blast hit
+    is dropped.
+    """
+    with_thresholds = pd.DataFrame(columns=df.columns)  # temp DFrame
+
+    for r in ranks:
+        with_thresholds = with_thresholds.append(
+            df.join(thresholds, on=r, how='inner'))
+        no_threshold = df[~df.index.isin(with_thresholds.index)]
+        df = no_threshold
+
+    # issue warning messages for everything that did not join
+    if len(df) > 0:
+        tax_names = df['tax_name'].drop_duplicates()
+        msg = ('dropping blast hit `{}\', no valid '
+               'taxonomic threshold information found')
+        tax_names.apply(lambda x: log.warn(msg.format(x)))
+
+    return with_thresholds
+
+
 def build_parser(parser):
     # required inputs
     parser.add_argument(
@@ -550,7 +576,7 @@ def build_parser(parser):
 def action(args):
     # for debugging:
     pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
@@ -661,8 +687,8 @@ def action(args):
     rank_thresholds.columns = rank_thresholds_cols
 
     log.info('joining thresholds file')
-
-    blast_results = blast_results.join(rank_thresholds, on='tax_id')
+    blast_results = join_thresholds(
+        blast_results, rank_thresholds, reversed(ranks))
 
     # assign assignment tax ids based on pident and thresholds
     blast_results_len = float(len(blast_results))
