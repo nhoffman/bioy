@@ -2,7 +2,10 @@
  Changes for bioy
 ==================
 
-1.9.2-HEAD
+1.9.3-HEAD
+==========
+
+1.9.2
 ==========
  * dynamically assigning rank thresholds and refreshed the available tax_ids in 
    data/rank_thresholds.csv (issue: 32)
