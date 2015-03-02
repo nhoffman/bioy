@@ -105,18 +105,23 @@ def build_parser(parser):
                         metavar='X',
                         help=('Exclude alignments with '
                               'z-score < X [%(default)s]'))
+    parser.add_argument('--strand',
+                        default='forward',
+                        choices=['forward','both'])
 
 
 def action(args):
     # setup ssearch command and communicate
     command = ['ssearch36']
     command += ['-m', '10']  # 10 is parseable key:value output format
-    command += ['-3']        # forward strand only
     command += ['-n']        # DNA/RNA query
     command += ['-z', args.statistical_calculation]
     command += ['-g', args.gap_extension_penalty]
     command += ['-f', args.gap_open_penalty]
     command += ['-T', str(args.threads)]
+
+    if args.strand == 'forward':
+        command += ['-3']        # forward strand only
 
     if args.full_sequences:
         command += ['-a']
