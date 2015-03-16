@@ -11,6 +11,7 @@
    data/rank_thresholds.csv (issue: 32)
  * exchanged target_rank with condensed_rank (issue: 31)
  * status messages now go to 100% (issue: 26)
+ * fixed bug when no blast hits (issue: 34)
 
 1.9.1
 =====

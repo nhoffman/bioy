@@ -690,6 +690,9 @@ def action(args):
     blast_results = join_thresholds(
         blast_results, rank_thresholds, reversed(ranks))
 
+    # save the blast_results.columns in case groupby drops all columns
+    blast_results_columns = blast_results.columns
+
     # assign assignment tax ids based on pident and thresholds
     blast_results_len = float(len(blast_results))
     blast_results = blast_results.sort('qseqid').reset_index(drop=True)
@@ -701,11 +704,10 @@ def action(args):
 
     if blast_results.empty:
         log.info('all blast results filtered, returning [no blast results]')
-        blast_results['assignment_rank'] = None
-        blast_results['assignment_tax_name'] = None
-        blast_results['condensed_id'] = None
-        blast_results['starred'] = None
-        blast_results['condensed_rank'] = None
+        assignment_columns = ['assignment_rank', 'assignment_threshold', 'assignment_tax_name',
+                              'condensed_id', 'starred', 'condensed_rank', ASSIGNMENT_TAX_ID]
+        assignment_columns += blast_results_columns
+        blast_results = pd.DataFrame(columns = assignment_columns)
     else:
         blast_results_post_len = len(blast_results)
         log.info('{} valid hits selected ({:.0f}%)'.format(
