@@ -4,6 +4,8 @@
 
 1.9.3-HEAD
 ==========
+ * added a workaround to get past a datatype inference bug in Pandas (issue: 36)
+
 
 1.9.2
 ==========

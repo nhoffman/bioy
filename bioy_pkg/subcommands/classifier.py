@@ -604,8 +604,8 @@ def action(args):
             args.specimen_map,
             names=['qseqid', 'specimen'],
             usecols=['qseqid', 'specimen'],
-            dtype=str,
-            index_col='qseqid')
+            dtype=str)
+        spec_map = spec_map.set_index('qseqid')
         blast_results = blast_results.join(spec_map, on='qseqid', how='inner')
     elif args.specimen:
         blast_results['specimen'] = args.specimen
@@ -704,10 +704,12 @@ def action(args):
 
     if blast_results.empty:
         log.info('all blast results filtered, returning [no blast results]')
-        assignment_columns = ['assignment_rank', 'assignment_threshold', 'assignment_tax_name',
-                              'condensed_id', 'starred', 'condensed_rank', ASSIGNMENT_TAX_ID]
+        assignment_columns = ['assignment_rank', 'assignment_threshold',
+                              'assignment_tax_name', 'condensed_id', 'starred',
+                              'assignment', 'assignment_hash',
+                              'condensed_rank', ASSIGNMENT_TAX_ID]
         assignment_columns += blast_results_columns
-        blast_results = pd.DataFrame(columns = assignment_columns)
+        blast_results = pd.DataFrame(columns=assignment_columns)
     else:
         blast_results_post_len = len(blast_results)
         log.info('{} valid hits selected ({:.0f}%)'.format(
