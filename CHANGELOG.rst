@@ -2,10 +2,13 @@
  Changes for bioy
 ==================
 
-1.9.3-HEAD
+1.9.4
+=====
+ * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (issue: 38)
+
+1.9.3
 ==========
  * added a workaround to get past a datatype inference bug in Pandas (issue: 36)
- * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (issue: 38)
 
 1.9.2
 ==========
