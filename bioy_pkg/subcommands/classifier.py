@@ -605,6 +605,7 @@ def action(args):
             names=['qseqid', 'specimen'],
             usecols=['qseqid', 'specimen'],
             dtype=str)
+        spec_map = spec_map.drop_duplicates()
         spec_map = spec_map.set_index('qseqid')
         blast_results = blast_results.join(spec_map, on='qseqid', how='inner')
     elif args.specimen:
