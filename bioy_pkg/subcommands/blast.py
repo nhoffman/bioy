@@ -166,8 +166,12 @@ def action(args):
     # make into dict
     lines = [dict(l) for l in lines]
 
-    if isinstance(args.coverage, float) and 'qcovs' in args.outfmt.split(','):
-        lines = [l for l in lines if float(l['qcovs']) >= args.coverage]
+    if isinstance(args.coverage, float):
+        for l in lines:
+            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                    / float(l['qlen']) * 100
+            l['coverage'] = '{0:.2f}'.format(l['coverage'])
+        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
 
     if args.nohits:
         # to get nohits first we need to know about the hits
