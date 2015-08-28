@@ -64,17 +64,19 @@ def action(args):
     # pandas.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
-    df = []
+    dfs = []
+    columns = None  # to preserve column order
     for csv in args.csv:
-        df.append(utils.read_csv(
-            csv,
-            dtype=str,
-            nrows=args.limit,
-            comment='#',
-            na_filter=False,
-            header=None if args.no_header else 0))
+        df = utils.read_csv(csv,
+                            dtype=str,
+                            nrows=args.limit,
+                            comment='#',
+                            na_filter=False,
+                            header=None if args.no_header else 0)
+        columns = df.columns
+        dfs.append(df)
 
-    df = pandas.concat(df, ignore_index=True)
+    df = pandas.concat(dfs, ignore_index=True)
 
     if not args.stack:
         if args.on:
@@ -88,4 +90,4 @@ def action(args):
         else:
             df = df.drop_duplicates(take_last=args.take_last)
 
-    df.to_csv(args.out, index=False)
+    df.to_csv(args.out, columns=columns, index=False)
