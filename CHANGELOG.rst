@@ -2,6 +2,10 @@
  Changes for bioy
 ==================
 
+1.9.4-dev
+=====
+ * updated classifier to work with Python Pandas >=0.17.0
+
 1.9.4
 =====
  * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (issue: 38)
