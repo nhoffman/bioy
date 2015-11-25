@@ -902,8 +902,7 @@ def action(args):
         if args.hits_below_threshold:
             with args.hits_below_threshold as hits_below_threshold:
                 below_threshold_columns = ['specimen','tax_name','rank','tax_id',
-                                           'tax_name','pident','qcovs','qseqid',
-                                           'accession','sseqid']
+                                           'pident','qcovs','qseqid', 'accession','sseqid']
                 below_threshold.to_csv(
                     hits_below_threshold,
                     columns=below_threshold_columns,
