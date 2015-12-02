@@ -338,7 +338,7 @@ def best_rank(s, ranks):
         majority_rank = majority_rank.to_frame()
         specificity = lambda x: ranks.index(x) if x in ranks else -1
         majority_rank['specificity'] = majority_rank['rank'].apply(specificity)
-        majority_rank = majority_rank.sort(columns=['specificity'])
+        majority_rank = majority_rank.sort_values(by=['specificity'])
         # most precise rank is at the highest index (-1)
         return majority_rank.iloc[-1].name
 
@@ -578,7 +578,7 @@ def build_parser(parser):
 
 def action(args):
     # for debugging:
-    pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
@@ -699,7 +699,8 @@ def action(args):
 
     # assign assignment tax ids based on pident and thresholds
     blast_results_len = float(len(blast_results))
-    blast_results = blast_results.sort('qseqid').reset_index(drop=True)
+    blast_results = blast_results.sort_values(by='qseqid')
+    blast_results = blast_results.reset_index(drop=True)
     results_belowthreshold = blast_results
     blast_results = blast_results.groupby(
         by=['specimen', 'qseqid'], group_keys=False)
@@ -713,7 +714,7 @@ def action(args):
                               'assignment_tax_name', 'condensed_id', 'starred',
                               'assignment', 'assignment_hash',
                               'condensed_rank', ASSIGNMENT_TAX_ID]
-        assignment_columns += blast_results_columns
+        assignment_columns += blast_results_columns.tolist()
         blast_results = pd.DataFrame(columns=assignment_columns)
     else:
         blast_results_post_len = len(blast_results)
@@ -742,7 +743,8 @@ def action(args):
 
         # create condensed assignment hashes by qseqid
         blast_results_len = float(len(blast_results))
-        blast_results = blast_results.sort('qseqid').reset_index(drop=True)
+        blast_results = blast_results.sort_values(by='qseqid')
+        blast_results = blast_results.reset_index(drop=True)
         blast_results = blast_results.groupby(
             by=['specimen', 'qseqid'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
@@ -763,7 +765,7 @@ def action(args):
         blast_results = blast_results.apply(star, args.starred)
 
         # assign names to assignment_hashes
-        blast_results = blast_results.sort('assignment_hash')
+        blast_results = blast_results.sort_values(by='assignment_hash')
         blast_results_len = float(len(blast_results))
         blast_results = blast_results.reset_index(drop=True)
         blast_results = blast_results.groupby(
@@ -853,7 +855,7 @@ def action(args):
     # 4) alpha assignment
     columns = ['corrected'] if args.copy_numbers else ['reads']
     columns += ['clusters', 'assignment']
-    output = output.sort(columns=columns, ascending=False)
+    output = output.sort_values(by=columns, ascending=False)
     output = output.reset_index(level='assignment_hash', drop=True)
     output = output.sort_index()
 
@@ -889,7 +891,7 @@ def action(args):
                            'assignment_threshold']
 
         # sort details for consistency and ease of viewing
-        blast_results = blast_results.sort(columns=details_columns)
+        blast_results = blast_results.sort_values(by=details_columns)
 
         with args.details_out as out_details:
             blast_results.to_csv(
