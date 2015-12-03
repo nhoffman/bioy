@@ -195,7 +195,6 @@ log = logging.getLogger(__name__)
 
 ASSIGNMENT_TAX_ID = 'assignment_tax_id'
 
-
 def raw_filtering(blast_results, min_coverage=None,
                   max_identity=None, min_identity=None):
     """run raw hi, low and coverage filters and output log information
@@ -525,6 +524,10 @@ def build_parser(parser):
     parser.add_argument(
         '-O', '--details-out', type=Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
+    parser.add_argument(
+        '--hits-below-threshold', type=Opener('w'), metavar='FILE',
+        help="""Hits that were below the best-rank threshold and not used for
+        classification""")
 
     # switches and options
     parser.add_argument(
@@ -698,6 +701,7 @@ def action(args):
     blast_results_len = float(len(blast_results))
     blast_results = blast_results.sort_values(by='qseqid')
     blast_results = blast_results.reset_index(drop=True)
+    results_belowthreshold = blast_results
     blast_results = blast_results.groupby(
         by=['specimen', 'qseqid'], group_keys=False)
     blast_results = blast_results.apply(
@@ -770,6 +774,7 @@ def action(args):
             assign, tax_dict, blast_results_len)
         sys.stderr.write('\n')
 
+
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
 
@@ -777,6 +782,11 @@ def action(args):
     no_hits = blast_results['sseqid'].isnull()
     blast_results.loc[no_hits, 'assignment'] = '[no blast result]'
     blast_results.loc[no_hits, 'assignment_hash'] = 0
+
+    # merge back in blast hits that were filtered because they were below threshold
+    if args.hits_below_threshold:
+        everything = blast_results.merge(results_belowthreshold, how='outer',)[blast_results.columns]
+        below_threshold = everything[~everything['accession'].isin(blast_results['accession'])]
 
     # concludes our blast details, on to output summary
     log.info('summarizing output')
@@ -858,6 +868,7 @@ def action(args):
 
     # output to details.csv.bz2
     if args.details_out:
+        # Annotate details with classification columns
         blast_results = blast_results.merge(output.reset_index(), how='left')
 
         if not args.details_full:
@@ -889,3 +900,14 @@ def action(args):
                 header=True,
                 index=False,
                 float_format='%.2f')
+
+        if args.hits_below_threshold:
+            with args.hits_below_threshold as hits_below_threshold:
+                below_threshold_columns = ['specimen','tax_name','rank','tax_id',
+                                           'pident','qcovs','qseqid', 'accession','sseqid']
+                below_threshold.to_csv(
+                    hits_below_threshold,
+                    columns=below_threshold_columns,
+                    header=True,
+                    index=False,
+                    float_format='%.2f')
