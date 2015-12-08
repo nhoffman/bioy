@@ -849,7 +849,7 @@ def action(args):
     output['pct_reads'] = output['pct_reads'].map(round_up)
 
     # sort output by:
-    # 1) specimen
+    # 1) specimen -- Data Frame is already grouped by specimen
     # 2) read/corrected count
     # 3) cluster count
     # 4) alpha assignment
@@ -857,7 +857,10 @@ def action(args):
     columns += ['clusters', 'assignment']
     output = output.sort_values(by=columns, ascending=False)
     output = output.reset_index(level='assignment_hash', drop=True)
-    output = output.sort_index()
+
+    # Sort index (specimen) in preparation for groupby.
+    # Use stable sort (mergesort) to preserve sortings (1-4); default algorithm is not stable
+    output = output.sort_index(kind='mergesort')
 
     # one last grouping on the sorted output plus assignment ids by specimen
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
