@@ -5,6 +5,8 @@
 1.9.4-dev
 =====
  * updated classifier to work with Python Pandas >=0.17.0
+ * fixed classifier bug where assignment_id assignment was being unordered
+ * classifier has new argument for emitting blast results normally discarded as below assignment threshold
 
 1.9.4
 =====
