@@ -436,3 +436,40 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
         self.assertTrue(filecmp.cmp(details_ref, details_out))
 
+    def test13(self):
+        """
+        Test ordering of assignment_id
+        """
+
+        # Note: This test was inspired by a case when upgrading from numpy 1.9.2 to 1.10.1 where,
+        # with sort_index we were using an "unstable" sort on a field (specimen) with only one 
+        # value, and our classifications became unsorted.  Data here is derived from that test,
+        # previously would have failed this test, and subsequently passes
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(datadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
+        weights = os.path.join(thisdatadir, this_test, 'weights.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+
+        args = [
+                '--specimen', 'specimen',
+                '--weights', weights,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+
