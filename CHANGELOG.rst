@@ -2,7 +2,7 @@
  Changes for bioy
 ==================
 
-1.9.4-dev
+1.10
 =====
  * updated classifier to work with Python Pandas >=0.17.0
  * fixed classifier bug where assignment_id assignment was being unordered
