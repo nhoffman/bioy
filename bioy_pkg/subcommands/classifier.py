@@ -195,6 +195,7 @@ log = logging.getLogger(__name__)
 
 ASSIGNMENT_TAX_ID = 'assignment_tax_id'
 
+
 def raw_filtering(blast_results, min_coverage=None,
                   max_identity=None, min_identity=None):
     """run raw hi, low and coverage filters and output log information
@@ -774,7 +775,6 @@ def action(args):
             assign, tax_dict, blast_results_len)
         sys.stderr.write('\n')
 
-
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
 
@@ -783,10 +783,13 @@ def action(args):
     blast_results.loc[no_hits, 'assignment'] = '[no blast result]'
     blast_results.loc[no_hits, 'assignment_hash'] = 0
 
-    # merge back in blast hits that were filtered because they were below threshold
+    # merge back in blast hits that were
+    # filtered because they were below threshold
     if args.hits_below_threshold:
-        everything = blast_results.merge(results_belowthreshold, how='outer',)[blast_results.columns]
-        below_threshold = everything[~everything['accession'].isin(blast_results['accession'])]
+        everything = blast_results.merge(
+            results_belowthreshold, how='outer',)[blast_results.columns]
+        below_threshold = everything[
+            ~everything['accession'].isin(blast_results['accession'])]
 
     # concludes our blast details, on to output summary
     log.info('summarizing output')
@@ -859,7 +862,8 @@ def action(args):
     output = output.reset_index(level='assignment_hash', drop=True)
 
     # Sort index (specimen) in preparation for groupby.
-    # Use stable sort (mergesort) to preserve sortings (1-4); default algorithm is not stable
+    # Use stable sort (mergesort) to preserve sortings (1-4);
+    # default algorithm is not stable
     output = output.sort_index(kind='mergesort')
 
     # one last grouping on the sorted output plus assignment ids by specimen
@@ -906,8 +910,9 @@ def action(args):
 
         if args.hits_below_threshold:
             with args.hits_below_threshold as hits_below_threshold:
-                below_threshold_columns = ['specimen','tax_name','rank','tax_id',
-                                           'pident','qcovs','qseqid', 'accession','sseqid']
+                below_threshold_columns = [
+                    'specimen', 'tax_name', 'rank', 'tax_id',
+                    'pident', 'qcovs', 'qseqid', 'accession', 'sseqid']
                 below_threshold.to_csv(
                     hits_below_threshold,
                     columns=below_threshold_columns,
