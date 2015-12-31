@@ -1,17 +1,17 @@
-# This file is part of Bioy
+# This file is part of csvpandas
 #
-#    Bioy is free software: you can redistribute it and/or modify
+#    csvpandas is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    Bioy is distributed in the hope that it will be useful,
+#    csvpandas is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+#    along with csvpandas.  If not, see <http://www.gnu.org/licenses/>.
 """
 Tools for microbial sequence analysis and classification.
 
@@ -23,24 +23,17 @@ import importlib
 import logging
 import os
 import pkgutil
-import utils
 import subcommands
 import sys
+import utils
+import version
 
 log = logging.getLogger(__name__)
 
 _data = os.path.join(os.path.dirname(__file__), 'data')
 
-# version file is not required
-try:
-    with open(os.path.join(_data, 'version')) as v:
-        __version__ = v.read().strip()
-except Exception, e:
-    print e
-    __version__ = ''
 
-
-def main(argv):
+def main(argv=sys.argv[1:]):
     # add_help after logging is setup or parse_known_args will exit on -h
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
 
@@ -51,6 +44,9 @@ def main(argv):
     namespace, argv = parser.parse_known_args(argv)
 
     setup_logging(namespace)
+
+    # parse version after logging has been configured
+    parse_version(parser)
 
     # add_help=True
     parser.add_argument('-h', '--help', action='help')
@@ -84,22 +80,23 @@ def setup_logging(namespace):
         3: logging.DEBUG,
     }.get(namespace.verbosity, logging.DEBUG)
 
-    logformat = ('%(asctime)s %(levelname)s %(filename)s '
-                 '%(funcName)s %(lineno)s %(message)s')
-
+    log_format = ('%(asctime)s %(levelname)s %(filename)s '
+                  '%(funcName)s %(lineno)s %(message)s')
     datefmt = '%Y-%m-%d %H:%M:%S'
 
-    logging.basicConfig(
-        stream=namespace.log, format=logformat,
-        level=loglevel, datefmt=datefmt)
+    logging.basicConfig(stream=namespace.log, format=log_format,
+                        level=loglevel, log_format=log_format,
+                        datefmt=datefmt)
+
+
+def parse_version(parser):
+    parser.add_argument('-V', '--version',
+                        action='version',
+                        version=version.version(),
+                        help='Print the version number and exit')
 
 
 def parse_args(parser):
-    parser.add_argument('-V', '--version',
-                        action='version',
-                        version=__version__,
-                        help='Print the version number and exit')
-
     parser.add_argument('-l', '--log',
                         metavar='FILE',
                         default=sys.stdout,
@@ -156,6 +153,7 @@ def parse_subcommands(parser, argv):
             imp = '{}.{}'.format(subcommands.__name__, name)
             mod = importlib.import_module(imp)
         except Exception, e:
+            log.error('error importing subcommand {}'.format(name))
             log.error(e)
             continue
 
@@ -164,9 +162,6 @@ def parse_subcommands(parser, argv):
             help=mod.__doc__.lstrip().split('\n', 1)[0],
             description=mod.__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
-
-        # see subcommands/__init__.py
-        subparser = subcommands.parse_args(subparser)
 
         mod.build_parser(subparser)
         actions[name] = mod.action
