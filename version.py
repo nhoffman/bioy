@@ -9,6 +9,8 @@ import pkg_resources
 import re
 import subprocess
 
+log = logging.getLogger(__name__)
+
 
 def version():
     """
@@ -43,7 +45,7 @@ def version():
                 version = '{tag}.dev{commit}'.format(**git_search.groupdict())
             break
         except Exception as e:
-            logging.warn(e)
+            log.debug(e)
 
     if version is None:
         try:
