@@ -188,8 +188,7 @@ from os import path
 import pandas as pd
 import math
 
-from bioy_pkg import sequtils, _data as datadir
-from bioy_pkg.utils import Opener
+from bioy_pkg import sequtils, _data as datadir, utils
 
 log = logging.getLogger(__name__)
 
@@ -252,18 +251,6 @@ def round_up(x):
     return max(0.01, x)
 
 
-def read_csv(filename, compression=None, **kwargs):
-    """Read a csv file using pandas.read_csv with compression defined by
-    the file suffix unless provided.
-    """
-
-    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
-    compression = compression or suffixes.get(path.splitext(filename)[-1])
-    kwargs['compression'] = compression
-
-    return pd.read_csv(filename, **kwargs)
-
-
 def star(df, starred):
     """Assign boolean if any items in the
     dataframe are above the star threshold.
@@ -273,14 +260,10 @@ def star(df, starred):
     return df
 
 
-def condense_ids(df, tax_dict, ranks, max_group_size, blast_results_len):
+def condense_ids(df, tax_dict, ranks, max_group_size):
     """Create mapping from tax_id to its
     condensed id and set assignment hash.
     """
-
-    sys.stderr.write('\rcondensing group tax_ids to size {}: {:.0f}%'.format(
-        max_group_size,
-        df.tail(1).index.get_values()[0] / blast_results_len * 100))
 
     condensed = sequtils.condense_ids(
         df[ASSIGNMENT_TAX_ID].unique(),
@@ -297,12 +280,9 @@ def condense_ids(df, tax_dict, ranks, max_group_size, blast_results_len):
     return df.join(condensed, on=ASSIGNMENT_TAX_ID)
 
 
-def assign(df, tax_dict, blast_results_len):
+def assign(df, tax_dict):
     """Create str assignment based on tax_ids str and starred boolean.
     """
-
-    sys.stderr.write('\rcreating compound assignments: {:.0f}%'.format(
-        df.tail(1).index.get_values()[0] / blast_results_len * 100))
 
     ids_stars = df.groupby(by=['condensed_id', 'starred']).groups.keys()
     df['assignment'] = sequtils.compound_assignment(ids_stars, tax_dict)
@@ -358,15 +338,12 @@ def find_tax_id(series, valids, r, ranks):
     return value if value not in valids[key].unique() else None
 
 
-def select_valid_hits(df, ranks, blast_results_len):
+def select_valid_hits(df, ranks):
     """Return valid hits of the most specific rank that passed their
     corresponding rank thresholds.  Hits that pass their rank thresholds
     but do not have a tax_id at that rank will be bumped to a less specific
     rank id and varified as a unique tax_id.
     """
-
-    sys.stderr.write('\rselecting valid blast hits: {0:.0f}%'.format(
-        df.tail(1).index.get_values()[0] / blast_results_len * 100))
 
     for r in ranks:
         thresholds = df['{}_threshold'.format(r)]
@@ -423,7 +400,7 @@ def load_rank_thresholds(
     rank_threshold_defaults.csv file will be loaded.
     """
 
-    return read_csv(
+    return pd.read_csv(
         path,
         comment='#',
         usecols=['tax_id'] + usecols,
@@ -431,7 +408,7 @@ def load_rank_thresholds(
 
 
 def copy_corrections(copy_numbers, blast_results, user_file=None):
-    copy_numbers = read_csv(
+    copy_numbers = pd.read_csv(
         copy_numbers,
         dtype=dict(tax_id=str, median=float),
         usecols=['tax_id', 'median']).set_index('tax_id')
@@ -519,14 +496,14 @@ def build_parser(parser):
 
     # common outputs
     parser.add_argument(
-        '-o', '--out', default=sys.stdout, type=Opener('w'),
+        '-o', '--out', default=sys.stdout, type=utils.Opener('w'),
         metavar='FILE',
         help="Classification results.")
     parser.add_argument(
-        '-O', '--details-out', type=Opener('w'), metavar='FILE',
+        '-O', '--details-out', type=utils.Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
     parser.add_argument(
-        '--hits-below-threshold', type=Opener('w'), metavar='FILE',
+        '--hits-below-threshold', type=utils.Opener('w'), metavar='FILE',
         help="""Hits that were below the best-rank threshold and not used for
         classification""")
 
@@ -587,7 +564,7 @@ def action(args):
     header = 0 if args.has_header else None
     usecols = ['qseqid', 'sseqid', 'pident', 'qcovs']
     log.info('loading blast results')
-    blast_results = read_csv(
+    blast_results = pd.read_csv(
         args.blast_file,
         dtype=dict(qseqid=str, sseqid=str, pident=float, coverage=float),
         names=names,
@@ -604,7 +581,7 @@ def action(args):
     if args.specimen_map:
         # if a specimen_map is defined and a qseqid is not included in the map
         # hits to that qseqid will be dropped (inner join)
-        spec_map = read_csv(
+        spec_map = pd.read_csv(
             args.specimen_map,
             names=['qseqid', 'specimen'],
             usecols=['qseqid', 'specimen'],
@@ -636,11 +613,11 @@ def action(args):
     # load seq_info as a bridge to the sequence taxonomy.  Additional
     # columns can be specified to be included in the details-out file
     # such as accession number
-    seq_info = read_csv(
+    seq_info = pd.read_csv(
         args.seq_info,
         usecols=['seqname', 'tax_id', 'accession'],
-        dtype=dict(seqname=str, tax_id=str, accession=str),
-        index_col='seqname')
+        dtype=dict(seqname=str, tax_id=str, accession=str))
+    seq_info = seq_info.set_index('seqname')
     # rename index to match blast results column name
     seq_info.index.name = 'sseqid'
 
@@ -657,9 +634,7 @@ def action(args):
 
     # load the full taxonomy table.  Rank specificity as ordered from
     # left (less specific) to right (more specific)
-    taxonomy = read_csv(args.taxonomy, dtype=str)
-    # set index after assigning dtype
-    taxonomy = taxonomy.set_index('tax_id')
+    taxonomy = pd.read_csv(args.taxonomy, dtype=str).set_index('tax_id')
 
     # get the a list of rank columns ordered by specificity (see above)
     # NOTE: we are assuming the rank columns
@@ -674,8 +649,8 @@ def action(args):
         taxonomy[['tax_name', 'rank'] + ranks], on='tax_id', how='inner')
     len_diff = blast_results_len - len(blast_results)
     if len_diff:
-        log.warn('{} subject sequences dropped without '
-                 'records in taxonomy file.'.format(len_diff))
+        msg = '{} subject sequences dropped without records in taxonomy file'
+        log.warn(msg.format(len_diff))
 
     # load the default rank thresholds
     rank_thresholds = load_rank_thresholds(usecols=ranks)
@@ -685,7 +660,7 @@ def action(args):
         rank_thresholds = rank_thresholds.append(
             load_rank_thresholds(path=args.rank_thresholds, usecols=ranks))
         # overwrite with user defined tax_id threshold
-        rank_thresholds = rank_thresholds.groupby(level=0).last()
+        rank_thresholds = rank_thresholds.groupby(level=0, sort=False).last()
 
     rank_thresholds_cols = ['{}_threshold'.format(c) if c in ranks else c
                             for c in rank_thresholds.columns]
@@ -693,21 +668,18 @@ def action(args):
 
     log.info('joining thresholds file')
     blast_results = join_thresholds(
-        blast_results, rank_thresholds, reversed(ranks))
+        blast_results, rank_thresholds, ranks[::-1])
 
     # save the blast_results.columns in case groupby drops all columns
     blast_results_columns = blast_results.columns
 
     # assign assignment tax ids based on pident and thresholds
+    log.info('selecting valid hits')
     blast_results_len = float(len(blast_results))
-    blast_results = blast_results.sort_values(by='qseqid')
-    blast_results = blast_results.reset_index(drop=True)
     results_belowthreshold = blast_results
     blast_results = blast_results.groupby(
         by=['specimen', 'qseqid'], group_keys=False)
-    blast_results = blast_results.apply(
-        select_valid_hits, list(reversed(ranks)), blast_results_len)
-    sys.stderr.write('\n')
+    blast_results = blast_results.apply(select_valid_hits, ranks[::-1])
 
     if blast_results.empty:
         log.info('all blast results filtered, returning [no blast results]')
@@ -719,9 +691,9 @@ def action(args):
         blast_results = pd.DataFrame(columns=assignment_columns)
     else:
         blast_results_post_len = len(blast_results)
-        log.info('{} valid hits selected ({:.0f}%)'.format(
+        log.info('{} valid hits selected ({:.0%})'.format(
             blast_results_post_len,
-            blast_results_post_len / blast_results_len * 100))
+            blast_results_post_len / blast_results_len))
 
         # drop unneeded tax and threshold columns to free memory
         for c in ranks + rank_thresholds_cols:
@@ -743,15 +715,12 @@ def action(args):
         tax_dict = {i: t.to_dict() for i, t in taxonomy.fillna('').iterrows()}
 
         # create condensed assignment hashes by qseqid
-        blast_results_len = float(len(blast_results))
-        blast_results = blast_results.sort_values(by='qseqid')
-        blast_results = blast_results.reset_index(drop=True)
+        msg = 'condensing group tax_ids to size {}'.format(args.max_group_size)
+        log.info(msg)
         blast_results = blast_results.groupby(
             by=['specimen', 'qseqid'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
-            condense_ids, tax_dict, ranks,
-            args.max_group_size, blast_results_len)
-        sys.stderr.write('\n')
+            condense_ids, tax_dict, ranks, args.max_group_size)
 
         blast_results = blast_results.join(
             taxonomy[['rank']], on='condensed_id', rsuffix='_condensed')
@@ -767,13 +736,10 @@ def action(args):
 
         # assign names to assignment_hashes
         blast_results = blast_results.sort_values(by='assignment_hash')
-        blast_results_len = float(len(blast_results))
-        blast_results = blast_results.reset_index(drop=True)
+        log.info('creating compound assignments')
         blast_results = blast_results.groupby(
             by=['specimen', 'assignment_hash'], sort=False, group_keys=False)
-        blast_results = blast_results.apply(
-            assign, tax_dict, blast_results_len)
-        sys.stderr.write('\n')
+        blast_results = blast_results.apply(assign, tax_dict)
 
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
@@ -813,7 +779,7 @@ def action(args):
     weights = weights.drop_duplicates().set_index('qseqid')
 
     if args.weights:
-        weights_file = read_csv(
+        weights_file = pd.read_csv(
             args.weights,
             names=['qseqid', 'weight'],
             dtype=dict(qseqid=str, weight=float),
@@ -908,14 +874,17 @@ def action(args):
                 index=False,
                 float_format='%.2f')
 
-        if args.hits_below_threshold:
-            with args.hits_below_threshold as hits_below_threshold:
-                below_threshold_columns = [
-                    'specimen', 'tax_name', 'rank', 'tax_id',
-                    'pident', 'qcovs', 'qseqid', 'accession', 'sseqid']
-                below_threshold.to_csv(
-                    hits_below_threshold,
-                    columns=below_threshold_columns,
-                    header=True,
-                    index=False,
-                    float_format='%.2f')
+    if args.hits_below_threshold:
+        below_threshold = below_threshold.sort_values(
+            by=['specimen', 'qseqid', 'pident', 'qcovs', 'tax_name'],
+            ascending=[True, True, False, False, True])
+        with args.hits_below_threshold as hits_below_threshold:
+            below_threshold_columns = [
+                'specimen', 'tax_name', 'rank', 'tax_id',
+                'pident', 'qcovs', 'qseqid', 'accession', 'sseqid']
+            below_threshold.to_csv(
+                hits_below_threshold,
+                columns=below_threshold_columns,
+                header=True,
+                index=False,
+                float_format='%.2f')
