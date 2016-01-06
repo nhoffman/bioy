@@ -2,6 +2,10 @@
  Changes for bioy
 ==================
 
+1.10.dev
+========
+ * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (issue: 44)
+
 1.10
 =====
  * updated classifier to work with Python Pandas >=0.17.0
