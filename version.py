@@ -52,7 +52,7 @@ def version():
             """
             return version that was installed if available
             """
-            version = pkg_resources.require("deenurp")[0].version
+            version = pkg_resources.require("bioy")[0].version
         except pkg_resources.DistributionNotFound as e:
             logging.warn(e)
 
