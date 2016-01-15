@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+import bioy_pkg
+import sys
+
+if __name__ == '__main__':
+    sys.exit(bioy_pkg.main(sys.argv[1:]))

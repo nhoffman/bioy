@@ -1,0 +1,14 @@
+*.pyc
+build
+working
+test_output
+bioy_pkg/data/version
+MANIFEST
+dist
+*.egg-info
+*_ignore.py
+*env/
+_build
+src
+*~
+*.swp
