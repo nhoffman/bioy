@@ -91,7 +91,7 @@ def build_parser(parser):
                         help='Decode alignment')
     parser.add_argument('--fieldnames',
                         default=('q_name,t_name,sw_zscore,sw_overlap,'
-                                 'q_al_start,q_al_stop,sw_ident,qcovs'),
+                                 'q_al_start,q_al_stop,sw_ident,qcovs,sw_frame'),
                         type=lambda f: f.split(','),
                         help=('comma-delimited list of field '
                               'names to include in output'))

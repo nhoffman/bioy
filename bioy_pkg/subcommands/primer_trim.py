@@ -80,26 +80,35 @@ def primer_dict(parsed, side, keep=None, include=False):
     (`include`). `position` is a 0-index slice coordinate and is
     defined as follows:
 
-    side  include  ------------------------------------------------------------
-                   L =======>                       R <=======
-    left  False             ^ (q_al_stop)
-    left  True       ^        (q_al_start - 1)
-    right False                                       ^        (q_al_start - 1)
-    right True                                               ^ (q_al_stop)
+    side  include frame  ------------------------------------------------------------
+                         L =======>                       R <=======
+    left  False    f              ^ (q_al_stop)
+    left  True     f       ^        (q_al_start - 1)
+    right False    f                                        ^        (q_al_start - 1)
+    right True     f                                               ^ (q_al_stop)
+
+    right False    r                                        ^        (q_al_stop-1)
+    right True     r                                               ^ (q_al_start)
     """
 
     assert side in ('left', 'right')
     assert include in (True, False)
 
+    # Given a side (left,right) and a value for whether to include the primer,
+    # return the appropriate bound for this side
     positions = {
-        ('left', False):
+        ('left', False, 'f'):
         lambda hit: hit['q_al_stop'].isdigit() and int(hit['q_al_stop']),
-        ('left', True):
+        ('left', True, 'f'):
         lambda hit: int(hit['q_al_start']) - 1,
-        ('right', True):
+        ('right', True, 'f'):
         lambda hit: hit['q_al_stop'].isdigit() and int(hit['q_al_stop']),
-        ('right', False):
-        lambda hit: int(hit['q_al_start']) - 1
+        ('right', False, 'f'):
+        lambda hit: int(hit['q_al_start']) - 1,
+        ('right', True, 'r'):
+        lambda hit: hit['q_al_start'].isdigit() and int(hit['q_al_start']),
+        ('right', False, 'r'):
+        lambda hit: int(hit['q_al_stop']) - 1,
     }
 
     # 'best' hit is assumed to be first in each group
@@ -108,7 +117,7 @@ def primer_dict(parsed, side, keep=None, include=False):
     if keep:
         hits = ifilter(keep, hits)
 
-    d = {hit['q_name']: int(positions[(side, include)](hit)) for hit in hits}
+    d = {hit['q_name']: positions[(side, include, hit['sw_frame'])](hit) for hit in hits}
 
     msg = ': {} sequences passed {} primer criteria'.format(len(d), side)
 
@@ -162,6 +171,7 @@ def action(args):
         else:
             keep = None
 
+        # dictionary of {seq_id: [xcoord,ycoord]}
         right = primer_dict(
             DictReader(args.right_aligns),
             side='right',
