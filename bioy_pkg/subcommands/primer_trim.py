@@ -110,7 +110,7 @@ def primer_dict(parsed, side, keep=None, include=False):
 
     d = {hit['q_name']: int(positions[(side, include)](hit)) for hit in hits}
 
-    msg = '{} sequences passed {} primer criteria'.format(side, len(d))
+    msg = ': {} sequences passed {} primer criteria'.format(len(d), side)
 
     log.debug(msg)
 
