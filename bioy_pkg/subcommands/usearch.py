@@ -1,94 +1,177 @@
+# This file is part of Bioy
+#
+#    Bioy is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Bioy is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 Run usearch global and produce classify friendly output
 """
 
 import logging
+import os
 import sys
+import csv
 
-from itertools import izip, ifilter, imap
-from subprocess import Popen, PIPE
-from csv import DictWriter
-from cStringIO import StringIO
+from subprocess import Popen, PIPE, CalledProcessError
 
-from bioy_pkg.sequtils import BLAST_HEADER, BLAST_FORMAT
-from bioy_pkg.utils import Opener
+from bioy_pkg.utils import Opener, named_tempfile
+from bioy_pkg.sequtils import USEARCH_HEADER
 
 log = logging.getLogger(__name__)
 
+toSsearch = {'qseqid': 'q_name',
+             'sseqid': 't_name',
+             'pident': 'sw_ident',
+             'length': 'q_sq_len',
+             'mismatch': 'mismatch',
+             'qcovs': 'qcovs',
+             'gapopen': 'gaopen',
+             'qstart': 'q_al_start',
+             'qend': 'q_al_stop',
+             'sstart': 't_al_start',
+             'send': 't_al_stop',
+             'evalue': 'sw_expect',
+             'bitscore': 'sw_bits'}
+
+
 def build_parser(parser):
-    parser.add_argument('fasta',
-            default = '-',
-            help = 'input fasta file')
+    parser.add_argument('query',
+                        help='input fasta query file')
+    parser.add_argument('library',
+                        help='input fasta library file to search against')
     parser.add_argument('-o', '--out',
-            type = Opener('w'),
-            default = sys.stdout,
-            help = 'tabulated BLAST results with the following headers {}'.format(BLAST_FORMAT))
-    parser.add_argument('-d', '--database',
-            help = 'a blast database')
-    parser.add_argument('--header',
-            action = 'store_true',
-            help = 'output header')
+                        type=Opener('w'),
+                        default=sys.stdout,
+                        help='tabulated ssearch results')
+    parser.add_argument('--no-header',
+                        dest='header',
+                        action='store_false',
+                        help='no header')
     parser.add_argument('--strand',
-            default = 'plus',
-            choices = ['plus', 'minus', 'both'],
-            help = """query strand(s) to search against database/subject.
-                      default = %(default)s""")
-    parser.add_argument('--id',
-            default = 0.9,
-            type = float,
-            help = 'minimum identity for accepted values default [%(default)s]')
+                        default='plus',
+                        choices=['plus', 'minus', 'both'],
+                        help=('query strand(s) to search against '
+                              'database/subject.default = %(default)s'))
+    parser.add_argument('--min-identity',
+                        default=0.9,
+                        type=float,
+                        help=('minimum identity for accepted '
+                              'values default [%(default)s]'))
+    parser.add_argument('--min-coverage', type=float,
+                        help='minimum percent coverage for each alignment')
     parser.add_argument('--max',
-            help = 'maximum number of alignments to keep default = 1')
-    parser.add_argument('--usearch', default = 'usearch6_64',
-            help = 'name of usearch executable')
+                        help=('maximum number of alignments '
+                              'to keep [%(default)s]'))
+    parser.add_argument('--usearch', default='usearch6',
+                        help='name of usearch executable')
+    parser.add_argument('--fieldnames',
+                        help='specify fieldnames to use')
+
+
+def coverage(d):
+    """
+    Coverage is calculated relative to the length of the query sequence.
+    """
+
+    d['qcovs'] = float(d['qend']) - float(d['qstart']) + 1
+    d['qcovs'] /= float(d['length'])
+
+    return d
+
+
+def sw_ident_to_decimal(result):
+    result['sw_ident'] = float(result['sw_ident']) / 100.0
+    return result
 
 
 def action(args):
-    command = [args.usearch]
-    command += ['-usearch_global', args.fasta]
-    command += ['-threads', str(args.threads)]
-    command += ['-id', str(args.id)]
-    command += ['-db', args.database]
-    command += ['-strand', args.strand]
-    command += ['-blast6out', '/dev/stdout']
+    with named_tempfile('rw') as tfile, args.out as outfile:
+        # If query or library file is empty, don't bother executing ssearch.
+        # Just print empty file
+        # with a header and exit
+        if args.fieldnames:
+            args_fieldnames = args.fieldnames.split(',')
+            fieldnames = []
+            for b in USEARCH_HEADER:
+                ssearch = toSsearch[b]
+                if ssearch == 'qcovs':
+                    # will calculate later
+                    continue
+                elif ssearch in args_fieldnames:
+                    fieldnames.append(ssearch)
+                else:
+                    fieldnames.append(b)
+        else:
+            fieldnames = USEARCH_HEADER
 
-    if args.max:
-        command += ['-maxaccepts', args.max]
+        if os.stat(args.query).st_size == 0 or \
+           os.stat(args.library).st_size == 0:
+            # write empty header
+            writer = csv.DictWriter(args.out,
+                                    extrasaction='ignore',
+                                    fieldnames=fieldnames)
+            if args.header:
+                writer.writeheader()
+            return
 
-    log.debug(' '.join(command))
+        command = [args.usearch,
+                   '-usearch_global', args.query,
+                   '-threads', str(args.threads),
+                   '-id', str(args.min_identity),
+                   '-db', args.library,
+                   '-strand', args.strand,
+                   '-blast6out', tfile.name,
+                   '-maxaccepts', '0',  # run full algo
+                   '-maxhits', args.max or '0']  # '0' = all hits
 
-    usearch = Popen(command, stdout = PIPE, stderr = PIPE)
+        log.info(' '.join(command))
 
-    lines = imap(lambda l: l.strip().split('\t'), usearch.stdout)
+        usearch_proc = Popen(command, stderr=PIPE, stdout=PIPE)
 
-    # usearch has strange commenting at the top it's alignment.
-    # we just just want the lines seperated by 12 tabs
-    lines = ifilter(lambda l: len(l) == 12, lines)
-    lines = imap(lambda l:
-            l[:3] + [l[6], l[7] , (int(l[7]) - int(l[6]) + 1)], lines)
-    lines = imap(lambda l: izip(BLAST_HEADER, l), lines)
-    lines = imap(lambda l: dict(l), lines)
+        error = set(e.strip() for e in usearch_proc.stderr)
+        error = ', '.join(error)
 
-    fieldnames = BLAST_HEADER
+        if usearch_proc.wait() != 0:
+            raise CalledProcessError(usearch_proc.returncode, error)
 
-    if isinstance(args.coverage, float):
-        for l in lines:
-            l['coverage'] = (float(l['qend']) - float(l['qstart']) + 1) \
-                    / float(l['qlen']) * 100
-            l['coverage'] = '{0:.2f}'.format(l['coverage'])
-        lines = [l for l in lines if float(l['coverage']) >= args.coverage]
+        if error:
+            log.error(error)
 
-        fieldnames += ['coverage']
+        usearch_proc.communicate()
 
-    out = DictWriter(args.out,
-                     fieldnames = BLAST_HEADER,
-                     extrasaction = 'ignore')
+        tfile.flush()
+        tfile.seek(0)
 
-    if args.header:
-        out.writeheader()
+        results = csv.DictReader(tfile,
+                                 fieldnames=fieldnames,
+                                 delimiter='\t')
 
-    out.writerows(lines)
+        if 'qcovs' in args_fieldnames or args.min_coverage:
+            results = (coverage(r) for r in results)
 
-    err = usearch.stderr.read().strip()
-    if err:
-        log.error(err)
+            if args.min_coverage:
+                results = (r for r in results
+                           if r['qcovs'] >= args.min_coverage)
+
+        if 'sw_ident' in args_fieldnames:
+            # convert to ssearch format
+            results = (sw_ident_to_decimal(r) for r in results)
+
+        writer = csv.DictWriter(outfile,
+                                fieldnames=args_fieldnames,
+                                extrasaction='ignore')
+
+        if args.header:
+            writer.writeheader()
+
+        writer.writerows(results)

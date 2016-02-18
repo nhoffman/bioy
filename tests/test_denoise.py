@@ -8,15 +8,24 @@ import os
 import sys
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.subcommands import denoise
+from bioy_pkg import main
 
-from __init__ import TestBase, TestSubcommand, datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir
 
 log = logging.getLogger(__name__)
 
-class TestDenoise(TestBase, TestSubcommand):
 
-    subcommand = denoise
+class TestDenoise(TestBase, TestCaseSuppressOutput):
+
+    def main(self, arguments):
+        """Pass list 'arguments' to scripts.main, ensuring that all are
+        strings.
+
+        """
+
+        command = ['denoise'] + [str(a) for a in arguments]
+        log.info('bioy ' + ' '.join(command))
+        main(command)
 
     def test01(self):
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
@@ -24,7 +33,8 @@ class TestDenoise(TestBase, TestSubcommand):
         outdir = self.mkoutdir()
         fa_out = path.join(outdir, 'denoised.fasta')
         limit = 100
-        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit])
+        self.main([fa, '--clusters', uc, '--outfile',
+                   fa_out, '--limit', limit])
 
         # cluster mass equals number of input sequences
         with open(fa_out) as f:
@@ -38,8 +48,8 @@ class TestDenoise(TestBase, TestSubcommand):
             outseqs = list(fastalite(out))
             refseqs = list(fastalite(ref))
             self.assertEqual(len(outseqs), len(refseqs))
-            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
-
+            self.assertEqual(set(s.seq for s in outseqs),
+                             set(s.seq for s in refseqs))
 
     def test02(self):
         fa = path.join(datadir, 'F1_3', 'trimmed.fasta')
@@ -48,16 +58,16 @@ class TestDenoise(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'denoised.fasta')
         limit = 100
         min_size = 2
-        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
-                   min_size])
+        self.main([fa, '--clusters', uc, '--outfile', fa_out,
+                   '--limit', limit, '--min-clust-size', min_size])
 
         reference = path.join(datadir, 'F1_3', 'test02_denoised.fasta')
         with open(fa_out) as out, open(reference) as ref:
             outseqs = list(fastalite(out))
             refseqs = list(fastalite(ref))
             self.assertEqual(len(outseqs), len(refseqs))
-            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
-
+            self.assertEqual(set(s.seq for s in outseqs),
+                             set(s.seq for s in refseqs))
 
     def test03(self):
         fa = path.join(datadir, 'F1_3xR1_36', 'trimmed.fasta')
@@ -73,8 +83,7 @@ class TestDenoise(TestBase, TestSubcommand):
                    '--outfile', denoised,
                    '--limit', limit,
                    '--min-clust-size', min_size,
-                   '--weights', path.join(outdir, 'weights.csv')
-               ])
+                   '--weights', path.join(outdir, 'weights.csv')])
 
         denoised_grouped = path.join(outdir, 'denoised.grouped.fasta')
         self.main([fa,
@@ -83,8 +92,7 @@ class TestDenoise(TestBase, TestSubcommand):
                    '--limit', limit,
                    '--min-clust-size', min_size,
                    '--groups', groups,
-                   '--weights', path.join(outdir, 'weights.grouped.csv')
-               ])
+                   '--weights', path.join(outdir, 'weights.grouped.csv')])
 
         with open(denoised) as d, open(denoised_grouped) as g:
             ds = list(fastalite(d))
@@ -105,8 +113,8 @@ class TestDenoise(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'denoised_empty.fasta')
         limit = 100
         min_size = sys.maxint
-        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit', limit, '--min-clust-size',
-                   min_size])
+        self.main([fa, '--clusters', uc, '--outfile', fa_out, '--limit',
+                   limit, '--min-clust-size', min_size])
 
         # 1)
         self.assertTrue(os.path.isfile(fa_out))
@@ -131,5 +139,5 @@ class TestDenoise(TestBase, TestSubcommand):
             outseqs = list(fastalite(out))
             refseqs = list(fastalite(ref))
             self.assertEqual(len(outseqs), len(refseqs))
-            self.assertEqual(set(s.seq for s in outseqs), set(s.seq for s in refseqs))
-
+            self.assertEqual(set(s.seq for s in outseqs),
+                             set(s.seq for s in refseqs))

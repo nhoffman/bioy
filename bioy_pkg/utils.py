@@ -1,11 +1,29 @@
+# This file is part of Bioy
+#
+#    Bioy is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Bioy is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import bz2
 import gzip
 import logging
+import pandas
 import re
 import shutil
 import sys
 import signal
+import contextlib
+import tempfile
 
 from itertools import takewhile, izip_longest, groupby
 from csv import DictReader
@@ -15,14 +33,32 @@ from os import path
 log = logging.getLogger(__name__)
 
 
+def apply_df_status(func, df, msg=''):
+    """
+    """
+    tmp_column = 'index_number'
+    row_count = float(len(df))
+    df[tmp_column] = xrange(int(row_count))
+    msg += ' {:.0%}\r'
+
+    def apply_func(item, msg):
+        sys.stderr.write(msg.format(item[tmp_column] / row_count))
+        return func(item)
+
+    df = df.apply(apply_func, args=[msg], axis=1)
+    return df.drop(tmp_column, axis=1)
+
+
 def flattener(iterable):
     """
     Flatten nested iterables (not strings or dict-like objects).
 
-    Poached from http://stackoverflow.com/questions/2158395/flatten-an-irregular-list-of-lists-in-python
+    Poached from http://stackoverflow.com/questions/2158395
+                       /flatten-an-irregular-list-of-lists-in-python
     """
     for el in iterable:
-        if isinstance(el, Iterable) and not (isinstance(el, basestring) or hasattr(el, 'get')):
+        if isinstance(el, Iterable) and \
+                not (isinstance(el, basestring) or hasattr(el, 'get')):
             for sub in flattener(el):
                 yield sub
         else:
@@ -107,6 +143,7 @@ def parse_extras(s, numeric=True):
 
 
 class Opener(object):
+
     """Factory for creating file objects
 
     Keyword Arguments:
@@ -116,7 +153,7 @@ class Opener(object):
             the builtin open() function.
     """
 
-    def __init__(self, mode = 'r', bufsize = -1):
+    def __init__(self, mode='r', bufsize=-1):
         self._mode = mode
         self._bufsize = bufsize
 
@@ -137,13 +174,18 @@ class Opener(object):
         args_str = ', '.join(repr(arg) for arg in args if arg != -1)
         return '{}({})'.format(type(self).__name__, args_str)
 
-def opener(pth, mode = 'r', bufsize = -1):
+
+def opener(pth, mode='r', bufsize=-1):
     return Opener(mode, bufsize)(pth)
 
-class Csv2Dict(object):
-    """Easy way to convert a csv file into a dictionary using the argparse type function
 
-    If no arguments the first column of the csv will be the key and every column
+class Csv2Dict(object):
+
+    """Easy way to convert a csv file into a
+    dictionary using the argparse type function
+
+    If no arguments the first column of the csv
+    will be the key and every column
     will be the value in an OrderedDict.
 
     Keyword Arguments:
@@ -152,7 +194,7 @@ class Csv2Dict(object):
         - fieldnames -- csv column names
     """
 
-    def __init__(self, index = None, value = None, *args, **kwds):
+    def __init__(self, index=None, value=None, *args, **kwds):
         self.index = index
         self.value = value
         self.args = args
@@ -171,12 +213,14 @@ class Csv2Dict(object):
                 results[key] = r[self.value]
             else:
                 fields = lambda k: reader.fieldnames.index(k[0])
-                results[key] = OrderedDict(sorted(r.items(), key = fields))
+                results[key] = OrderedDict(sorted(r.items(), key=fields))
 
         return results
 
-def csv2dict(pth, index = None, value = None, *args, **kwds):
+
+def csv2dict(pth, index=None, value=None, *args, **kwds):
     return Csv2Dict(index, value, args, kwds)(pth)
+
 
 def groupbyl(li, key=None, as_dict=False):
     groups = sorted(li, key=key)
@@ -208,3 +252,31 @@ def exit_on_sigpipe(status=None):
     Set program to exit on SIGPIPE
     """
     _exit_on_signal(signal.SIGPIPE, status)
+
+
+def read_csv(filename, compression=None, limit=None, **kwargs):
+    """Read a csv file using pandas.read_csv with compression defined by
+    the file suffix unless provided.
+    """
+
+    suffixes = {'.bz2': 'bz2', '.gz': 'gzip'}
+    compression = compression or suffixes.get(path.splitext(filename)[-1])
+    kwargs['compression'] = compression
+
+    return pandas.read_csv(filename, **kwargs)
+
+
+@contextlib.contextmanager
+def named_tempfile(*args, **kwargs):
+    """Near-clone of tempfile.NamedTemporaryFile, but the file is deleted
+    when the context manager exits, rather than when it's closed.
+
+    """
+
+    kwargs['delete'] = False
+    tf = tempfile.NamedTemporaryFile(*args, **kwargs)
+    try:
+        with tf:
+            yield tf
+    finally:
+        os.unlink(tf.name)

@@ -4,13 +4,11 @@ Test subcommands.
 
 from os import path
 import logging
-import argparse
 
 from bioy_pkg.utils import opener
-from bioy_pkg.scripts.main import parse_arguments, main
-from bioy_pkg.subcommands import reverse_complement
+from bioy_pkg import main
 
-from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand, datadir
+from __init__ import TestCaseSuppressOutput, TestBase, datadir
 
 log = logging.getLogger(__name__)
 
@@ -23,15 +21,19 @@ class TestMainScript(TestCaseSuppressOutput, TestBase):
     def testExit02(self):
         self.assertRaises(SystemExit, main, ['-h'])
 
-class TestReverseComplement(TestBase, TestSubcommand):
 
-    subcommand = reverse_complement
+class TestReverseComplement(TestBase, TestCaseSuppressOutput):
+
+    def main(self, arguments):
+        main(['reverse_complement'] + arguments)
 
     def test01(self):
         outdir = self.mkoutdir()
         fa = path.join(datadir, 'F1_3', 'trimmed_rle.fasta')
         fa_out = path.join(outdir, 'rc.fasta')
-        self.main([fa, '-o', fa_out])
+
+        self.main([fa, '--is-file', '-o', fa_out])
+
         self.assertTrue(path.exists(fa_out))
 
         with open(fa) as infile, open(fa_out) as outfile:
@@ -46,7 +48,10 @@ class TestReverseComplement(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'rc.fasta')
         rle_out = path.join(outdir, 'rc.csv.bz2')
 
-        self.main([fa, rle, '--out-fasta', fa_out, '--out-rle', rle_out])
+        self.main(
+            ['--is-file', '--out-fasta', fa_out, '--out-rle',
+             rle_out, '--rlefile', rle, fa])
+
         self.assertTrue(path.exists(fa_out))
         self.assertTrue(path.exists(rle_out))
 
@@ -62,7 +67,10 @@ class TestReverseComplement(TestBase, TestSubcommand):
         fa_out = path.join(outdir, 'rc.fasta')
         rle_out = path.join(outdir, 'rc.csv.bz2')
 
-        self.main([fa, rle, '--out-fasta', fa_out, '--out-rle', rle_out])
+        self.main(
+            ['--is-file', '--out-fasta', fa_out, '--out-rle',
+             rle_out, '--rlefile', rle, fa])
+
         self.assertTrue(path.exists(fa_out))
         self.assertTrue(path.exists(rle_out))
 

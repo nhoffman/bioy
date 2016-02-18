@@ -7,19 +7,20 @@ import logging
 
 from os import path
 
-from bioy_pkg.subcommands import csv2fasta
+from bioy_pkg import main
 
-from __init__ import TestBase, TestSubcommand, datadir as datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
 log = logging.getLogger(__name__)
 
-class TestCsv2fasta(TestBase, TestSubcommand):
-
-    subcommand = csv2fasta
+class TestCsv2fasta(TestBase, TestCaseSuppressOutput):
 
     log_info = 'bioy csv2fasta {}'
 
     datadir = path.join(datadir, 'csv2fasta')
+
+    def main(self, arguments):
+        main(['csv2fasta'] + arguments)
 
     def test01(self):
         """

@@ -8,15 +8,16 @@ import sys
 
 from os import path
 
-from bioy_pkg.subcommands import dedup as subcommand
+from bioy_pkg import main
 
-from __init__ import TestBase, TestSubcommand, datadir as datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
 log = logging.getLogger(__name__)
 
-class TestDedup(TestBase, TestSubcommand):
+class TestDedup(TestBase, TestCaseSuppressOutput):
 
-    subcommand = subcommand
+    def main(self, arguments):
+        main(['dedup'] + arguments)
 
     log_info = 'bioy dedup {}'
 

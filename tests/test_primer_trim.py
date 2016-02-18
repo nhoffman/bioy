@@ -6,22 +6,18 @@ import logging
 
 from os import path
 
-from bioy_pkg.scripts.main import main
-from bioy_pkg.subcommands import primer_trim
+from bioy_pkg import main
 from bioy_pkg.sequtils import fastalite
 
-from __init__ import TestCaseSuppressOutput, TestBase, TestSubcommand
+from __init__ import TestCaseSuppressOutput, TestBase
 
 log = logging.getLogger(__name__)
 
-class TestMain(TestCaseSuppressOutput, TestBase):
 
-    def testExit01(self):
-        self.assertRaises(SystemExit, main, ['-h'])
+class TestPrimerTrimAction(TestCaseSuppressOutput, TestBase):
 
-class TestPrimerTrimAction(TestSubcommand, TestBase):
-
-    subcommand = primer_trim
+    def main(self, arguments):
+        main(['primer_trim'] + arguments)
 
     def testHelp(self):
         self.assertRaises(SystemExit, self.main, ['-h'])

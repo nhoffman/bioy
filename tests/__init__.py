@@ -1,12 +1,11 @@
+import cPickle
 import sys
 import logging
 import os
 from os import path
 import unittest
-import argparse
 
-from bioy_pkg.utils import mkdir
-from bioy_pkg.scripts import globe
+from bioy_pkg.utils import mkdir, opener
 
 # set up logging for unit tests
 verbosity_flag = [x for x in sys.argv if x.startswith('-v')]
@@ -54,6 +53,9 @@ class TestBase(unittest.TestCase):
     def data(self, fname):
         return path.join(datadir, fname)
 
+    def write_pickle(self, pth, data):
+        with opener(pth, 'wb') as f:
+            cPickle.dump(data, f, protocol=cPickle.HIGHEST_PROTOCOL)
 
 class TestCaseSuppressOutput(unittest.TestCase):
 
@@ -68,30 +70,3 @@ class TestCaseSuppressOutput(unittest.TestCase):
             sys.stdout = sys.__stdout__
             sys.stderr = sys.__stderr__
 
-class TestSubcommand(unittest.TestCase):
-    """Must define class variable subcommand with methods action and
-    build_parser. Execute the subcommand using
-
-      self.main(list_of_args)
-
-    """
-
-    def setUp(self):
-        self.funcname = '_'.join(self.id().split('.')[-2:])
-        self.suppress_output = log.getEffectiveLevel() >= logging.INFO
-        if self.suppress_output:
-            sys.stdout = sys.stderr = open(os.devnull, 'w')
-
-        self.action = self.subcommand.action
-        self.build_parser = self.subcommand.build_parser
-        parser = argparse.ArgumentParser()
-        parser = globe.parse_args(parser)
-        self.build_parser(parser)
-
-        self.main = lambda args: self.action(parser.parse_args([str(arg) for arg in args]))
-
-
-    def tearDown(self):
-        if self.suppress_output:
-            sys.stdout = sys.__stdout__
-            sys.stderr = sys.__stderr__

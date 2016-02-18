@@ -8,23 +8,25 @@ import sys
 
 from os import path
 
-from bioy_pkg.subcommands import classify
+from bioy_pkg import main
 
-from __init__ import TestBase, TestSubcommand, datadir as datadir
+from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
 log = logging.getLogger(__name__)
 
-class TestClassify(TestBase, TestSubcommand):
+class TestClassify(TestBase, TestCaseSuppressOutput):
 
-    subcommand = classify
+    def main(self, arguments):
+        main(['classify'] + [str(a) for a in arguments])
 
     log_info = 'bioy classify {}'
+
+    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2')
 
     datadir = path.join(datadir, 'classify')
 
     tax = path.join(datadir, 'taxonomy.csv.bz2')
     info = path.join(datadir, 'seq_info.csv.bz2')
-    copy_numbers = path.join(datadir, 'rrnDB_16S_copy_num.csv')
 
     def test01(self):
         """

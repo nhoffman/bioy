@@ -1,2 +1,2 @@
-numpy>=1.7.0
-biopython>=1.6.3
+Sphinx>=1.2.2
+ghp-import

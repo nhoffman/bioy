@@ -1,3 +1,18 @@
+# This file is part of Bioy
+#
+#    Bioy is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    Bioy is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with Bioy.  If not, see <http://www.gnu.org/licenses/>.
+
 """
 Describe distributions of sequencing quality scores
 """
@@ -41,7 +56,6 @@ BASES = set(['A', 'C', 'G', 'T'])
 def action(args):
 
     try:
-        from scipy.stats.mstats import mquantiles
         from numpy import mean
     except ImportError, e:
         print(e)
@@ -49,11 +63,8 @@ def action(args):
 
     extras = parse_extras(args.extra_fields) if args.extra_fields else {}
 
-    quants = [0.025, 0.25, 0.5, 0.75, 0.975]
-
     # TODO: add 'ambiguities'
     fieldnames = ['name', 'length', 'mean', 'ambig']
-    fieldnames += ['Q{0:03.0f}'.format(q * 1000) for q in quants]
     fieldnames += extras.keys()
 
     stats = DictWriter(args.out, fieldnames=fieldnames)
@@ -65,6 +76,5 @@ def action(args):
         qual = s.letter_annotations["phred_quality"]
         ambig = len([1 for b in s.seq if b not in BASES])
         row = [s.name.replace(':', '_'), len(s), mean(qual), ambig]
-        row += list(mquantiles(qual, quants))
         row += extras.values()
         stats.writerow(dict(zip(fieldnames, row)))
