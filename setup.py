@@ -20,11 +20,11 @@ setup(author='Noah Hoffman',
       scripts=['bioy'],
       version=version,
       url='https://github.com/nhoffman/bioy',
-      package_data={'bioy_pkg': ['data/rank_thresholds.csv']},
+      package_data={'bioy_pkg': ['data/*']},
       requires=['python (>= 2.7.5)'],
       install_requires=[
           'numpy>=1.8.1',
-          'pandas>=0.15',
+          'pandas>=0.17.0',
           'biopython>=1.6.3',
           'matplotlib'
       ])

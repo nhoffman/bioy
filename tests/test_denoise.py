@@ -8,7 +8,7 @@ import os
 import sys
 
 from bioy_pkg.sequtils import fastalite
-from bioy_pkg.scripts.main import main
+from bioy_pkg import main
 
 from __init__ import TestBase, TestCaseSuppressOutput, datadir
 

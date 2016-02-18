@@ -6,7 +6,7 @@ import logging
 
 from os import path
 
-from bioy_pkg.scripts.main import main
+from bioy_pkg import main
 from bioy_pkg.sequtils import fastalite
 
 from __init__ import TestCaseSuppressOutput, TestBase

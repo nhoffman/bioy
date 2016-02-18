@@ -41,10 +41,10 @@ def build_parser(parser):
     parser.add_argument(
         '--limit', type=int, help='Limit number of rows read from each csv.')
     parser.add_argument(
-        '--columns',
+        '--on',
         metavar='COLS',
         help=('Comma delimited list of column '
-              'names or numbers to only consider in deduplication.'))
+              'names or indices if --no-header'))
     parser.add_argument(
         '--no-header',
         action='store_true',
@@ -53,14 +53,10 @@ def build_parser(parser):
         '--take-last',
         action='store_true',
         help='Take the last duplicate value. Default is first.')
-
-
-def get_column(col, columns):
-    try:
-        col = columns[int(col) - 1]
-    except ValueError:
-        pass
-    return col
+    parser.add_argument(
+        '--stack',
+        action='store_true',
+        help=('keep all lines, do not deduplicate'))
 
 
 def action(args):
@@ -68,28 +64,30 @@ def action(args):
     # pandas.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
-    df = []
+    dfs = []
+    columns = None  # to preserve column order
     for csv in args.csv:
-        df.append(utils.read_csv(
-            csv,
-            dtype=str,
-            nrows=args.limit,
-            comment='#',
-            na_filter=False,
-            header=None if args.no_header else 0))
-    columns = df[0].columns
-    df = pandas.concat(df, ignore_index=True)
-    df = df[columns]
+        df = utils.read_csv(csv,
+                            dtype=str,
+                            nrows=args.limit,
+                            comment='#',
+                            na_filter=False,
+                            header=None if args.no_header else 0)
+        columns = df.columns
+        dfs.append(df)
 
-    # must set index after read_csv so the index_col will have dtype as str
-    if args.columns:
-        index = [get_column(i, df.columns) for i in args.columns.split(',')]
-        if len(index) == 1:
-            index = index[0]
-        df = df.set_index(index, drop=True)
-        df = df.groupby(level=index, sort=False)
-        df = df.last() if args.take_last else df.first()
-    else:
-        df = df.drop_duplicates()
+    df = pandas.concat(dfs, ignore_index=True)
 
-    df.to_csv(args.out, index=args.columns)
+    if not args.stack:
+        if args.on:
+            on = args.on.split(',')
+
+            if args.no_header:
+                on = map(int, on)
+
+            df = df.groupby(by=on, sort=False)
+            df = df.tail(1) if args.take_last else df.head(1)
+        else:
+            df = df.drop_duplicates(take_last=args.take_last)
+
+    df.to_csv(args.out, columns=columns, index=False)

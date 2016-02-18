@@ -8,7 +8,7 @@ import os
 import filecmp
 import sys
 
-from bioy_pkg.scripts.main import main
+from bioy_pkg import main
 
 from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 
@@ -293,7 +293,7 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
     def test09(self):
         """
-        Test all [no blast results] classification
+        Test all [no blast results] classification with hits
         """
 
         thisdatadir = self.thisdatadir
@@ -327,10 +327,9 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
         self.assertTrue(filecmp.cmp(details_ref, details_out))
 
-
     def test10(self):
         """
-        Parse non-default blast result files that have haders
+        Parse non-default blast result files that have headers
         """
 
         thisdatadir = self.thisdatadir
@@ -340,7 +339,6 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         outdir = self.mkoutdir()
 
         classify_out = os.path.join(outdir, 'classifications.csv')
-        details_out = os.path.join(outdir, 'details.csv')
 
         blast = os.path.join(thisdatadir, 'blast_extrafields.csv.bz2')
         taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
@@ -349,12 +347,9 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         outdir = self.mkoutdir()
 
         classify_out = os.path.join(outdir, 'classifications.csv.bz2')
-        details_out = os.path.join(outdir, 'details.csv.bz2')
 
         classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
-        details_ref = os.path.join(
-            thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
             '--has-header',
@@ -368,3 +363,113 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         self.main(args)
 
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+
+    def test11(self):
+        """
+        Test dynamic thresholding
+
+        github issue #32
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, this_test, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = os.path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = ['--details-out', details_out,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test12(self):
+        """
+        Test all [no blast results] classification with no hits
+        """
+
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+        weights = os.path.join(thisdatadir, 'weights.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = os.path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = ['--weights', weights,
+                '--details-out', details_out,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test13(self):
+        """
+        Test ordering of assignment_id
+        """
+
+        # Note: This test was inspired by a case when upgrading from numpy 1.9.2 to 1.10.1 where,
+        # with sort_index we were using an "unstable" sort on a field (specimen) with only one 
+        # value, and our classifications became unsorted.  Data here is derived from that test,
+        # previously would have failed this test, and subsequently passes
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, this_test, 'blast.csv.bz2')
+        taxonomy = os.path.join(datadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, this_test, 'seq_info.csv.bz2')
+        weights = os.path.join(thisdatadir, this_test, 'weights.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+
+        args = [
+                '--specimen', 'specimen',
+                '--weights', weights,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+

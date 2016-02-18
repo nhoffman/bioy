@@ -8,7 +8,7 @@ import sys
 
 from os import path
 
-from bioy_pkg.scripts.main import main
+from bioy_pkg import main
 
 from __init__ import TestBase, TestCaseSuppressOutput, datadir as datadir
 

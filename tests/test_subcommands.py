@@ -6,7 +6,7 @@ from os import path
 import logging
 
 from bioy_pkg.utils import opener
-from bioy_pkg.scripts.main import main
+from bioy_pkg import main
 
 from __init__ import TestCaseSuppressOutput, TestBase, datadir
 

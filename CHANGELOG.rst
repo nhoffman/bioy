@@ -2,6 +2,32 @@
  Changes for bioy
 ==================
 
+1.10.dev
+========
+ * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (issue: 44)
+
+1.10
+=====
+ * updated classifier to work with Python Pandas >=0.17.0
+ * fixed classifier bug where assignment_id assignment was being unordered
+ * classifier has new argument for emitting blast results normally discarded as below assignment threshold
+
+1.9.4
+=====
+ * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (issue: 38)
+
+1.9.3
+==========
+ * added a workaround to get past a datatype inference bug in Pandas (issue: 36)
+
+1.9.2
+==========
+ * dynamically assigning rank thresholds and refreshed the available tax_ids in 
+   data/rank_thresholds.csv (issue: 32)
+ * exchanged target_rank with condensed_rank (issue: 31)
+ * status messages now go to 100% (issue: 26)
+ * fixed bug when no blast hits (issue: 34)
+
 1.9.1
 =====
  * bioy reverse_complement can take a raw dna string now. Fasta file input is specified using --is-file.

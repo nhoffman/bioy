@@ -166,7 +166,13 @@ def action(args):
     # make into dict
     lines = [dict(l) for l in lines]
 
-    if isinstance(args.coverage, float) and 'qcovs' in args.outfmt.split(','):
+    # Replace blast's local alignment query coverage with global coverage calculation
+    if 'qcovs' in args.outfmt.split(',') or isinstance(args.coverage, float):
+        for l in lines:
+            l['qcovs'] = (float(l['qend']) - float(l['qstart']) + 1) \
+                    / float(l['qlen']) * 100
+            l['qcovs'] = '{0:.2f}'.format(l['qcovs'])
+    if isinstance(args.coverage, float):
         lines = [l for l in lines if float(l['qcovs']) >= args.coverage]
 
     if args.nohits:
