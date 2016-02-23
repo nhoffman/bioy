@@ -292,9 +292,13 @@ def assign(df, tax_dict):
 def assignment_id(df):
     """Resets and drops the current dataframe's
     index and sets it to the assignment_hash
+
+    assignment_id is treated as a string identifier to account
+    for hits in details with no assignment or assignment_id
     """
     df = df.reset_index(drop=True)  # specimen is retained in the group key
     df.index.name = 'assignment_id'
+    df.index = df.index.astype(str)
     return df
 
 
@@ -314,10 +318,11 @@ def best_rank(s, ranks):
         # [no blast result]
         return None
     else:
+        def specificity(r):
+            return ranks.index(r) if r in ranks else -1
         majority_rank = value_counts[value_counts == value_counts.max()]
         majority_rank.name = 'rank'
         majority_rank = majority_rank.to_frame()
-        specificity = lambda x: ranks.index(x) if x in ranks else -1
         majority_rank['specificity'] = majority_rank['rank'].apply(specificity)
         majority_rank = majority_rank.sort_values(by=['specificity'])
         # most precise rank is at the highest index (-1)
@@ -349,27 +354,30 @@ def select_valid_hits(df, ranks):
         thresholds = df['{}_threshold'.format(r)]
         pidents = df['pident']
         valid = df[thresholds < pidents]
-        if not valid.empty:
-            tax_ids = valid[r]
 
-            na_ids = tax_ids.isnull()
+        if valid.empty:
+            # Move to higher rank
+            continue
 
-            # Occasionally tax_ids will be missing at a certain rank.
-            # If so use the next less specific tax_id available
-            if na_ids.all():
-                continue
+        tax_ids = valid[r]
+        na_ids = tax_ids.isnull()
 
-            if na_ids.any():
-                # bump up missing taxids
-                have_ids = valid[tax_ids.notnull()]
-                found_ids = valid[na_ids].apply(
-                    find_tax_id, args=(have_ids, r, ranks), axis=1)
-                tax_ids = have_ids[r].append(found_ids)
+        # Occasionally tax_ids will be missing at a certain rank.
+        # If so use the next less specific tax_id available
+        if na_ids.all():
+            continue
 
-            valid[ASSIGNMENT_TAX_ID] = tax_ids
-            valid['assignment_threshold'] = thresholds
-            # return notnull() assignment_threshold valid values
-            return valid[valid[ASSIGNMENT_TAX_ID].notnull()]
+        if na_ids.any():
+            # bump up missing taxids
+            have_ids = valid[tax_ids.notnull()]
+            found_ids = valid[na_ids].apply(
+                find_tax_id, args=(have_ids, r, ranks), axis=1)
+            tax_ids = have_ids[r].append(found_ids)
+
+        valid[ASSIGNMENT_TAX_ID] = tax_ids
+        valid['assignment_threshold'] = thresholds
+        # return notnull() assignment_threshold valid values
+        return valid[valid[ASSIGNMENT_TAX_ID].notnull()]
 
     # nothing passed
     df[ASSIGNMENT_TAX_ID] = None
@@ -503,9 +511,10 @@ def build_parser(parser):
         '-O', '--details-out', type=utils.Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
     parser.add_argument(
-        '--hits-below-threshold', type=utils.Opener('w'), metavar='FILE',
-        help="""Hits that were below the best-rank threshold and not used for
-        classification""")
+        '--hits-below-threshold',
+        action='store_true',
+        help=('Hits that were below the best-rank threshold '
+              'will be included in the details'))
 
     # switches and options
     parser.add_argument(
@@ -556,7 +565,7 @@ def build_parser(parser):
 
 def action(args):
     # for debugging:
-    # pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
@@ -638,7 +647,6 @@ def action(args):
 
     # get the a list of rank columns ordered by specificity (see above)
     # NOTE: we are assuming the rank columns
-    #       are last N columns staring with 'root'
     ranks = taxonomy.columns.tolist()
     ranks = ranks[ranks.index('root'):]
 
@@ -676,10 +684,19 @@ def action(args):
     # assign assignment tax ids based on pident and thresholds
     log.info('selecting valid hits')
     blast_results_len = float(len(blast_results))
-    results_belowthreshold = blast_results
-    blast_results = blast_results.groupby(
+
+    valid_hits = blast_results.groupby(
         by=['specimen', 'qseqid'], group_keys=False)
-    blast_results = blast_results.apply(select_valid_hits, ranks[::-1])
+    valid_hits = valid_hits.apply(select_valid_hits, ranks[::-1])
+
+    if args.hits_below_threshold:
+        """
+        Store all the hits to append to blast_results details later
+        """
+        hits_below_threshold = blast_results[
+            ~blast_results.index.isin(valid_hits.index)]
+
+    blast_results = valid_hits
 
     if blast_results.empty:
         log.info('all blast results filtered, returning [no blast results]')
@@ -691,7 +708,7 @@ def action(args):
         blast_results = pd.DataFrame(columns=assignment_columns)
     else:
         blast_results_post_len = len(blast_results)
-        log.info('{} valid hits selected ({:.0%})'.format(
+        log.info('{} ({:.0%}) valid hits selected'.format(
             blast_results_post_len,
             blast_results_post_len / blast_results_len))
 
@@ -748,14 +765,6 @@ def action(args):
     no_hits = blast_results['sseqid'].isnull()
     blast_results.loc[no_hits, 'assignment'] = '[no blast result]'
     blast_results.loc[no_hits, 'assignment_hash'] = 0
-
-    # merge back in blast hits that were
-    # filtered because they were below threshold
-    if args.hits_below_threshold:
-        everything = blast_results.merge(
-            results_belowthreshold, how='outer',)[blast_results.columns]
-        below_threshold = everything[
-            ~everything['accession'].isin(blast_results['accession'])]
 
     # concludes our blast details, on to output summary
     log.info('summarizing output')
@@ -863,6 +872,21 @@ def action(args):
                            'accession', 'qseqid', 'sseqid', 'starred',
                            'assignment_threshold']
 
+        if args.hits_below_threshold:
+            """
+            append assignment_thresholds and append to --details-out
+            """
+            deets_cols = hits_below_threshold.columns
+            deets_cols &= set(details_columns)
+            hits_below_threshold = hits_below_threshold[list(deets_cols)]
+            threshold_cols = ['specimen', 'qseqid', 'assignment_threshold']
+            assignment_thresholds = blast_results[threshold_cols]
+            assignment_thresholds = assignment_thresholds.drop_duplicates()
+            hits_below_threshold = hits_below_threshold.merge(
+                assignment_thresholds, how='left')
+            blast_results = pd.concat(
+                [blast_results, hits_below_threshold], ignore_index=True)
+
         # sort details for consistency and ease of viewing
         blast_results = blast_results.sort_values(by=details_columns)
 
@@ -870,21 +894,6 @@ def action(args):
             blast_results.to_csv(
                 out_details,
                 columns=details_columns,
-                header=True,
-                index=False,
-                float_format='%.2f')
-
-    if args.hits_below_threshold:
-        below_threshold = below_threshold.sort_values(
-            by=['specimen', 'qseqid', 'pident', 'qcovs', 'tax_name'],
-            ascending=[True, True, False, False, True])
-        with args.hits_below_threshold as hits_below_threshold:
-            below_threshold_columns = [
-                'specimen', 'tax_name', 'rank', 'tax_id',
-                'pident', 'qcovs', 'qseqid', 'accession', 'sseqid']
-            below_threshold.to_csv(
-                hits_below_threshold,
-                columns=below_threshold_columns,
                 header=True,
                 index=False,
                 float_format='%.2f')

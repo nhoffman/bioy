@@ -439,12 +439,13 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
     def test13(self):
         """
         Test ordering of assignment_id
-        """
 
-        # Note: This test was inspired by a case when upgrading from numpy 1.9.2 to 1.10.1 where,
-        # with sort_index we were using an "unstable" sort on a field (specimen) with only one 
-        # value, and our classifications became unsorted.  Data here is derived from that test,
-        # previously would have failed this test, and subsequently passes
+        Note: This test was inspired by a case when upgrading
+        from numpy 1.9.2 to 1.10.1 where, with sort_index we were using
+        an "unstable" sort on a field (specimen) with only one value, and
+        our classifications became unsorted.  Data here is derived from that
+        test, previously would have failed this test, and subsequently passes
+        """
         thisdatadir = self.thisdatadir
 
         this_test = sys._getframe().f_code.co_name
@@ -461,8 +462,7 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
         classify_ref = os.path.join(
             thisdatadir, this_test, 'classifications.csv.bz2')
 
-        args = [
-                '--specimen', 'specimen',
+        args = ['--specimen', 'specimen',
                 '--weights', weights,
                 '--out', classify_out,
                 blast, seq_info, taxonomy]
@@ -473,3 +473,36 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
 
+    def test14(self):
+        """
+        Test --hits-below-threshold
+        """
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        blast = os.path.join(thisdatadir, 'blast.csv.bz2')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
+
+        classify_ref = os.path.join(
+            thisdatadir, this_test, 'classifications.csv.bz2')
+        details_ref = os.path.join(
+            thisdatadir, this_test, 'details.csv.bz2')
+
+        args = ['--hits-below-threshold',
+                '--details-out', details_out,
+                '--out', classify_out,
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        self.assertTrue(filecmp.cmp(classify_ref, classify_out))
+        self.assertTrue(filecmp.cmp(details_ref, details_out))
