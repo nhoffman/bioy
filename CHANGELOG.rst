@@ -2,9 +2,10 @@
  Changes for bioy
 ==================
 
-1.10.dev
+1.11
 ========
- * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (issue: 44)
+ * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (GH 44)
+ * ``bioy classifier --hits-below-threshold`` switch will append hits below the threshold to ``--details-out`` file (GH 41)
 
 1.10
 =====
@@ -14,19 +15,19 @@
 
 1.9.4
 =====
- * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (issue: 38)
+ * fixed a bug when duplicate values are in the specimen map cause duplicate entries in details (GH 38)
 
 1.9.3
 ==========
- * added a workaround to get past a datatype inference bug in Pandas (issue: 36)
+ * added a workaround to get past a datatype inference bug in Pandas (GH 36)
 
 1.9.2
 ==========
  * dynamically assigning rank thresholds and refreshed the available tax_ids in 
-   data/rank_thresholds.csv (issue: 32)
- * exchanged target_rank with condensed_rank (issue: 31)
- * status messages now go to 100% (issue: 26)
- * fixed bug when no blast hits (issue: 34)
+   data/rank_thresholds.csv (GH 32)
+ * exchanged target_rank with condensed_rank (GH 31)
+ * status messages now go to 100% (GH 26)
+ * fixed bug when no blast hits (GH 34)
 
 1.9.1
 =====
