@@ -87,7 +87,7 @@ def retrieve_record(seq_id, seq_start, seq_stop):
     if seq_start and seq_stop:
         assert(len(sequence) <= abs(int(seq_stop) - int(seq_start))+1)
 
-    seqids = [seqid for seqid in seq_record['GBSeq_other-seqids'] if 'gb' in seqid]
+    seqids = ''.join(seq_record['GBSeq_other-seqids'])
     assert(len(seqids) >= 1)
     seqid = ''.join(seqids) # Joins genbank ids, which include '|'
     return SeqRecord(Seq(sequence, NucleotideAlphabet),
