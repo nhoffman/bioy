@@ -561,6 +561,12 @@ def build_parser(parser):
         (NOT IMPLEMENTED)""")
     parser.add_argument(
         '--limit', type=int, help='limit number of blast results')
+    parser.add_argument(
+        '--best', type=int, default=0,
+        help="""for each query sequence, filter out all but the best N hits,
+        based on the number of mismatches. NOTE: If using this option, blast
+        results MUST contain "mismatch" column and column headers
+        """)
 
 
 def action(args):
@@ -572,6 +578,8 @@ def action(args):
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
     header = 0 if args.has_header else None
     usecols = ['qseqid', 'sseqid', 'pident', 'qcovs']
+    if args.best > 0:
+        usecols.append('mismatch')
     log.info('loading blast results')
     blast_results = pd.read_csv(
         args.blast_file,
@@ -707,10 +715,28 @@ def action(args):
         assignment_columns += blast_results_columns.tolist()
         blast_results = pd.DataFrame(columns=assignment_columns)
     else:
+
         blast_results_post_len = len(blast_results)
         log.info('{} ({:.0%}) valid hits selected'.format(
             blast_results_post_len,
             blast_results_post_len / blast_results_len))
+
+        if args.best > 0:
+            blast_results_len = len(blast_results)
+            query_groups = blast_results.groupby(by=['specimen', 'qseqid'])
+
+            # For each query, determine the mismatches of the Nth best hit
+            mismatch_threshold = query_groups.apply(lambda g: g['mismatch'].nsmallest(args.best).iloc[-1])
+            # For each hit, compare that hit's mismatches with its group's Nth
+            # best hit's mismatches
+            meets_threshold = blast_results.apply(lambda r: r.mismatch <= mismatch_threshold[(r.specimen, r.qseqid)], axis=1)
+            # Filter hits that fall below their geoups' thresholds
+            blast_results = blast_results[meets_threshold]
+
+            blast_results_post_len = len(blast_results)
+            log.info('{} ({:.0%}) hits remain after filtering on mismatches (--best)'.format(
+                blast_results_post_len,
+                blast_results_post_len / blast_results_len))
 
         # drop unneeded tax and threshold columns to free memory
         for c in ranks + rank_thresholds_cols:
