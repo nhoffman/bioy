@@ -467,6 +467,16 @@ def join_thresholds(df, thresholds, ranks):
     return with_thresholds
 
 
+def get_compression(io):
+    if io is sys.stdout:
+        compression = None
+    else:
+        compress_ops = {'.gz': 'gzip', '.bz2': 'bz2'}
+        ext = os.path.splitext(io)[-1]
+        compression = compress_ops.get(ext, None)
+    return compression
+
+
 def build_parser(parser):
     # required inputs
     parser.add_argument(
@@ -846,11 +856,11 @@ def action(args):
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
-    compress_ops = {'.gz': 'gzip', '.bz2': 'bz2'}
-
-    out_compression = compress_ops.get(os.path.splitext(args.out)[-1], None)
     output.to_csv(
-        args.out, index=True, float_format='%.2f', compression=out_compression)
+        args.out,
+        index=True,
+        float_format='%.2f',
+        compression=get_compression(args.out))
 
     # output to details.csv.bz2
     if args.details_out:
@@ -894,11 +904,9 @@ def action(args):
         # sort details for consistency and ease of viewing
         blast_results = blast_results.sort_values(by=details_columns)
 
-        details_compression = compress_ops.get(
-            os.path.splitext(args.details_out)[-1], None)
         blast_results.to_csv(
             args.details_out,
-            compression=details_compression,
+            compression=get_compression(args.details_out),
             columns=details_columns,
             header=True,
             index=False,
