@@ -259,7 +259,8 @@ def star(df, starred):
     return df
 
 
-def condense_ids(df, tax_dict, ranks, max_group_size):
+def condense_ids(
+        df, tax_dict, ranks, max_group_size, threshold_assignments=False):
     """Create mapping from tax_id to its
     condensed id and set assignment hash.
     """
@@ -274,7 +275,12 @@ def condense_ids(df, tax_dict, ranks, max_group_size):
         condensed.items(),
         columns=[ASSIGNMENT_TAX_ID, 'condensed_id'])
     condensed = condensed.set_index(ASSIGNMENT_TAX_ID)
-    assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
+
+    if threshold_assignments:
+        assignment_hash = hash(frozenset(condensed.index.unique()))
+    else:
+        assignment_hash = hash(frozenset(condensed['condensed_id'].unique()))
+
     condensed['assignment_hash'] = assignment_hash
     return df.join(condensed, on=ASSIGNMENT_TAX_ID)
 
@@ -571,6 +577,11 @@ def build_parser(parser):
         help="""include column with percent sseqids per assignment_id
         (NOT IMPLEMENTED)""")
     parser.add_argument(
+        '--split-condensed-assignments',
+        action='store_true',
+        dest='threshold_assignments',
+        help=('Do not combine common condensed assignments'))
+    parser.add_argument(
         '--limit', type=int, help='limit number of blast results')
 
 
@@ -748,7 +759,11 @@ def action(args):
         blast_results = blast_results.groupby(
             by=['specimen', 'qseqid'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
-            condense_ids, tax_dict, ranks, args.max_group_size)
+            condense_ids,
+            tax_dict,
+            ranks,
+            args.max_group_size,
+            threshold_assignments=args.threshold_assignments)
 
         blast_results = blast_results.join(
             taxonomy[['rank']], on='condensed_id', rsuffix='_condensed')
