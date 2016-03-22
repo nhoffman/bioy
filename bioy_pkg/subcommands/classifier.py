@@ -510,16 +510,22 @@ def build_parser(parser):
     parser.add_argument(
         '-O', '--details-out', type=utils.Opener('w'), metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
-    parser.add_argument(
-        '--hits-below-threshold',
-        action='store_true',
-        help=('Hits that were below the best-rank threshold '
-              'will be included in the details'))
 
     # switches and options
     parser.add_argument(
         '--details-full', action='store_true',
         help='do not limit out_details to only larget cluster per assignment')
+    parser.add_argument(
+        '--hits-below-threshold',
+        action='store_true',
+        help=('Hits that were below the best-rank threshold '
+              'will be included in the details'))
+    parser.add_argument(
+        '--include-ref-rank',
+        action='append',
+        help=("Given a single rank (species,genus,etc), include each reference "
+              "sequence's tax_id as $\{rank\}_id and its taxonomic name as "
+              "$\{rank\}_name in details output "))
     parser.add_argument(
         '--group-def', metavar='INTEGER', action='append',
         default=[], help="""define a group threshold for a
@@ -758,6 +764,13 @@ def action(args):
             by=['specimen', 'assignment_hash'], sort=False, group_keys=False)
         blast_results = blast_results.apply(assign, tax_dict)
 
+        # Foreach ref rank:
+        # - merge with taxonomy, extract rank_id, rank_name
+        for rank in args.include_ref_rank:
+            # TODO: verify that this rank_id is NOT float
+            blast_results[rank + '_id'] = blast_results.merge(taxonomy, left_on='tax_id', right_index=True, how='left' )[rank].fillna(-1)
+            blast_results[rank + '_name'] = blast_results.merge(taxonomy, left_on=rank + '_id', right_index=True, how='left')['tax_name_y']
+
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
 
@@ -871,6 +884,9 @@ def action(args):
                            'tax_id', ASSIGNMENT_TAX_ID, 'condensed_id',
                            'accession', 'qseqid', 'sseqid', 'starred',
                            'assignment_threshold']
+        ref_rank_columns = [rank + '_id' for rank in args.include_ref_rank]
+        ref_rank_columns += [rank + '_name' for rank in args.include_ref_rank]
+        details_columns += ref_rank_columns
 
         if args.hits_below_threshold:
             """
