@@ -180,15 +180,14 @@ assigned tax_ids of a higher threshold that *could* represent invalid tax_ids
 (tax_ids that may *not* have passed the rank threshold).
 """
 
+import os
 import sys
 import logging
-
-from os import path
 
 import pandas as pd
 import math
 
-from bioy_pkg import sequtils, _data as datadir, utils
+from bioy_pkg import sequtils, _data as datadir
 
 log = logging.getLogger(__name__)
 
@@ -403,7 +402,7 @@ def pct(s):
 
 
 def load_rank_thresholds(
-        path=path.join(datadir, 'rank_thresholds.csv'), usecols=None):
+        path=os.path.join(datadir, 'rank_thresholds.csv'), usecols=None):
     """Load a rank-thresholds file.  If no argument is specified the default
     rank_threshold_defaults.csv file will be loaded.
     """
@@ -504,11 +503,13 @@ def build_parser(parser):
 
     # common outputs
     parser.add_argument(
-        '-o', '--out', default=sys.stdout, type=utils.Opener('w'),
+        '-o', '--out',
+        default=sys.stdout,
         metavar='FILE',
         help="Classification results.")
     parser.add_argument(
-        '-O', '--details-out', type=utils.Opener('w'), metavar='FILE',
+        '-O', '--details-out',
+        metavar='FILE',
         help="""Optional details of taxonomic assignments.""")
 
     # switches and options
@@ -858,8 +859,11 @@ def action(args):
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
-    with args.out as out:
-        output.to_csv(out, index=True, float_format='%.2f')
+    compress_ops = {'.gz': 'gzip', '.bz2': 'bz2'}
+
+    out_compression = compress_ops.get(os.path.splitext(args.out)[-1], None)
+    output.to_csv(
+        args.out, index=True, float_format='%.2f', compression=out_compression)
 
     # output to details.csv.bz2
     if args.details_out:
@@ -906,10 +910,12 @@ def action(args):
         # sort details for consistency and ease of viewing
         blast_results = blast_results.sort_values(by=details_columns)
 
-        with args.details_out as out_details:
-            blast_results.to_csv(
-                out_details,
-                columns=details_columns,
-                header=True,
-                index=False,
-                float_format='%.2f')
+        details_compression = compress_ops.get(
+            os.path.splitext(args.details_out)[-1], None)
+        blast_results.to_csv(
+            args.details_out,
+            compression=details_compression,
+            columns=details_columns,
+            header=True,
+            index=False,
+            float_format='%.2f')
