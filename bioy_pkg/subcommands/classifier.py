@@ -259,9 +259,20 @@ def star(df, starred):
     return df
 
 
-def condense_ids(df, tax_dict, ranks, max_group_size):
-    """Create mapping from tax_id to its
-    condensed id and set assignment hash.
+def condense_ids(
+        df, tax_dict, ranks, max_group_size, threshold_assignments=False):
+    """
+    Create mapping from tax_id to its condensed id.  Also creates the
+    assignment hash on either the condensed_id or assignment_tax_id decided
+    by the --split-condensed-assignments switch.
+
+    By taking a hash of the set (frozenset) of ids the qseqid is given a
+    unique identifier (the hash).  Later, we will use this hash and
+    assign an ssignment name based on either the set of condensed_ids or
+    assignment_tax_ids.  The modivation for using a hash rather than
+    the actual assignment text for grouping is that the assignment text
+    can contains extra annotations that are independent of which
+    assignment group a qseqid belongs to such as a 100% id star.
     """
 
     condensed = sequtils.condense_ids(
@@ -274,7 +285,12 @@ def condense_ids(df, tax_dict, ranks, max_group_size):
         condensed.items(),
         columns=[ASSIGNMENT_TAX_ID, 'condensed_id'])
     condensed = condensed.set_index(ASSIGNMENT_TAX_ID)
-    assignment_hash = hash(frozenset(condensed.condensed_id.unique()))
+
+    if threshold_assignments:
+        assignment_hash = hash(frozenset(condensed.index.unique()))
+    else:
+        assignment_hash = hash(frozenset(condensed['condensed_id'].unique()))
+
     condensed['assignment_hash'] = assignment_hash
     return df.join(condensed, on=ASSIGNMENT_TAX_ID)
 
@@ -467,6 +483,16 @@ def join_thresholds(df, thresholds, ranks):
     return with_thresholds
 
 
+def get_compression(io):
+    if io is sys.stdout:
+        compression = None
+    else:
+        compress_ops = {'.gz': 'gzip', '.bz2': 'bz2'}
+        ext = os.path.splitext(io)[-1]
+        compression = compress_ops.get(ext, None)
+    return compression
+
+
 def build_parser(parser):
     # required inputs
     parser.add_argument(
@@ -567,6 +593,11 @@ def build_parser(parser):
         '--pct-reference', action='store_true',
         help="""include column with percent sseqids per assignment_id
         (NOT IMPLEMENTED)""")
+    parser.add_argument(
+        '--split-condensed-assignments',
+        action='store_true',
+        dest='threshold_assignments',
+        help=('Do not combine common condensed assignments'))
     parser.add_argument(
         '--limit', type=int, help='limit number of blast results')
 
@@ -745,7 +776,11 @@ def action(args):
         blast_results = blast_results.groupby(
             by=['specimen', 'qseqid'], sort=False, group_keys=False)
         blast_results = blast_results.apply(
-            condense_ids, tax_dict, ranks, args.max_group_size)
+            condense_ids,
+            tax_dict,
+            ranks,
+            args.max_group_size,
+            threshold_assignments=args.threshold_assignments)
 
         blast_results = blast_results.join(
             taxonomy[['rank']], on='condensed_id', rsuffix='_condensed')
@@ -859,11 +894,11 @@ def action(args):
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
     # output results
-    compress_ops = {'.gz': 'gzip', '.bz2': 'bz2'}
-
-    out_compression = compress_ops.get(os.path.splitext(args.out)[-1], None)
     output.to_csv(
-        args.out, index=True, float_format='%.2f', compression=out_compression)
+        args.out,
+        index=True,
+        float_format='%.2f',
+        compression=get_compression(args.out))
 
     # output to details.csv.bz2
     if args.details_out:
@@ -910,11 +945,9 @@ def action(args):
         # sort details for consistency and ease of viewing
         blast_results = blast_results.sort_values(by=details_columns)
 
-        details_compression = compress_ops.get(
-            os.path.splitext(args.details_out)[-1], None)
         blast_results.to_csv(
             args.details_out,
-            compression=details_compression,
+            compression=get_compression(args.details_out),
             columns=details_columns,
             header=True,
             index=False,
