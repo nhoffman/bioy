@@ -2,6 +2,10 @@
  Changes for bioy
 ==================
 
+1.11-dev
+=====
+ * `bioy classifier --include-ref-rank $RANK` will pull in ${RANK}_id and ${RANK}_name columns from taxonomy into details.
+
 1.11
 ========
  * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (GH 44)
