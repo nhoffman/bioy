@@ -306,7 +306,7 @@ def best_rank(s, ranks):
 
     `ranks' are sorted with less specific first for example:
 
-    ['root', 'kingdom', 'phylum', 'order', 'family', 'genus', 'species']
+    ['root', 'kingdom', 'phylum', 'order', 'family', 'genus', 'species_group', 'species']
 
     so when sorting the indexes the most specific
     rank will be in the iloc[-1] location
@@ -769,7 +769,7 @@ def action(args):
         # Foreach ref rank:
         # - merge with taxonomy, extract rank_id, rank_name
         for rank in args.include_ref_rank:
-            blast_results[rank + '_id'] = blast_results.merge(taxonomy, left_on='tax_id', right_index=True, how='left' )[rank].fillna(-1)
+            blast_results[rank + '_id'] = blast_results.merge(taxonomy, left_on='tax_id', right_index=True, how='left' )[rank].fillna(0)
             blast_results[rank + '_name'] = blast_results.merge(taxonomy, left_on=rank + '_id', right_index=True, how='left')['tax_name_y']
 
     # merge qseqids that have no hits back into blast_results
