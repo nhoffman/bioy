@@ -261,8 +261,18 @@ def star(df, starred):
 
 def condense_ids(
         df, tax_dict, ranks, max_group_size, threshold_assignments=False):
-    """Create mapping from tax_id to its
-    condensed id and set assignment hash.
+    """
+    Create mapping from tax_id to its condensed id.  Also creates the
+    assignment hash on either the condensed_id or assignment_tax_id decided
+    by the --split-condensed-assignments switch.
+
+    By taking a hash of the set (frozenset) of ids the qseqid is given a
+    unique identifier (the hash).  Later, we will use this hash and
+    assign an ssignment name based on either the set of condensed_ids or
+    assignment_tax_ids.  The modivation for using a hash rather than
+    the actual assignment text for grouping is that the assignment text
+    can contains extra annotations that are independent of which
+    assignment group a qseqid belongs to such as a 100% id star.
     """
 
     condensed = sequtils.condense_ids(
