@@ -523,6 +523,7 @@ def build_parser(parser):
     parser.add_argument(
         '--include-ref-rank',
         action='append',
+        default=[],
         help=("Given a single rank (species,genus,etc), include each reference "
               "sequence's tax_id as $\{rank\}_id and its taxonomic name as "
               "$\{rank\}_name in details output "))
@@ -767,7 +768,6 @@ def action(args):
         # Foreach ref rank:
         # - merge with taxonomy, extract rank_id, rank_name
         for rank in args.include_ref_rank:
-            # TODO: verify that this rank_id is NOT float
             blast_results[rank + '_id'] = blast_results.merge(taxonomy, left_on='tax_id', right_index=True, how='left' )[rank].fillna(-1)
             blast_results[rank + '_name'] = blast_results.merge(taxonomy, left_on=rank + '_id', right_index=True, how='left')['tax_name_y']
 
