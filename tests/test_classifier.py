@@ -4,6 +4,8 @@ Test classifier
 
 import logging
 import os
+import csv
+from bz2 import BZ2File
 
 import filecmp
 import sys
@@ -506,3 +508,42 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         self.assertTrue(filecmp.cmp(classify_ref, classify_out))
         self.assertTrue(filecmp.cmp(details_ref, details_out))
+
+    def test15(self):
+        """
+        Test --best-n-hits
+        """
+        thisdatadir = self.thisdatadir
+
+        this_test = sys._getframe().f_code.co_name
+
+        # Blast results contain:
+        # 2 strep mutans, 0 mismatch
+        # 1 strep troglodytae, 2 mismatch
+        # 1 strep infantarius, 3 mismatch
+        # All (artificially) > 99%
+        blast = os.path.join(thisdatadir, 'blast_3strepto.csv')
+        taxonomy = os.path.join(thisdatadir, 'taxonomy.csv.bz2')
+        seq_info = os.path.join(thisdatadir, 'seq_info.csv.bz2')
+
+        outdir = self.mkoutdir()
+
+        classify_out = os.path.join(outdir, 'classifications.csv.bz2')
+        details_out = os.path.join(outdir, 'details.csv.bz2')
+
+        args = [
+                '--best-n-hits', 3,
+                '--details-out', details_out,
+                '--out', classify_out,
+                '--has-header',
+                blast, seq_info, taxonomy]
+
+        log.info(self.log_info.format(' '.join(map(str, args))))
+
+        self.main(args)
+
+        names = list(set([line['tax_name'] for line in csv.DictReader(BZ2File(details_out))]))
+
+        # Normally we would expect 4 details rows spanning 3 tax_names, lending to the classification "Streptococcus infantarius/mutans*/troglodytae"
+        # With --best-n-hits, we expect 3 details rows lending to the classification
+        self.assertTrue(len(lines) == 2)
