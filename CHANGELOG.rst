@@ -2,6 +2,11 @@
  Changes for bioy
 ==================
 
+1.11.dev
+========
+ * ``bioy --split-condensed-assignments`` to retain assignment threshold assignments regardless of common 
+   condense ids assignments (GH 53)
+
 1.11
 ========
  * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (GH 44)
