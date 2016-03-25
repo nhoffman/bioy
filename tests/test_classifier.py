@@ -290,8 +290,8 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         self.main(args)
 
-        self.assertTrue(os.path.getsize(classify_out) == 0)
-        self.assertTrue(os.path.getsize(details_out) == 0)
+        self.assertFalse(os.path.isfile(classify_out))
+        self.assertFalse(os.path.isfile(details_out))
 
     def test09(self):
         """
