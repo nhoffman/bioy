@@ -2,6 +2,11 @@
  Changes for bioy
 ==================
 
+1.11-dev
+=======
+ * ``bioy classifier --best-n-hits`` argument looks at each query sequence's Nth best blast hit, based on
+   number of mismatches, and disregards all hits for that query with greater mismatches
+
 1.10.dev
 ========
  * ``bioy --version`` outputs git tag release plus a count of additional commits above tag release (issue: 44)
