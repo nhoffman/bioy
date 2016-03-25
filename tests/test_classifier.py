@@ -546,4 +546,4 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
         # Normally we would expect 4 details rows spanning 3 tax_names, lending to the classification "Streptococcus infantarius/mutans*/troglodytae"
         # With --best-n-hits, we expect 3 details rows lending to the classification
-        self.assertTrue(len(lines) == 2)
+        self.assertTrue(len(names) == 2)
