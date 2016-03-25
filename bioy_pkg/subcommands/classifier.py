@@ -600,6 +600,12 @@ def build_parser(parser):
         help=('Do not combine common condensed assignments'))
     parser.add_argument(
         '--limit', type=int, help='limit number of blast results')
+    parser.add_argument(
+        '--best-n-hits', type=int,
+        help="""for each query sequence, filter out all but the best N hits,
+        based on the number of mismatches. NOTE: If using this option, blast
+        results MUST contain "mismatch" column and column headers
+        """)
 
 
 def action(args):
@@ -611,6 +617,8 @@ def action(args):
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
     header = 0 if args.has_header else None
     usecols = ['qseqid', 'sseqid', 'pident', 'qcovs']
+    if args.best_n_hits:
+        usecols.append('mismatch')
     log.info('loading blast results')
     blast_results = pd.read_csv(
         args.blast_file,
@@ -746,10 +754,31 @@ def action(args):
         assignment_columns += blast_results_columns.tolist()
         blast_results = pd.DataFrame(columns=assignment_columns)
     else:
+
         blast_results_post_len = len(blast_results)
         log.info('{} ({:.0%}) valid hits selected'.format(
             blast_results_post_len,
             blast_results_post_len / blast_results_len))
+
+        if args.best_n_hits:
+            blast_results_len = len(blast_results)
+
+            def filter_mismatches(df, best_n):
+                """
+                Filter all hits with more mismatches than the Nth best hit
+                """
+
+                threshold = df['mismatch'].nsmallest(best_n).iloc[-1]
+                return df[ df['mismatch'] <= threshold]
+
+            # Filter hits for each query
+            blast_results = blast_results.groupby(by=['specimen', 'qseqid'],
+                                                  group_keys=False).apply(filter_mismatches, args.best_n_hits)
+
+            blast_results_post_len = len(blast_results)
+            log.info('{} ({:.0%}) hits remain after filtering on mismatches (--best_n_hits)'.format(
+                blast_results_post_len,
+                blast_results_post_len / blast_results_len))
 
         # drop unneeded tax and threshold columns to free memory
         for c in ranks + rank_thresholds_cols:
