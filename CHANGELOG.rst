@@ -8,6 +8,7 @@
    number of mismatches, and disregards all hits for that query with greater mismatches
  * ``bioy --split-condensed-assignments`` to retain assignment threshold assignments regardless of common 
    condense ids assignments (GH 53)
+ * `bioy classifier --include-ref-rank $RANK` will pull in ${RANK}_id and ${RANK}_name columns from taxonomy into details.
 
 1.11
 ========
