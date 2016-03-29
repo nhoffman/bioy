@@ -2,7 +2,7 @@
  Changes for bioy
 ==================
 
-1.11-dev
+1.12
 =======
  * ``bioy classifier --best-n-hits`` argument looks at each query sequence's Nth best blast hit, based on (GH 46)
    number of mismatches, and disregards all hits for that query with greater mismatches
