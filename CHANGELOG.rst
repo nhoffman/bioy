@@ -2,13 +2,14 @@
  Changes for bioy
 ==================
 
-1.11-dev
+1.12
 =======
  * ``bioy classifier --best-n-hits`` argument looks at each query sequence's Nth best blast hit, based on (GH 46)
    number of mismatches, and disregards all hits for that query with greater mismatches
  * ``bioy --split-condensed-assignments`` to retain assignment threshold assignments regardless of common 
    condense ids assignments (GH 53)
- * `bioy classifier --include-ref-rank $RANK` will pull in ${RANK}_id and ${RANK}_name columns from taxonomy into details.
+ * ``bioy classifier --include-ref-rank $RANK`` will pull in ${RANK}_id and ${RANK}_name columns from taxonomy into details.
+ * Fixed ``bioy --split-condensed-assignments`` centroid bug (GH 58)
 
 1.11
 ========

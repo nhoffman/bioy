@@ -322,7 +322,8 @@ def best_rank(s, ranks):
 
     `ranks' are sorted with less specific first for example:
 
-    ['root', 'kingdom', 'phylum', 'order', 'family', 'genus', 'species_group', 'species']
+    ['root', 'kingdom', 'phylum', 'order', 'family',
+     'genus', 'species_group', 'species']
 
     so when sorting the indexes the most specific
     rank will be in the iloc[-1] location
@@ -551,7 +552,8 @@ def build_parser(parser):
         '--include-ref-rank',
         action='append',
         default=[],
-        help=("Given a single rank (species,genus,etc), include each reference "
+        help=("Given a single rank (species,genus,etc), "
+              "include each reference "
               "sequence's tax_id as $\{rank\}_id and its taxonomic name as "
               "$\{rank\}_name in details output "))
     parser.add_argument(
@@ -610,8 +612,8 @@ def build_parser(parser):
 
 def action(args):
     # for debugging:
-    pd.set_option('display.max_columns', None)
-    # pd.set_option('display.max_rows', None)
+#    pd.set_option('display.max_columns', None)
+#    pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
@@ -769,16 +771,18 @@ def action(args):
                 """
 
                 threshold = df['mismatch'].nsmallest(best_n).iloc[-1]
-                return df[ df['mismatch'] <= threshold]
+                return df[df['mismatch'] <= threshold]
 
             # Filter hits for each query
-            blast_results = blast_results.groupby(by=['specimen', 'qseqid'],
-                                                  group_keys=False).apply(filter_mismatches, args.best_n_hits)
+            blast_results = blast_results.groupby(
+                by=['specimen', 'qseqid'],
+                group_keys=False).apply(filter_mismatches, args.best_n_hits)
 
             blast_results_post_len = len(blast_results)
-            log.info('{} ({:.0%}) hits remain after filtering on mismatches (--best_n_hits)'.format(
-                blast_results_post_len,
-                blast_results_post_len / blast_results_len))
+            log.info('{} ({:.0%}) hits remain after filtering '
+                     'on mismatches (--best_n_hits)'.format(
+                         blast_results_post_len,
+                         blast_results_post_len / blast_results_len))
 
         # drop unneeded tax and threshold columns to free memory
         for c in ranks + rank_thresholds_cols:
@@ -833,8 +837,15 @@ def action(args):
         # Foreach ref rank:
         # - merge with taxonomy, extract rank_id, rank_name
         for rank in args.include_ref_rank:
-            blast_results[rank + '_id'] = blast_results.merge(taxonomy, left_on='tax_id', right_index=True, how='left' )[rank].fillna(0)
-            blast_results[rank + '_name'] = blast_results.merge(taxonomy, left_on=rank + '_id', right_index=True, how='left')['tax_name_y']
+            blast_results[rank + '_id'] = blast_results.merge(
+                taxonomy, left_on='tax_id',
+                right_index=True,
+                how='left')[rank].fillna(0)
+            blast_results[rank + '_name'] = blast_results.merge(
+                taxonomy,
+                left_on=rank + '_id',
+                right_index=True,
+                how='left')['tax_name_y']
 
     # merge qseqids that have no hits back into blast_results
     blast_results = blast_results.merge(qseqids, how='outer')
@@ -912,7 +923,7 @@ def action(args):
     columns = ['corrected'] if args.copy_numbers else ['reads']
     columns += ['clusters', 'assignment']
     output = output.sort_values(by=columns, ascending=False)
-    output = output.reset_index(level='assignment_hash', drop=True)
+    output = output.reset_index(level='assignment_hash')
 
     # Sort index (specimen) in preparation for groupby.
     # Use stable sort (mergesort) to preserve sortings (1-4);
@@ -922,11 +933,16 @@ def action(args):
     # one last grouping on the sorted output plus assignment ids by specimen
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
+    output_columns = ['assignment', 'max_percent', 'min_percent',
+                      'min_threshold', 'best_rank', 'reads', 'clusters',
+                      'pct_reads', 'corrected', 'pct_corrected']
+
     # output results
     output.to_csv(
         args.out,
         index=True,
         float_format='%.2f',
+        columns=output_columns,
         compression=get_compression(args.out))
 
     # output to details.csv.bz2
