@@ -612,8 +612,8 @@ def build_parser(parser):
 
 def action(args):
     # for debugging:
-#    pd.set_option('display.max_columns', None)
-#    pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_rows', None)
 
     # format blast data and add additional available information
     names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
@@ -939,6 +939,10 @@ def action(args):
         blast_results = blast_results.merge(output.reset_index(), how='left')
 
         if not args.details_full:
+            """
+            by using the assignment_threshold we will get multiple 'largest'
+            centroids for --max-group-size combined assignments
+            """
             # groupby will drop NA values so we must fill them with 0
             weights['assignment_threshold'] = weights[
                 'assignment_threshold'].fillna(0)
