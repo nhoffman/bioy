@@ -933,18 +933,6 @@ def action(args):
     # one last grouping on the sorted output plus assignment ids by specimen
     output = output.groupby(level="specimen", sort=False).apply(assignment_id)
 
-    output_columns = ['assignment', 'max_percent', 'min_percent',
-                      'min_threshold', 'best_rank', 'reads', 'clusters',
-                      'pct_reads', 'corrected', 'pct_corrected']
-
-    # output results
-    output.to_csv(
-        args.out,
-        index=True,
-        float_format='%.2f',
-        columns=output_columns,
-        compression=get_compression(args.out))
-
     # output to details.csv.bz2
     if args.details_out:
         # Annotate details with classification columns
@@ -997,3 +985,13 @@ def action(args):
             header=True,
             index=False,
             float_format='%.2f')
+
+    # was required to merge with details above but not needed now
+    output = output.drop('assignment_hash', axis=1)
+
+    # output results
+    output.to_csv(
+        args.out,
+        index=True,
+        float_format='%.2f',
+        compression=get_compression(args.out))
