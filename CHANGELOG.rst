@@ -2,6 +2,10 @@
  Changes for bioy
 ==================
 
+1.12-dev
+========
+ * new ``bioy ssearch_count`` output columns [tax_name, position, A, T, G, C, N, expected, naligns, nseqs, rank, id]
+
 1.12
 =======
  * ``bioy classifier --best-n-hits`` argument looks at each query sequence's Nth best blast hit, based on (GH 46)
