@@ -145,7 +145,7 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
 
     def test05(self):
         """
-        min-identity 99, max-identity 100
+        min-pident 99, max-pident 100
         """
 
         this_test = sys._getframe().f_code.co_name
@@ -167,8 +167,8 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--max-identity', '100',
-            '--min-identity', '99',
+            '--max-pident', '100',
+            '--min-pident', '99',
             '--out', classify_out,
             '--details-out', details_out,
             blast,
@@ -208,8 +208,8 @@ class TestClassifier(TestBase, TestCaseSuppressOutput):
             thisdatadir, this_test, 'details.csv.bz2')
 
         args = [
-            '--max-identity', '100',
-            '--min-identity', '99',
+            '--max-pident', '100',
+            '--min-pident', '99',
             '--specimen-map', specimen_map,
             '--weights', weights,
             '--copy-numbers', self.copy_numbers,

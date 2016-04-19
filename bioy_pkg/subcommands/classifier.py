@@ -497,117 +497,108 @@ def get_compression(io):
 def build_parser(parser):
     # required inputs
     parser.add_argument(
-        'blast_file',
-        help="""CSV tabular blast file of
-                query and subject hits, containing
-                at least {}.""".format(sequtils.BLAST_FORMAT_DEFAULT))
+        'blast', help='tabular blast file of query and subject hits')
     parser.add_argument(
-        'seq_info',
-        help='File mapping reference seq name to tax_id')
+        'seq_info', help='File mapping reference seq name to tax_id')
     parser.add_argument(
-        'taxonomy',
-        help="""Table defining the taxonomy for each tax_id""")
+        'taxonomy', help='Table defining the taxonomy for each tax_id')
+
+    blast_parser = parser.add_argument_group('blast input options')
+    blast_parser.add_argument(
+        '--has-header', action='store_true', help='if blast data has a header')
+    blast_parser.add_argument(
+        '--columns', default='qseqid,sseqid,pident,qstart,qend,qlen,qcovs',
+        help=('column specifiers. global query coverage can be '
+              'calculated by including the qstart, qend and qlen specifiers. '
+              'column "mismatch will filter out all but the best N hits based '
+              'on the number of mismatches.'))
+    blast_parser.add_argument(
+        '--tab', action='store_true', help='default: csv')
+
+    filters_parser = parser.add_argument_group('blast filtering options')
+    filters_parser.add_argument(
+        '--limit', type=int, help='limit number of blast results')
+    filters_parser.add_argument(
+        '--min-pident', metavar='PERCENT', type=float,
+        help='minimum identity threshold for accepting matches')
+    filters_parser.add_argument(
+        '--max-pident', metavar='PERCENT', type=float,
+        help='maximum identity threshold for accepting matches')
+    filters_parser.add_argument(
+        '--min-cluster-size', default=1, metavar='INTEGER', type=int,
+        help=('minimum cluster size to include '
+              'in classification output [%(default)s]'))
+    filters_parser.add_argument(
+        '--min-qcovs', type=float, metavar='PERCENT',
+        help='percent of alignment coverage of blast result')
+    filters_parser.add_argument(
+        '--best-n-hits', type=int, default=float('inf'),
+        help=('For each query sequence, filter out all but the best N hits. '
+              'Used in conjunction with blast "mismatch" column.'))
 
     # optional inputs
-    parser.add_argument(
+    opts_parser = parser.add_argument_group('optional inputs')
+    opts_parser.add_argument(
         '--copy-numbers', metavar='CSV',
-        help="""Estimated 16s rRNA gene copy number for each tax_ids
-        (CSV file with columns: tax_id, median)""")
-    parser.add_argument(
-        '--rank-thresholds', metavar='CSV',
-        help="""Columns [tax_id,ranks...]""")
-    parser.add_argument(
+        help=('Estimated 16s rRNA gene copy number for each tax_ids '
+              '(CSV file with columns: tax_id, median)'))
+    opts_parser.add_argument(
+        '--rank-thresholds', metavar='CSV', help='Columns [tax_id,ranks...]')
+    opts_group = opts_parser.add_mutually_exclusive_group(required=False)
+    opts_group.add_argument(
+        '--specimen', metavar='LABEL', help='Single group label for reads')
+    opts_group.add_argument(
         '--specimen-map', metavar='CSV',
-        help="""CSV file with columns (name, specimen) assigning sequences to
-        groups. The default behavior is to treat all query sequences
-        as belonging to one specimen.""")
-    parser.add_argument(
+        help=('CSV file with columns (name, specimen) assigning sequences to '
+              'groups. The default behavior is to treat all query sequences '
+              'as belonging to one specimen. OVERRIDES --specimen'))
+    opts_parser.add_argument(
         '-w', '--weights', metavar='CSV',
-        help="""Optional headless csv file with columns 'seqname',
-        'count' providing weights for each query sequence described in
-        the blast input (used, for example, to describe cluster sizes
-        for corresponding cluster centroids).""")
+        help=('Optional headless csv file with columns \'seqname\', '
+              '\'count\' providing weights for each query sequence described  '
+              'in the blast input (used, for example, to describe cluster '
+              'sizes for corresponding cluster centroids).'))
 
-    # common outputs
-    parser.add_argument(
-        '-o', '--out',
-        default=sys.stdout,
-        metavar='FILE',
-        help="Classification results.")
-    parser.add_argument(
-        '-O', '--details-out',
-        metavar='FILE',
-        help="""Optional details of taxonomic assignments.""")
+    assignment_parser = parser.add_argument_group('assignment options')
+    assignment_parser.add_argument(
+        '--starred', default=100.0, metavar='PERCENT', type=float,
+        help=('Names of organisms for which at least one reference '
+              'sequence has pairwise identity with a query sequence of at '
+              'least PERCENT will be marked with an asterisk [%(default)s]'))
+    assignment_parser.add_argument(
+        '--max-group-size', metavar='INTEGER', default=3, type=int,
+        help=('group multiple target-rank assignments that excede a '
+              'threshold to a higher rank [%(default)s]'))
+    assignment_parser.add_argument(
+        '--split-condensed-assignments',
+        action='store_true',
+        dest='threshold_assignments',
+        help=('Do not combine condensed identical assignments'))
 
-    # switches and options
-    parser.add_argument(
+    outs_parser = parser.add_argument_group('output options')
+    outs_parser.add_argument(
         '--details-full', action='store_true',
         help='do not limit out_details to only larget cluster per assignment')
-    parser.add_argument(
+    outs_parser.add_argument(
+        '--include-ref-rank', action='append', default=[],
+        help=('Given a single rank (species,genus,etc), '
+              'include each reference '
+              'sequence\'s tax_id as $\{rank\}_id and its taxonomic name as '
+              '$\{rank\}_name in details output'))
+    outs_parser.add_argument(
         '--hits-below-threshold',
         action='store_true',
         help=('Hits that were below the best-rank threshold '
               'will be included in the details'))
-    parser.add_argument(
-        '--include-ref-rank',
-        action='append',
-        default=[],
-        help=("Given a single rank (species,genus,etc), "
-              "include each reference "
-              "sequence's tax_id as $\{rank\}_id and its taxonomic name as "
-              "$\{rank\}_name in details output "))
-    parser.add_argument(
-        '--group-def', metavar='INTEGER', action='append',
-        default=[], help="""define a group threshold for a
-        particular rank overriding --max-group-size. example:
-        genus:2 (NOT IMPLEMENTED)""")
-    parser.add_argument(
-        '--has-header', action='store_true',
-        help='specify this if blast data has a header')
-    parser.add_argument(
-        '--min-identity', metavar='PERCENT', type=float,
-        help="""minimum identity threshold
-        for accepting matches""")
-    parser.add_argument(
-        '--max-identity', metavar='PERCENT', type=float,
-        help="""maximum identity threshold for
-        accepting matches""")
-    parser.add_argument(
-        '--min-cluster-size', default=1, metavar='INTEGER', type=int,
-        help="""minimum cluster size to include in
-        classification output [%(default)s]""")
-    parser.add_argument(
-        '--min-coverage', type=float, metavar='PERCENT',
-        help='percent of alignment coverage of blast result')
-    parser.add_argument(
-        '--specimen', metavar='LABEL',
-        help="""Single group label for reads""")
-    parser.add_argument(
-        '--starred', default=100.0, metavar='PERCENT', type=float,
-        help="""Names of organisms for which at least one reference
-        sequence has pairwise identity with a query sequence of at
-        least PERCENT will be marked with an asterisk [%(default)s]""")
-    parser.add_argument(
-        '--max-group-size', metavar='INTEGER', default=3, type=int,
-        help="""group multiple target-rank assignments that excede a
-        threshold to a higher rank [%(default)s]""")
-    parser.add_argument(
-        '--pct-reference', action='store_true',
-        help="""include column with percent sseqids per assignment_id
-        (NOT IMPLEMENTED)""")
-    parser.add_argument(
-        '--split-condensed-assignments',
-        action='store_true',
-        dest='threshold_assignments',
-        help=('Do not combine common condensed assignments'))
-    parser.add_argument(
-        '--limit', type=int, help='limit number of blast results')
-    parser.add_argument(
-        '--best-n-hits', type=int,
-        help="""for each query sequence, filter out all but the best N hits,
-        based on the number of mismatches. NOTE: If using this option, blast
-        results MUST contain "mismatch" column and column headers
-        """)
+    outs_parser.add_argument(
+        '-O', '--details-out',
+        metavar='FILE',
+        help='Optional details of taxonomic assignments.')
+    outs_parser.add_argument(
+        '-o', '--out',
+        default=sys.stdout,
+        metavar='FILE',
+        help="classification results [default: stdout]")
 
 
 def action(args):
@@ -615,20 +606,15 @@ def action(args):
     # pd.set_option('display.max_columns', None)
     # pd.set_option('display.max_rows', None)
 
-    # format blast data and add additional available information
-    names = None if args.has_header else sequtils.BLAST_HEADER_DEFAULT
-    header = 0 if args.has_header else None
-    usecols = ['qseqid', 'sseqid', 'pident', 'qcovs']
-    if args.best_n_hits:
-        usecols.append('mismatch')
     log.info('loading blast results')
     blast_results = pd.read_csv(
-        args.blast_file,
-        dtype=dict(qseqid=str, sseqid=str, pident=float, coverage=float),
-        names=names,
-        na_filter=True,  # False is faster
-        header=header,
-        usecols=usecols,
+        args.blast,
+        dtype={'qseqid': str, 'sseqid': str, 'pident': float,
+               'qcovs': float, 'qstart': float, 'qend': float,
+               'qlen': float, 'mismatch': float},
+        names=None if args.has_header else args.columns.split(','),
+        header=0 if args.has_header else None,
+        sep='\t' if args.tab else ',',
         nrows=args.limit)
 
     if blast_results.empty:
@@ -655,10 +641,16 @@ def action(args):
     # get a set of qseqids for identifying [no blast hits] after filtering
     qseqids = blast_results[['specimen', 'qseqid']].drop_duplicates()
 
-    blast_results_len = len(blast_results)
-
     log.info('successfully loaded {} blast results for {} query '
-             'sequences'.format(blast_results_len, len(qseqids)))
+             'sequences'.format(len(blast_results), len(qseqids)))
+
+    if ('qcovs' not in blast_results.columns and
+        all(col in blast_results.columns
+            for col in ['qstart', 'qend', 'qlen'])):
+        log.info('calculating global qcovs')
+        blast_results['qcovs'] = (
+            (blast_results['qend'] -
+                blast_results['qstart']) / blast_results['qlen'])
 
     blast_results = raw_filtering(blast_results)
 
@@ -762,7 +754,7 @@ def action(args):
             blast_results_post_len,
             blast_results_post_len / blast_results_len))
 
-        if args.best_n_hits:
+        if 'mismatch' in blast_results.columns:
             blast_results_len = len(blast_results)
 
             def filter_mismatches(df, best_n):
