@@ -439,7 +439,7 @@ def copy_corrections(copy_numbers, blast_results, user_file=None):
 
     # get root out (taxid: 1) and set it as the default correction value
 
-    # set index nana (no blast result) to the defaul value
+    # set index nana (no blast result) to the default value
     default = copy_numbers.get_value('1', 'median')
     default_entry = pd.DataFrame(default, index=[None], columns=['median'])
     copy_numbers = copy_numbers.append(default_entry)
@@ -644,6 +644,7 @@ def action(args):
     log.info('successfully loaded {} blast results for {} query '
              'sequences'.format(len(blast_results), len(qseqids)))
 
+    # calclute global coverage if no qcovs and qstart, qend and qlen present
     if ('qcovs' not in blast_results.columns and
         all(col in blast_results.columns
             for col in ['qstart', 'qend', 'qlen'])):
