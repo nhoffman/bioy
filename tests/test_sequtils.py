@@ -517,7 +517,7 @@ class TestCorrectCopyNumbers(TestBase):
     assignments = cPickle.load(assignments)
 
     copy_numbers = BZ2File(path.join(datadir, 'rrnDB_16S_copy_num.csv.bz2'))
-    copy_numbers = {c['tax_id']: c['median']
+    copy_numbers = {c['tax_id']: c['16S']
                     for c in csv.DictReader(copy_numbers)}
 
     def test01(self):
