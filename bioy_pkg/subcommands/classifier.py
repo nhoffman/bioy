@@ -536,8 +536,24 @@ def build_parser(parser):
         help=('For each query sequence, filter out all but the best N hits. '
               'Used in conjunction with blast "mismatch" column.'))
 
+    assignment_parser = parser.add_argument_group('assignment options')
+    assignment_parser.add_argument(
+        '--starred', default=100.0, metavar='PERCENT', type=float,
+        help=('Names of organisms for which at least one reference '
+              'sequence has pairwise identity with a query sequence of at '
+              'least PERCENT will be marked with an asterisk [%(default)s]'))
+    assignment_parser.add_argument(
+        '--max-group-size', metavar='INTEGER', default=3, type=int,
+        help=('group multiple target-rank assignments that excede a '
+              'threshold to a higher rank [%(default)s]'))
+    assignment_parser.add_argument(
+        '--split-condensed-assignments',
+        action='store_true',
+        dest='threshold_assignments',
+        help=('Do not combine condensed identical assignments'))
+
     # optional inputs
-    opts_parser = parser.add_argument_group('optional inputs')
+    opts_parser = parser.add_argument_group('other input options')
     opts_parser.add_argument(
         '--copy-numbers', metavar='CSV',
         help=('Estimated 16s rRNA gene copy number for each tax_ids '
@@ -558,22 +574,6 @@ def build_parser(parser):
               '\'count\' providing weights for each query sequence described  '
               'in the blast input (used, for example, to describe cluster '
               'sizes for corresponding cluster centroids).'))
-
-    assignment_parser = parser.add_argument_group('assignment options')
-    assignment_parser.add_argument(
-        '--starred', default=100.0, metavar='PERCENT', type=float,
-        help=('Names of organisms for which at least one reference '
-              'sequence has pairwise identity with a query sequence of at '
-              'least PERCENT will be marked with an asterisk [%(default)s]'))
-    assignment_parser.add_argument(
-        '--max-group-size', metavar='INTEGER', default=3, type=int,
-        help=('group multiple target-rank assignments that excede a '
-              'threshold to a higher rank [%(default)s]'))
-    assignment_parser.add_argument(
-        '--split-condensed-assignments',
-        action='store_true',
-        dest='threshold_assignments',
-        help=('Do not combine condensed identical assignments'))
 
     outs_parser = parser.add_argument_group('output options')
     outs_parser.add_argument(
