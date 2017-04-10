@@ -16,6 +16,8 @@
 """Create a full taxonomic table of thresholds based on a csv of defaults.
 
 Child tax_ids not specified in the defaults receive the parent threshold
+
+TODO: Move this into the rrndb pipeline repo
 """
 
 import sys
