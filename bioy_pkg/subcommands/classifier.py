@@ -32,7 +32,7 @@ Running the program
       --threads NUM         Number of threads (CPUs). Can also specify with
                             environment variable THREADS_ALLOC. [32]
       --copy-numbers CSV    Estimated 16s rRNA gene copy number for each
-                            tax_ids (CSV file with columns: tax_id, median)
+                            tax_ids (CSV file with columns: tax_id, 16S)
       --rank-thresholds CSV
                             Columns [tax_id,ranks...]
       --specimen-map CSV    CSV file with columns (name, specimen) assigning
@@ -115,7 +115,7 @@ copy-numbers
 Below is an *example* copy numbers csv with the required columns:
 
     ====== ==================== ======
-    tax_id tax_name             median
+    tax_id tax_name             16S
     ====== ==================== ======
     155977 Acaryochloris        2.00
     155978 Acaryochloris marina 2.00
@@ -434,14 +434,14 @@ def load_rank_thresholds(
 def copy_corrections(copy_numbers, blast_results, user_file=None):
     copy_numbers = pd.read_csv(
         copy_numbers,
-        dtype=dict(tax_id=str, median=float),
-        usecols=['tax_id', 'median']).set_index('tax_id')
+        dtype={'tax_id': str, '16S': float},
+        usecols=['tax_id', '16S']).set_index('tax_id')
 
     # get root out (taxid: 1) and set it as the default correction value
 
     # set index nana (no blast result) to the defaul value
-    default = copy_numbers.get_value('1', 'median')
-    default_entry = pd.DataFrame(default, index=[None], columns=['median'])
+    default = copy_numbers.get_value('1', '16S')
+    default_entry = pd.DataFrame(default, index=[None], columns=['16S'])
     copy_numbers = copy_numbers.append(default_entry)
 
     # do our copy number correction math
@@ -451,10 +451,10 @@ def copy_corrections(copy_numbers, blast_results, user_file=None):
     corrections = corrections.set_index(ASSIGNMENT_TAX_ID)
     corrections = corrections.join(copy_numbers)
     # any tax_id not present will receive default tax_id
-    corrections['median'] = corrections['median'].fillna(default)
+    corrections['16S'] = corrections['16S'].fillna(default)
     corrections = corrections.groupby(
         by=['specimen', 'assignment_hash'], sort=False)
-    corrections = corrections['median'].mean()
+    corrections = corrections['16S'].mean()
     return corrections
 
 
@@ -512,7 +512,7 @@ def build_parser(parser):
     parser.add_argument(
         '--copy-numbers', metavar='CSV',
         help="""Estimated 16s rRNA gene copy number for each tax_ids
-        (CSV file with columns: tax_id, median)""")
+        (CSV file with columns: tax_id, 16S)""")
     parser.add_argument(
         '--rank-thresholds', metavar='CSV',
         help="""Columns [tax_id,ranks...]""")

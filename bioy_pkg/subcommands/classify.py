@@ -51,7 +51,7 @@ def build_parser(parser):
     parser.add_argument('--copy-numbers',
             metavar = 'CSV',
             type = Opener(),
-            help = 'columns: tax_id, median')
+            help = 'columns: tax_id, 16S')
     parser.add_argument('-c', '--coverage',
             default = 95,
             metavar = 'PERCENT',
@@ -247,7 +247,7 @@ def action(args):
 
     if args.copy_numbers:
         copy_numbers = DictReader(args.copy_numbers)
-        copy_numbers = {d['tax_id']:float(d['median']) for d in copy_numbers}
+        copy_numbers = {d['tax_id']:float(d['16S']) for d in copy_numbers}
         fieldnames += ['corrected', 'pct_corrected']
     else:
         copy_numbers = {}

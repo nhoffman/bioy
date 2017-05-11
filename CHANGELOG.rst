@@ -5,6 +5,7 @@
 1.12-dev
 ========
  * new ``bioy ssearch_count`` output columns [tax_name, position, A, T, G, C, N, expected, naligns, nseqs, rank, id]
+ * ``bioy classifier --copy-numbers`` uses column 16S instead of median
 
 1.12
 =======
